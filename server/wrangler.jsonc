@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "joyofit-api",
+  // Same account as JoyoRogo (Dzulfikar.at@gmail.com's Account).
+  "account_id": "b7e6f8457bd39fa37a7eea5249799754",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -15,15 +17,13 @@
     {
       "binding": "DB",
       "database_name": "joyofit",
-      // PLACEHOLDER: replace with the id printed by `wrangler d1 create joyofit`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "fe079319-963d-454d-9625-35eee1462a8b",
       "migrations_dir": "migrations"
     }
   ],
   "r2_buckets": [
     {
       "binding": "IMPORTS",
-      // PLACEHOLDER: create it with `wrangler r2 bucket create joyofit-imports`, or rename it here.
       "bucket_name": "joyofit-imports"
     }
   ]

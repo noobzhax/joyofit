@@ -36,7 +36,7 @@
     ],
     "extra": {
       "joyorogoUrl": "https://api.joyorogo.com",
-      "cloudUrl": ""
+      "cloudUrl": "https://joyofit-api.dzulfikar-at.workers.dev"
     }
   }
 }
