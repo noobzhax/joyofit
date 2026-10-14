@@ -39,6 +39,12 @@ internal class NotificationForwarder(
   private var nextId = 1
   private var msgId: Short = 0
 
+  /** GB's `getNotificationId` counter, shared with the call notifications so message ids never collide. */
+  fun nextMessageId(): Short = synchronized(lock) {
+    msgId = NotificationPackets.nextMessageId(msgId)
+    msgId
+  }
+
   fun onPosted(sbn: StatusBarNotification) {
     if (!settings.notificationsEnabled) return
     val notification = sbn.notification ?: return

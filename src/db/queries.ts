@@ -26,3 +26,71 @@ export function listSleepSince(db: SQLiteDatabase, sinceSec: number): Promise<Sl
     sinceSec,
   );
 }
+
+/** A `workouts` row. `complete` is false while a part of its download failed; the next sync retries. */
+export interface WorkoutRow {
+  id: number;
+  workoutNumber: number;
+  /** Unix seconds. */
+  start: number;
+  end: number;
+  /** The raw Huawei sport type byte. */
+  sportType: number;
+  sportName: string;
+  /** Active seconds. */
+  duration: number;
+  /** Metres. */
+  distance: number;
+  calories: number;
+  avgHr: number | null;
+  maxHr: number | null;
+  steps: number;
+  complete: boolean;
+}
+
+/** One `workout_points` row: GPS points have lat/lon, data samples have hr and altitude. */
+export interface WorkoutPointRow {
+  ts: number;
+  lat: number | null;
+  lon: number | null;
+  alt: number | null;
+  hr: number | null;
+}
+
+const WORKOUT_COLUMNS = `id, workout_number AS workoutNumber, start, end, sport_type AS sportType,
+  sport_name AS sportName, duration, distance, calories, avg_hr AS avgHr, max_hr AS maxHr, steps,
+  complete != 0 AS complete`;
+
+type RawWorkout = Omit<WorkoutRow, 'complete'> & { complete: number };
+
+function toWorkout(row: RawWorkout): WorkoutRow {
+  return { ...row, complete: row.complete !== 0 };
+}
+
+/** Newest first. */
+export async function listWorkouts(db: SQLiteDatabase): Promise<WorkoutRow[]> {
+  const rows = await db.getAllAsync<RawWorkout>(
+    `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY start DESC`,
+  );
+  return rows.map(toWorkout);
+}
+
+export async function getWorkout(
+  db: SQLiteDatabase,
+  id: number,
+): Promise<{ workout: WorkoutRow; summaryJson: string } | null> {
+  const row = await db.getFirstAsync<RawWorkout & { summaryJson: string }>(
+    `SELECT ${WORKOUT_COLUMNS}, summary_json AS summaryJson FROM workouts WHERE id = ?`,
+    id,
+  );
+  if (!row) return null;
+  const { summaryJson, ...rest } = row;
+  return { workout: toWorkout(rest), summaryJson };
+}
+
+export function listWorkoutPoints(db: SQLiteDatabase, workoutId: number): Promise<WorkoutPointRow[]> {
+  return db.getAllAsync<WorkoutPointRow>(
+    'SELECT ts, lat, lon, alt, hr FROM workout_points WHERE workout_id = ? ORDER BY ts',
+    workoutId,
+  );
+}

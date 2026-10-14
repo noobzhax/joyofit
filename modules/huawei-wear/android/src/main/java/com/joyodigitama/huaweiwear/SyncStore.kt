@@ -25,11 +25,17 @@ internal class SyncSummary(
   val totalSteps: Int,
   val totalCalories: Int,
   val totalDistance: Int,
+  /** Workouts written (new or completed) by this sync's workout phase. */
+  val workouts: Int = 0,
 ) {
+  fun withWorkouts(count: Int) =
+    SyncSummary(from, to, samples, sleep, totalSteps, totalCalories, totalDistance, count)
+
   fun toJs(): Map<String, Any?> = mapOf(
     "from" to from,
     "to" to to,
     "samples" to samples,
+    "workouts" to workouts,
     "sleep" to sleep,
     "totals" to mapOf(
       "steps" to totalSteps,
@@ -52,7 +58,7 @@ internal class SyncStore(context: Context) {
   private var database: SQLiteDatabase? = null
 
   @Synchronized
-  private fun db(): SQLiteDatabase {
+  internal fun db(): SQLiteDatabase {
     database?.let { return it }
     file.parentFile?.mkdirs()
     val opened = SQLiteDatabase.openDatabase(
@@ -101,6 +107,9 @@ internal class SyncStore(context: Context) {
       }
     }
   }
+
+  /** Runs [block] against the open database; the Health Connect export reads stored rows through this. */
+  fun <T> read(block: (SQLiteDatabase) -> T): T = block(db())
 
   fun lastSync(address: String): Long? =
     db().rawQuery("SELECT last_sync FROM device WHERE address = ?", arrayOf(address)).use { cursor ->

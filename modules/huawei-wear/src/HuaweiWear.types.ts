@@ -70,6 +70,8 @@ export interface SyncSummary {
   samples: number;
   /** Number of sleep segments stored by this sync. */
   sleep: number;
+  /** Workouts stored (new, or completed after an earlier cut-off download) by this sync's workout phase. */
+  workouts: number;
   /** Today's totals as reported by the watch. */
   totals: FitnessTotals;
 }
@@ -138,6 +140,91 @@ export interface UserProfile {
   birthYear: number;
   sex: UserSex;
   dailyStepGoal: number;
+}
+
+export type HealthConnectAvailability = 'available' | 'update-required' | 'unavailable';
+
+/** Health Connect record types WatchFit writes; also the names in `granted` / `missing`. */
+export type HealthConnectRecordType =
+  | 'Steps'
+  | 'HeartRate'
+  | 'OxygenSaturation'
+  | 'RestingHeartRate'
+  | 'Distance'
+  | 'ActiveCaloriesBurned'
+  | 'SleepSession'
+  | 'ExerciseSession';
+
+/** State of the Health Connect export (write only; WatchFit never reads Health Connect). */
+export interface HealthConnectStatus {
+  /** `update-required`: the Health Connect app on the phone must be updated first. */
+  availability: HealthConnectAvailability;
+  /** Every sync is written to Health Connect (set by `setHealthConnectEnabled`). */
+  enabled: boolean;
+  /** Record types with write permission. */
+  granted: HealthConnectRecordType[];
+  /** Record types without write permission; these are skipped by the export. */
+  missing: HealthConnectRecordType[];
+  /** An export is running right now. */
+  exporting: boolean;
+  /** Unix seconds of the last export that finished without error, or null. */
+  lastExportSec: number | null;
+  /** Why the last export failed, or null. */
+  lastError: string | null;
+  /** What the last export wrote, e.g. `steps=120 distance=120 ... workouts=1`, or null. */
+  lastCounts: string | null;
+}
+
+/** Records written by one Health Connect export (a backfill). */
+export interface HealthConnectExportResult {
+  steps: number;
+  distance: number;
+  calories: number;
+  heartRate: number;
+  spo2: number;
+  restingHeartRate: number;
+  sleep: number;
+  workouts: number;
+}
+
+export type TemperatureUnit = 'celsius' | 'fahrenheit';
+
+/** `current`: the phone's coarse location. `city`: the city chosen with `setWeatherCity`. */
+export type WeatherLocationMode = 'current' | 'city';
+
+/** A city found by Open-Meteo geocoding. */
+export interface WeatherPlace {
+  /** Shown on the watch; null for a current position that could not be named. */
+  name: string | null;
+  latitude: number;
+  longitude: number;
+  /** Region and country, e.g. "West Java, Indonesia". */
+  detail: string | null;
+}
+
+/** Weather settings and what the last push to the watch did. */
+export interface WeatherStatus {
+  /** Off by default: weather needs the internet and the phone's location. */
+  enabled: boolean;
+  unit: TemperatureUnit;
+  locationMode: WeatherLocationMode;
+  /** Minutes between pushes while the watch is connected (default 60). */
+  intervalMinutes: number;
+  /** The chosen city, used when `locationMode` is `city`. */
+  city: WeatherPlace | null;
+  /** ACCESS_COARSE_LOCATION (or fine) is granted. Needed for `current`. */
+  locationPermission: boolean;
+  /** The connected watch lists the weather service; null when no watch is connected. */
+  watchSupported: boolean | null;
+  /** Unix seconds of the last push that reached the watch in this process, or null. */
+  lastPushAt: number | null;
+  /** Why the last attempt failed, or null. */
+  lastError: string | null;
+  /** Temperature of the last push, whole degrees Celsius. */
+  lastTemperatureC: number | null;
+  /** Huawei icon name of the last push, e.g. `SUNNY`, `LIGHT_RAIN`. */
+  lastCondition: string | null;
+  lastLocationName: string | null;
 }
 
 export type HuaweiWearModuleEvents = {

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.joyodigitama.huaweiwear.BackgroundPlanningTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:47.347Z" hostname="dzul" time="0.023">
+<testsuite name="com.joyodigitama.huaweiwear.BackgroundPlanningTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:44.809Z" hostname="dzul" time="0.006">
   <properties/>
-  <testcase name="laterSyncsOverlapByOneHour" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.001"/>
-  <testcase name="backoffDoublesUpToFiveMinutes" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.019"/>
-  <testcase name="firstSyncLooksBackSevenDays" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.0"/>
+  <testcase name="laterSyncsOverlapByOneHour" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.002"/>
+  <testcase name="backoffDoublesUpToFiveMinutes" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.002"/>
+  <testcase name="firstSyncLooksBackSevenDays" classname="com.joyodigitama.huaweiwear.BackgroundPlanningTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

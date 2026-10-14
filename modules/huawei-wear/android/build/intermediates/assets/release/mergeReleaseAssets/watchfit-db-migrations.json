@@ -6,5 +6,10 @@
   ],
   [
     "ALTER TABLE sleep_segments ADD COLUMN stage TEXT"
+  ],
+  [
+    "CREATE TABLE workouts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, workout_number INTEGER NOT NULL, start INTEGER NOT NULL UNIQUE, end INTEGER NOT NULL, sport_type INTEGER NOT NULL, sport_name TEXT NOT NULL, duration INTEGER NOT NULL, distance INTEGER NOT NULL, calories INTEGER NOT NULL, avg_hr INTEGER, max_hr INTEGER, steps INTEGER NOT NULL, summary_json TEXT NOT NULL, complete INTEGER NOT NULL DEFAULT 1)",
+    "CREATE TABLE workout_points (workout_id INTEGER NOT NULL, ts INTEGER NOT NULL, lat REAL, lon REAL, alt REAL, hr INTEGER)",
+    "CREATE INDEX workout_points_by_workout ON workout_points (workout_id, ts)"
   ]
 ]

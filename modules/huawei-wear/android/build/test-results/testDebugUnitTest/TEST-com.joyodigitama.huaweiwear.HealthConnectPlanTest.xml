@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.joyodigitama.huaweiwear.HealthConnectPlanTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:46.571Z" hostname="dzul" time="0.025">
+  <properties/>
+  <testcase name="intervalsSkipZeroMinutesAndEarlierSamples" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.003"/>
+  <testcase name="sessionsEndedBeforeTheWindowAreNotRewritten" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.009"/>
+  <testcase name="heartRateIsOneSeriesPerHourWithValidReadingsOnly" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.004"/>
+  <testcase name="sameMinuteAlwaysGetsTheSameId" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.0"/>
+  <testcase name="sleepStagesDoNotOverlapAndSameStagesMerge" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.001"/>
+  <testcase name="sleepSpansSplitIntoSessionsAtLongGaps" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.004"/>
+  <testcase name="spo2KeepsOnlyPercentages" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.001"/>
+  <testcase name="restingHeartRateIsTheLatestReadingOfEachDay" classname="com.joyodigitama.huaweiwear.HealthConnectPlanTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

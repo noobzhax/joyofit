@@ -15,13 +15,15 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-// Modified for watch-fit (AGPL-3.0-or-later): removed Earphones tests and FindPhone class assertion (packet classes not ported).
+// Modified for watch-fit (AGPL-3.0-or-later): removed Earphones tests (packet class not ported).
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.List;
+
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FindPhone;
 
 
 public class TestHuaweiPacket {
@@ -186,8 +188,7 @@ public class TestHuaweiPacket {
         HuaweiPacket packet = new HuaweiPacket(paramsProvider);
         packet = packet.parse(input);
 
-        // GB asserts FindPhone.Response here; that packet class is not ported, so dispatch falls back to the generic packet (still decrypted).
-        Assert.assertEquals(HuaweiPacket.class, packet.getClass());
+        Assert.assertEquals(FindPhone.Response.class, packet.getClass());
         Assert.assertEquals(0x0b, packet.serviceId);
         Assert.assertEquals(0x01, packet.commandId);
         Assert.assertTrue(packet.isEncrypted);

@@ -42,6 +42,7 @@ internal class HuaweiNotificationState(
   val supportsPromptPushMessage: Boolean get() = ((capabilities.toInt() shr 1) and 1) == 0
 
   val supportsIncomingNumber: Boolean get() = supportsConstraint(NotificationConstraintsType.incomingNumberSupport)
+  val incomingNumberFormat: Int get() = constraint(NotificationConstraintsType.incomingNumberFormat)
 
   val contentFormat: Int get() = constraint(NotificationConstraintsType.contentFormat)
   val contentLength: Int get() = constraint(NotificationConstraintsType.contentLength)

@@ -167,6 +167,15 @@ class HuaweiWearModule : Module() {
       runtime().setUserProfile(profileOf(profile))
     }
 
+    // Find my watch / find my phone, calls and alarms (PhoneFeaturesModuleApi.kt).
+    phoneFeaturesApi { runtime() }
+
+    // Health Connect export: status, permission request, enable + backfill (HealthConnectModuleApi.kt).
+    healthConnectApi { runtime() }
+
+    // Weather: settings, status, refresh (WeatherModuleApi.kt).
+    weatherApi { runtime() }
+
     OnDestroy {
       destroyed = true
       runtimeRef?.let {

@@ -31,8 +31,11 @@ export default function RootLayout() {
             }}>
             <Tabs.Screen name="index" options={{ title: 'Device' }} />
             <Tabs.Screen name="today" options={{ title: 'Today' }} />
+            <Tabs.Screen name="workouts" options={{ title: 'Workouts', headerShown: false }} />
             <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
             <Tabs.Screen name="log" options={{ title: 'Log' }} />
+            {/* Reached from Settings; not a tab. */}
+            <Tabs.Screen name="alarms" options={{ title: 'Alarms', href: null }} />
           </Tabs>
         </WatchProvider>
       </SQLiteProvider>

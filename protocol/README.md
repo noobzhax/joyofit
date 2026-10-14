@@ -57,8 +57,18 @@ never found a usable channel.
 | `02` | `04` | NotificationState | the watch-side notification switch (`0x81{02:on,03:on}`); sent in init and when forwarding is toggled, if `02/04` is supported |
 | `02` | `01` | NotificationAction | one notification: id, type (`7F` generic, `0F` email), title/sender/text elements, source package, optional key/channel/category/timestamp tags by ExpandCapability |
 | `02` | `06` | NotificationRemoveAction | dismisses one notification on the watch; only when ExpandCapability 94 or 120 is set |
+| `0B` FindPhone | `01` (watch → phone) | start / stop find phone | tag `01` bool: true = start; a missing tag means stop |
+| `0B` | `02` | StopFindPhone | `01` = 2, sent whenever the phone's alert ends |
+| `37` DataSync | `01` | ConfigCommand | find my watch: `01` = `hw.unitedevice.finddevice`, `02` = `findDevice`, `83{84{05 = 900100002, 06 = 2 start / 1 stop}}`; gated by ExpandCapability 79 (find device) and 83 (config commands) |
+| `04` Calls | `01` (watch → phone) | AnswerCall | tag `01` byte: 1 = reject, 2 = accept |
+| `08` Alarms | `01` | EventAlarms | set: `81{82{03 index 1-5, 04 on, 05 hour<<8 \| minute, 06 repeat, 07 name}…}`; an empty list sends a bare `82{03 = 1}` |
+| `08` | `02` / `03` / `04` | SmartAlarm / EventAlarmList / SmartAlarmList | set smart (`03` = 1, `04`, `05`, `06`, `07` = minutes early) / read the event alarms / read the smart alarm; list gated by SupportedCommands `08/03`, smart by `08/02` |
 | `2C` FileDownload | `01` init, `03` info, `04` block request, `05` data (pushed), `06` complete | new-sync file download | `sequence_data` (sleep dictionary 700013), `sleep_state.bin`, `sleep_data.bin` |
 | `0A` FileDownload | `01` init, `02` parameters, `03` info, `04` block request, `05` data (pushed), `06` complete | old-sync file download | `sleep_state.bin` / `sleep_data.bin` when SettingRelated `truSleepNewSync` is false |
+| `17` Workout | `07` count, `08` totals, `0A` data, `0C` pace, `0E` swim segments, `14` SpO₂, `16` sections, `15` capability | workout sync | workouts, heart-rate series, pace splits; see Workouts and GPS |
+| `2C` / `0A` | as above | GPS file | `<n>_gps.bin` for a workout (file type `0x11`; `0A`: init type `02`, FileParameters type `02`) |
+| `0F` Weather | `09` start, `05` unit, `02` support, `06` extended support, `0A` sun/moon support, `01` current, `08` forecast, `07` / `0C` error, `04` device request | weather push | see Weather |
+| `18` GpsAndTime | `07` | current position | sent after the current weather when `18/06` is listed; see Weather |
 
 ## Notifications and profile
 
@@ -91,6 +101,90 @@ After the frame-based sync, `SleepSync` follows GB's `downloadTruSleepData(start
 GB's P2P data-dictionary sync (`34`/`01`, module `hw.unitedevice.datadictionarysync`) carries skin
 temperature, HRV, emotion, sleep apnea and similar. It carries no sleep stages, steps, heart rate
 or SpO₂, so it is not ported.
+
+## Workouts and GPS
+
+`WorkoutSync` follows GB's `HuaweiWorkoutSyncManager` after the activity sync, over service `17`:
+
+1. Skipped when SupportedCommands is known and has no service `17`. `17/15` WorkoutCapability (only if listed)
+   returns `supportNewStep` (bit 1 of tag `01`), which adds tag `06` to the data request and changes the walking cadence.
+2. `17/07` WorkoutCount for `[start, end]`: per workout a number, the counts of data, pace, swim-segment, SpO₂ and
+   section chunks, and `trajectoriesData` (tag `0E`, 1 when a `_gps.bin`/`_pdr.bin` exists). `start` is the end of the
+   newest stored workout + 1 (2022-06-10 when none; the oldest incomplete workout wins). An error answer or a count that
+   does not match the list splits the window in halves, up to 5 levels (GB).
+3. Per workout, in number order: `17/08` totals (start, end, calories, distance m, steps, total and active seconds,
+   sport type byte, altitude and elevation in dm, heart-rate peaks, training load, recovery time, swim and run-pace
+   fields), `17/0A` data chunks (header: workout, chunk, timestamp, interval, count, length, bitmap; per sample heart rate,
+   speed dm/s, step rate, swolf, stroke rate, altitude dm, an inner block of running/cycling metrics, calories, jump
+   frequency, cycling power), `17/0C` pace blocks (per km `type 0` / per mile `type 1`, seconds per unit, last block a
+   fraction in 1/10000), `17/0E` swim segments, `17/14` SpO₂, `17/16` sections.
+4. Each request that answers with an error (tag `7F`), a wrong workout/chunk number or no usable TLV is repeated 3 times,
+   then skipped and the workout is marked `missingData`. Section error `0001E079` is ignored (GB: normal). A timeout
+   aborts the sync and stores the workout as incomplete (GB aborts without storing).
+5. GPS: file `<n>_gps.bin` (file type `0x11`, start/end 0) over `2C` when SettingRelated tag `02` bit 3 is set
+   (`gpsNewSync`); otherwise the `0A` init with `02{02:02, 86{07:01, 88{09:workout}}}` answers with the workout's file list
+   (`8B/8C/0D`, `;` separated), the `_gps.bin` entry is downloaded with FileParameters type `02`. Skipped when the watch
+   sent `trajectoriesData = 0`. A failed GPS download does not make the workout incomplete.
+
+Sport type bytes map to GB's `HuaweiActivityType` names (`WorkoutSportTypes.kt`, 107 types; unknown ones are shown as
+`Workout (type N)`). GPS file layout (`HuaweiGpsParser`, little endian): 0x20 trim bytes, a type byte (`& 3 == 3` means
+altitude is present), start time, longitude, latitude (degrees, plus altitude), padding up to offset 62 / 70, then
+15 / 19-byte records `(time delta s, ?, lon delta f32, lat delta f32, ?, ?, pause[, altitude i16, ?])`. GB's loop
+leaves out a final record that would end exactly at the end of the file.
+
+## Weather
+
+Port of GB's `HuaweiWeatherManager.sendWeather` (`Weather.java`, `SendWeather*Request`). The watch only
+takes it if it lists `0f/01` in SupportedCommands (`supportsWeather`); every request below waits for the
+watch's reply with the same service and command (5 s), like GB's request chain. All TLVs are encrypted.
+
+| Step | Command | Sent when | Content |
+|---|---|---|---|
+| 1 | `0f/09` WeatherStart | always | `01: 03`. The reply's tag `7f` must be `0x186A0` or `0x186A3`, else GB stops the chain and so do we |
+| 2 | `0f/05` WeatherUnit | `0f/05` listed | `01:` 0 = °C, 1 = °F |
+| 3 | `0f/02` WeatherSupport | always | `01:`; reply bitmap: bit0 weather, 1 wind, 2 pm2.5, 3 temperature, 4 location name, 5 current temperature, 6 unit, 7 air quality |
+| 4 | `0f/06` WeatherExtendedSupport | `0f/06` listed | reply bitmap: bit0 time, 1 source, 2 icon |
+| 5 | `0f/0a` WeatherSunMoonSupport | `0f/0a` listed | reply bitmap: bit0 sun rise/set, 1 moon phase |
+| 6 | `0f/01` Current | always | `81{02 icon, 03 wind = (direction << 8) + beaufort}`, `85{06 low, 07 high}`, `04` pm2.5, `08` location, `09` current temp, `0a` unit, `0b` AQI, `0c` observation time, `0e` source, `0f` UV (ExpandCapability 0x2f), `10` humidity, `11` wind km/h, `12` feels-like (ExpandCapability 0xc0) |
+| 7 | `18/07` GpsAndTime | `18/06` listed | `01` time (now - 1 day, as GB), `02` lat f64, `03` lon f64 (7 decimals); a missing reply is only logged |
+| 8 | `0f/08` Forecast (sliced) | `0f/08` listed | `81{82{03 time, 04 icon, 05 temp, 06 rain %, 07 UV}}` up to 24 hours; `90{91{12 time, 13 icon, 14 high, 15 low, 16/17 sun rise/set, 1a/1b moon rise/set, 1e moon phase}}` up to 8 days (today first). Each tag only if the matching support bit is set |
+
+A tag the watch did not report as supported is left out. Temperatures are whole degrees Celsius in a signed byte in
+every unit (GB sends `K - 273` and sets the unit tag only); whether the watch converts for display is not verified.
+Today's entry uses the current icon and the observation time, later days use the observation time plus whole days
+(GB's `SendWeatherForecastRequest`). Sun times outside their local day are sent as 0 (GB `fixupWeather`: a wrong one makes
+the watch show no weather at all). Open-Meteo has no moon rise/set (sent as 0, which the packet skips) so only
+the moon phase is sent, computed from the synodic month ([0..360) degrees to GB's eight phases).
+
+Errors (`0f/0c` WeatherErrorExtended when listed, else `0f/07` WeatherErrorSimple): `0` network, `1` GPS permission
+(used for no location available), `2` weather disabled.
+
+**Watch request.** The watch sends `0f/04` with tag `7f` = `0x000186AA` to ask for weather. We answer with the push above
+(or the matching error). Any other `0f/04` is acknowledged with `0f/04` `01: 0x186A0`, unencrypted, without waiting for a reply
+(GB `handleAsyncMessage`). A request inside five minutes of the last fetch reuses that data.
+
+**Icons.** Open-Meteo gives WMO codes. GB has no WMO table, only OpenWeatherMap code to Huawei icon
+(`openWeatherMapConditionCodeToHuaweiIcon`, ported unchanged), so WMO goes through the closest OpenWeatherMap code
+(table in `WeatherModel.kt`): 0 sunny; 1 and 2 cloudy; 3 overcast; 45 and 48 fog; 51 to 55 drizzle, 61 and 80 light rain, 63 and 81 rain,
+65 and 82 heavy rain; 56, 57, 66, 67 freezing rain; 71, 77, 85 light snow, 73 snow, 75 and 86 heavy snow; 95 to 99
+thunderstorm. Icon byte values are in `Weather.java` (`iconToByte`, unknown = `0x63`).
+
+## Find phone, find watch, calls and alarms
+
+- **Find phone** (watch → phone): `0B/01` arrives unrequested. GB ignores it unless its find-phone setting is on, then
+  rings (alarm stream at maximum volume, vibration, notification). When the alert ends for any reason, including the
+  watch's own stop, GB sends `0B/02` (`01` = 2). We do the same and never answer the start.
+- **Find watch**: GB's `HuaweiDataSyncFindDevice`, a DataSync config command (service `37`, command `01`), not a
+  FindPhone packet. Request only; GB does not wait for a reply, and replies and watch-side events are only logged
+  (`DataSync config from ... id=900100002 action=...`; GB notes actions 2 and 4).
+- **Calls**: an incoming call is a normal notification `02/01` with type `01` (call): text element `01` = caller name
+  (number if unknown), and element `07` = number in the format the watch reported (`incomingNumberFormat`) when it
+  supports incoming numbers (NotificationConstraints). Answering on the phone sends the same packet with type `0D`
+  (start call, ExpandCapability 74) or `0C` (stop) and an empty text; the end of the call sends `0C`. Those two are
+  not acknowledged. The watch's buttons come back as `04/01` (1 reject, 2 accept).
+- **Alarms** (service `08`): event alarms use watch index 1 to 5 (the smart alarm is separate, index 1 of `08/02`). A
+  slot missing from the list is not an alarm, and a set replaces the whole event list. The app sends the list, then
+  reads it back, because a missing acknowledgment is otherwise invisible.
 
 ## Auth decision
 

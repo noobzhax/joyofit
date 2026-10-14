@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.834Z" hostname="dzul" time="0.004">
+<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:47.376Z" hostname="dzul" time="0.014">
   <properties/>
-  <testcase name="testParseFailure" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.002"/>
-  <testcase name="testParsePadding" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.001"/>
+  <testcase name="testParseFailure" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.004"/>
+  <testcase name="testParsePadding" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.002"/>
   <testcase name="testParseState" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.0"/>
   <testcase name="testParseDataAcc" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.0"/>
-  <testcase name="testParseDataPpg" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.001"/>
+  <testcase name="testParseDataPpg" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiTruSleepParser" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

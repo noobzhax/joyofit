@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.811Z" hostname="dzul" time="0.004">
+<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:44.789Z" hostname="dzul" time="0.014">
   <properties/>
-  <testcase name="testUnknownEncryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.0"/>
+  <testcase name="testUnknownEncryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.002"/>
   <testcase name="testEmptyPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.001"/>
-  <testcase name="testKnownEncryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.0"/>
-  <testcase name="testEncryptedUnslicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.001"/>
-  <testcase name="testUnencryptedUnslicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.0"/>
-  <testcase name="testUnencryptedSlicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.0"/>
-  <testcase name="testUnknownUnencryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.0"/>
+  <testcase name="testKnownEncryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.001"/>
+  <testcase name="testEncryptedUnslicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.004"/>
+  <testcase name="testUnencryptedUnslicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.003"/>
+  <testcase name="testUnencryptedSlicedSerialize" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.002"/>
+  <testcase name="testUnknownUnencryptedPacketParse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestHuaweiPacket" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

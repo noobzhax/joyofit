@@ -1,21 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.joyodigitama.huaweiwear.FileDownloadTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:47.377Z" hostname="dzul" time="1.296">
+<testsuite name="com.joyodigitama.huaweiwear.FileDownloadTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:44.827Z" hostname="dzul" time="1.739">
   <properties/>
-  <testcase name="invalidSequenceFileGivesNoSegments" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.018"/>
-  <testcase name="stageMappingFollowsGbSampleProvider" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.0"/>
-  <testcase name="silentWatchTimesOutBlockDownload" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="1.172"/>
-  <testcase name="truSleepStateRangesBecomeSegmentsWhenDictionaryIsNotSupported" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.032"/>
-  <testcase name="oldSyncReusesFileListAndDecryptsBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.034"/>
-  <testcase name="oldSyncDataFileWithoutPrecedingStateInitFails" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.001"/>
-  <testcase name="answerForOtherFileIsRejected" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.006"/>
-  <testcase name="sleepFilesAreSkippedWithoutTruSleepSupport" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.001"/>
-  <testcase name="emptyFileIsCompletedWithoutBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.002"/>
-  <testcase name="sequenceFileBecomesStagedSegments" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.01"/>
-  <testcase name="dictionarySleepIsDownloadedWhenGbWouldUseIt" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.011"/>
-  <testcase name="newSyncDownloadsFileInBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.006"/>
+  <testcase name="invalidSequenceFileGivesNoSegments" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.008"/>
+  <testcase name="stageMappingFollowsGbSampleProvider" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.001"/>
+  <testcase name="silentWatchTimesOutBlockDownload" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="1.485"/>
+  <testcase name="truSleepStateRangesBecomeSegmentsWhenDictionaryIsNotSupported" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.087"/>
+  <testcase name="oldSyncReusesFileListAndDecryptsBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.079"/>
+  <testcase name="oldSyncDataFileWithoutPrecedingStateInitFails" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.003"/>
+  <testcase name="answerForOtherFileIsRejected" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.012"/>
+  <testcase name="sleepFilesAreSkippedWithoutTruSleepSupport" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.002"/>
+  <testcase name="emptyFileIsCompletedWithoutBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.008"/>
+  <testcase name="sequenceFileBecomesStagedSegments" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.019"/>
+  <testcase name="dictionarySleepIsDownloadedWhenGbWouldUseIt" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.013"/>
+  <testcase name="newSyncDownloadsFileInBlocks" classname="com.joyodigitama.huaweiwear.FileDownloadTest" time="0.016"/>
   <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[SLF4J(W): No SLF4J providers were found.
-SLF4J(W): Defaulting to no-operation (NOP) logger implementation
-SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
-]]></system-err>
+  <system-err><![CDATA[]]></system-err>
 </testsuite>

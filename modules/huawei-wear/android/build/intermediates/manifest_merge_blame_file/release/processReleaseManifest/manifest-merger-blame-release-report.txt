@@ -34,73 +34,201 @@
 18    <uses-permission android:name="android.permission.WAKE_LOCK" />
 18-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:9:3-66
 18-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:9:20-63
-19
-20    <uses-feature
-20-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:3-85
-21        android:name="android.hardware.bluetooth"
-21-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:17-58
-22        android:required="true" />
-22-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:59-82
-23
-24    <!-- Lets the notification app chooser list launcher apps without QUERY_ALL_PACKAGES. -->
-25    <queries>
-25-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:13:3-18:13
-26        <intent>
-26-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:14:5-17:14
-27            <action android:name="android.intent.action.MAIN" />
-27-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:7-59
-27-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:15-56
-28
-29            <category android:name="android.intent.category.LAUNCHER" />
-29-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:7-67
-29-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:17-64
-30        </intent>
-31    </queries>
-32
-33    <application>
-33-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:20:3-44:17
-34        <service
-34-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:21:5-24:57
-35            android:name="com.joyodigitama.huaweiwear.WatchService"
-35-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:22:7-62
-36            android:exported="false"
-36-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:23:7-31
-37            android:foregroundServiceType="connectedDevice" />
-37-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:24:7-54
-38        <service
-38-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:26:5-34:15
-39            android:name="com.joyodigitama.huaweiwear.WatchNotificationListener"
-39-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:27:7-75
-40            android:exported="true"
-40-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:28:7-30
-41            android:label="WatchFit"
-41-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:29:7-31
-42            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
-42-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:30:7-81
-43            <intent-filter>
-43-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:31:7-33:23
-44                <action android:name="android.service.notification.NotificationListenerService" />
-44-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:32:9-91
-44-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:32:17-88
-45            </intent-filter>
-46        </service>
-47
-48        <receiver
-48-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:36:5-43:16
-49            android:name="com.joyodigitama.huaweiwear.BootReceiver"
-49-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:37:7-62
-50            android:exported="true" >
-50-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:38:7-30
-51            <intent-filter>
-51-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:39:7-42:23
-52                <action android:name="android.intent.action.BOOT_COMPLETED" />
-52-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:40:9-71
-52-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:40:17-68
-53                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-53-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:41:9-76
-53-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:41:17-73
-54            </intent-filter>
-55        </receiver>
-56    </application>
-57
-58</manifest>
+19    <!-- Health Connect: write-only; WatchFit never reads Health Connect. -->
+20    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+20-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:11:3-75
+20-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:11:20-72
+21    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
+21-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:12:3-80
+21-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:12:20-77
+22    <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" />
+22-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:13:3-87
+22-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:13:20-84
+23    <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" />
+23-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:14:3-88
+23-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:14:20-85
+24    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+24-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:3-78
+24-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:20-75
+25    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
+25-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:3-92
+25-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:20-89
+26    <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
+26-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:17:3-75
+26-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:17:20-72
+27    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+27-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:18:3-78
+27-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:18:20-75
+28    <!-- Find my phone vibration; incoming calls, caller name and number, and answering/rejecting them from the watch. -->
+29    <uses-permission android:name="android.permission.VIBRATE" />
+29-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:20:3-64
+29-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:20:20-61
+30    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+30-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:21:3-73
+30-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:21:20-70
+31    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+31-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:22:3-70
+31-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:22:20-67
+32    <uses-permission android:name="android.permission.READ_CONTACTS" />
+32-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:23:3-70
+32-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:23:20-67
+33    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+33-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:24:3-75
+33-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:24:20-72
+34
+35    <uses-feature
+35-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:25:3-86
+36        android:name="android.hardware.telephony"
+36-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:25:17-58
+37        android:required="false" />
+37-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:25:59-83
+38    <!-- Weather: Open-Meteo over HTTPS, and the phone's coarse location (LocationManager, no Google Play services). -->
+39    <uses-permission android:name="android.permission.INTERNET" />
+39-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:27:3-65
+39-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:27:20-62
+40    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+40-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:28:3-79
+40-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:28:20-76
+41
+42    <uses-feature
+42-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:29:3-85
+43        android:name="android.hardware.location"
+43-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:29:17-57
+44        android:required="false" />
+44-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:29:58-82
+45    <uses-feature
+45-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:30:3-85
+46        android:name="android.hardware.bluetooth"
+46-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:30:17-58
+47        android:required="true" />
+47-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:30:59-82
+48
+49    <!-- Lets the notification app chooser list launcher apps without QUERY_ALL_PACKAGES. -->
+50    <queries>
+50-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:33:3-40:13
+51        <intent>
+51-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:34:5-37:14
+52            <action android:name="android.intent.action.MAIN" />
+52-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:35:7-59
+52-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:35:15-56
+53
+54            <category android:name="android.intent.category.LAUNCHER" />
+54-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:36:7-67
+54-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:36:17-64
+55        </intent>
+56        <!-- HealthConnectClient.getSdkStatus() needs to see the Health Connect app on Android 11 to 13. -->
+57        <package android:name="com.google.android.apps.healthdata" />
+57-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:39:5-66
+57-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:39:14-63
+58    </queries>
+59
+60    <application>
+60-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:42:3-103:17
+61        <service
+61-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:43:5-46:57
+62            android:name="com.joyodigitama.huaweiwear.WatchService"
+62-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:44:7-62
+63            android:exported="false"
+63-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:45:7-31
+64            android:foregroundServiceType="connectedDevice" />
+64-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:46:7-54
+65        <service
+65-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:48:5-56:15
+66            android:name="com.joyodigitama.huaweiwear.WatchNotificationListener"
+66-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:49:7-75
+67            android:exported="true"
+67-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:50:7-30
+68            android:label="WatchFit"
+68-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:51:7-31
+69            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+69-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:52:7-81
+70            <intent-filter>
+70-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:53:7-55:23
+71                <action android:name="android.service.notification.NotificationListenerService" />
+71-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:54:9-91
+71-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:54:17-88
+72            </intent-filter>
+73        </service>
+74
+75        <receiver
+75-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:58:5-65:16
+76            android:name="com.joyodigitama.huaweiwear.BootReceiver"
+76-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:59:7-62
+77            android:exported="true" >
+77-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:60:7-30
+78            <intent-filter>
+78-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:61:7-64:23
+79                <action android:name="android.intent.action.BOOT_COMPLETED" />
+79-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:62:9-71
+79-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:62:17-68
+80                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+80-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:63:9-76
+80-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:63:17-73
+81            </intent-filter>
+82        </receiver>
+83
+84        <!-- Calls: PHONE_STATE shows incoming calls on the watch (READ_PHONE_STATE; the number also needs READ_CALL_LOG). -->
+85        <receiver
+85-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:68:5-74:16
+86            android:name="com.joyodigitama.huaweiwear.PhoneStateReceiver"
+86-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:69:7-68
+87            android:exported="true" >
+87-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:70:7-30
+88            <intent-filter>
+88-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:71:7-73:23
+89                <action android:name="android.intent.action.PHONE_STATE" />
+89-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:72:9-68
+89-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:72:17-65
+90            </intent-filter>
+91        </receiver>
+92
+93        <!-- Find my phone: the Stop action of its notification. -->
+94        <receiver
+94-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:77:5-79:34
+95            android:name="com.joyodigitama.huaweiwear.FindPhoneStopReceiver"
+95-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:78:7-71
+96            android:exported="false" />
+96-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:79:7-31
+97
+98        <!-- Health Connect: the privacy-policy screen its permission dialog links to (Android 13 and older). -->
+99        <activity
+99-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:82:5-90:16
+100            android:name="com.joyodigitama.huaweiwear.HealthConnectRationaleActivity"
+100-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:83:7-80
+101            android:exported="true"
+101-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:84:7-30
+102            android:label="WatchFit and Health Connect"
+102-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:85:7-50
+103            android:theme="@android:style/Theme.DeviceDefault.DayNight" >
+103-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:86:7-66
+104            <intent-filter>
+104-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:87:7-89:23
+105                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+105-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:88:9-84
+105-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:88:17-81
+106            </intent-filter>
+107        </activity> <!-- Android 14+: the same screen, reached through "View permission usage". -->
+108        <activity-alias
+108-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:93:5-102:22
+109            android:name="com.joyodigitama.huaweiwear.ViewPermissionUsageActivity"
+109-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:94:7-77
+110            android:exported="true"
+110-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:95:7-30
+111            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+111-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:96:7-74
+112            android:targetActivity="com.joyodigitama.huaweiwear.HealthConnectRationaleActivity" >
+112-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:97:7-90
+113            <intent-filter>
+113-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:98:7-101:23
+114                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+114-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:99:9-78
+114-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:99:17-75
+115
+116                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+116-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:100:9-79
+116-->/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:100:19-76
+117            </intent-filter>
+118        </activity-alias>
+119    </application>
+120
+121</manifest>

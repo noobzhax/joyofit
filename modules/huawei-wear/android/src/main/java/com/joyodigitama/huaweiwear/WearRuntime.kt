@@ -59,11 +59,13 @@ internal class WearRuntime private constructor(context: Context) {
   var paused = false
     private set
 
-  private val events = object : WearEvents {
+  private val events: WearEvents = object : WearEvents {
     override fun state(state: LinkState, error: String?) {
       status.update { it.copy(state = state, note = if (state == LinkState.DISCONNECTED) it.note else null) }
       listeners.forEach { it.state(state, error) }
       if (state == LinkState.DISCONNECTED || state == LinkState.CONNECTED) controller?.onLinkChanged()
+      features.onLinkState(state)
+      weather.onLinkState(state)
     }
 
     override fun battery(level: Int) {
@@ -73,6 +75,7 @@ internal class WearRuntime private constructor(context: Context) {
 
     override fun syncComplete(summary: SyncSummary) {
       status.update { it.copy(lastSyncSec = summary.to) }
+      healthConnect.onSyncComplete(summary)
       listeners.forEach { it.syncComplete(summary) }
     }
 
@@ -90,6 +93,10 @@ internal class WearRuntime private constructor(context: Context) {
 
   val link = WearLink(appContext, events, settings, syncStore)
   val forwarder = NotificationForwarder(appContext, settings, link, events, scope)
+  val features = PhoneFeatures(appContext, PhoneFeatureSettings(appContext), link, events, scope, forwarder::nextMessageId)
+  val healthConnect = HealthConnectExporter(appContext, syncStore, events, scope)
+  val weatherSettings = WeatherSettings(appContext)
+  val weather = WeatherController(appContext, weatherSettings, link, events, scope)
 
   fun addListener(listener: WearEvents) {
     listeners.add(listener)

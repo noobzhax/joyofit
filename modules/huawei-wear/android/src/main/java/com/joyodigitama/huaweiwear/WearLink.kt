@@ -355,7 +355,8 @@ internal class WearLink(
         val last = storage { syncStore.lastSync(connection.address) }
         val from = syncWindowStart(last, System.currentTimeMillis() / 1000)
         val result = ActivitySync(connection.session, events).sync(from)
-        storage { syncStore.save(connection.address, result) }
+        val stored = storage { syncStore.save(connection.address, result) }
+        stored.withWorkouts(syncWorkouts(connection))
       } finally {
         val restored = synchronized(lock) {
           if (current === connection && state == LinkState.SYNCING) {
@@ -379,4 +380,23 @@ internal class WearLink(
     } catch (e: SQLiteException) {
       throw WearException(ErrorCodes.STORAGE, "Database error: ${e.message}", e)
     }
+
+  /**
+   * Workout sessions and their GPS tracks, after the activity data is stored. Whatever fails here is logged and
+   * does not fail the sync: the steps, sleep and totals are already committed.
+   */
+  private suspend fun syncWorkouts(connection: Connection): Int {
+    val workouts = WorkoutStore(syncStore)
+    val sync = WorkoutSync(connection.session, events)
+    try {
+      val now = (System.currentTimeMillis() / 1000).toInt()
+      sync.sync(workouts.syncStart(), now, workouts)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      events.log(LogDirection.ERROR, null, null, null, "Workout sync failed: ${e.message ?: e.javaClass.simpleName}")
+    }
+    events.log(LogDirection.INFO, null, null, null, "Workout sync: ${sync.saved} workouts stored")
+    return sync.saved
+  }
 }

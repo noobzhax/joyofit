@@ -15,6 +15,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
+// Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() also dispatch the Weather service (support, start, forecast).
+// Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the Workout service (0x17).
 // Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() dispatch limited to the ported packet classes (DeviceConfig, FitnessData, FileDownloadService0A/2C, Notifications constraints/capabilities); other packet classes not ported.
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei;
 
@@ -36,6 +38,12 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FitnessData;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileDownloadService0A;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileDownloadService2C;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Alarms;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Calls;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DataSync;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FindPhone;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Workout;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Weather;
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 public class HuaweiPacket {
@@ -533,6 +541,76 @@ public class HuaweiPacket {
                         this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
                         return this;
                 }
+            case FindPhone.id:
+                if (this.commandId == FindPhone.Response.id)
+                    return new FindPhone.Response(paramsProvider).fromPacket(this);
+                this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                return this;
+            case Calls.id:
+                if (this.commandId == Calls.AnswerCallResponse.id)
+                    return new Calls.AnswerCallResponse(paramsProvider).fromPacket(this);
+                this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                return this;
+            case Alarms.id:
+                switch (this.commandId) {
+                    case Alarms.EventAlarmsList.id:
+                        return new Alarms.EventAlarmsList.Response(paramsProvider).fromPacket(this);
+                    case Alarms.SmartAlarmList.id:
+                        return new Alarms.SmartAlarmList.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case DataSync.id:
+                switch (this.commandId) {
+                    case DataSync.ConfigCommand.id:
+                        return new DataSync.ConfigCommand.Response(paramsProvider).fromPacket(this);
+                    case DataSync.EventCommand.id:
+                        return new DataSync.EventCommand.Response(paramsProvider).fromPacket(this);
+                    case DataSync.DataCommand.id:
+                        return new DataSync.DataCommand.Response(paramsProvider).fromPacket(this);
+                    case DataSync.DictDataCommand.id:
+                        return new DataSync.DictDataCommand.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case Weather.id:
+                switch (this.commandId) {
+                    case Weather.WeatherSupport.id:
+                        return new Weather.WeatherSupport.Response(paramsProvider).fromPacket(this);
+                    case Weather.WeatherExtendedSupport.id:
+                        return new Weather.WeatherExtendedSupport.Response(paramsProvider).fromPacket(this);
+                    case Weather.WeatherStart.id:
+                        return new Weather.WeatherStart.Response(paramsProvider).fromPacket(this);
+                    case Weather.WeatherSunMoonSupport.id:
+                        return new Weather.WeatherSunMoonSupport.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case Workout.id:
+                switch (this.commandId) {
+                    case Workout.WorkoutCount.id:
+                        return new Workout.WorkoutCount.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutTotals.id:
+                        return new Workout.WorkoutTotals.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutData.id:
+                        return new Workout.WorkoutData.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutPace.id:
+                        return new Workout.WorkoutPace.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutSwimSegments.id:
+                        return new Workout.WorkoutSwimSegments.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutSpO2.id:
+                        return new Workout.WorkoutSpO2.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutCapability.id:
+                        return new Workout.WorkoutCapability.Response(paramsProvider).fromPacket(this);
+                    case Workout.WorkoutSections.id:
+                        return new Workout.WorkoutSections.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
             default:
                 this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
                 return this;
@@ -561,6 +639,13 @@ public class HuaweiPacket {
                         return new DeviceConfig.HiChain.OutgoingRequest(paramsProvider).fromPacket(this);
                     case DeviceConfig.Auth.id:
                         return new DeviceConfig.Auth.OutgoingRequest(paramsProvider).fromPacket(this);
+                    default:
+                        return this;
+                }
+            case Weather.id:
+                switch (this.commandId) {
+                    case Weather.WeatherForecastData.id:
+                        return new Weather.WeatherForecastData.OutgoingRequest(paramsProvider).fromPacket(this);
                     default:
                         return this;
                 }

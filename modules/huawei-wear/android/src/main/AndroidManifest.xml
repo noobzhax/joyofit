@@ -7,6 +7,26 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <!-- Health Connect: write-only; WatchFit never reads Health Connect. -->
+  <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+  <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
+  <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" />
+  <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" />
+  <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+  <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
+  <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
+  <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+  <!-- Find my phone vibration; incoming calls, caller name and number, and answering/rejecting them from the watch. -->
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+  <uses-permission android:name="android.permission.READ_CALL_LOG" />
+  <uses-permission android:name="android.permission.READ_CONTACTS" />
+  <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+  <uses-feature android:name="android.hardware.telephony" android:required="false" />
+  <!-- Weather: Open-Meteo over HTTPS, and the phone's coarse location (LocationManager, no Google Play services). -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-feature android:name="android.hardware.location" android:required="false" />
   <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
 
   <!-- Lets the notification app chooser list launcher apps without QUERY_ALL_PACKAGES. -->
@@ -15,6 +35,8 @@
       <action android:name="android.intent.action.MAIN" />
       <category android:name="android.intent.category.LAUNCHER" />
     </intent>
+    <!-- HealthConnectClient.getSdkStatus() needs to see the Health Connect app on Android 11 to 13. -->
+    <package android:name="com.google.android.apps.healthdata" />
   </queries>
 
   <application>
@@ -41,5 +63,42 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
       </intent-filter>
     </receiver>
+
+    <!-- Calls: PHONE_STATE shows incoming calls on the watch (READ_PHONE_STATE; the number also needs READ_CALL_LOG). -->
+    <receiver
+      android:name="com.joyodigitama.huaweiwear.PhoneStateReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.PHONE_STATE" />
+      </intent-filter>
+    </receiver>
+
+    <!-- Find my phone: the Stop action of its notification. -->
+    <receiver
+      android:name="com.joyodigitama.huaweiwear.FindPhoneStopReceiver"
+      android:exported="false" />
+
+    <!-- Health Connect: the privacy-policy screen its permission dialog links to (Android 13 and older). -->
+    <activity
+      android:name="com.joyodigitama.huaweiwear.HealthConnectRationaleActivity"
+      android:exported="true"
+      android:label="WatchFit and Health Connect"
+      android:theme="@android:style/Theme.DeviceDefault.DayNight">
+      <intent-filter>
+        <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+      </intent-filter>
+    </activity>
+
+    <!-- Android 14+: the same screen, reached through "View permission usage". -->
+    <activity-alias
+      android:name="com.joyodigitama.huaweiwear.ViewPermissionUsageActivity"
+      android:exported="true"
+      android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+      android:targetActivity="com.joyodigitama.huaweiwear.HealthConnectRationaleActivity">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+      </intent-filter>
+    </activity-alias>
   </application>
 </manifest>

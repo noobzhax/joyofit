@@ -4,13 +4,19 @@ import type {
   BackgroundStatus,
   BondedDevice,
   DeviceInfo,
+  HealthConnectExportResult,
+  HealthConnectStatus,
   HuaweiWearModuleEvents,
   LinkState,
   NotificationAccessStatus,
   NotificationApp,
   SyncSummary,
   UserProfile,
+  WeatherLocationMode,
+  WeatherPlace,
+  WeatherStatus,
 } from './HuaweiWear.types';
+import type { PhoneFeatures, WatchAlarms, WatchAlarmsUpdate } from './HuaweiWearPhone.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   /** Bonded classic-Bluetooth devices. Requires BLUETOOTH_CONNECT on Android 12+. */
@@ -61,6 +67,72 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
    * they reached the watch, false when stored only (not connected or unsupported).
    */
   setUserProfile(profile: UserProfile): Promise<boolean>;
+
+  /**
+   * Makes the watch ring and vibrate (`start` true) or stops it. Needs a connected watch that
+   * reports find-device support (ERR_UNSUPPORTED otherwise, ERR_NOT_CONNECTED when disconnected).
+   * The command is fire-and-forget like Gadgetbridge's: it resolves once sent.
+   */
+  findWatch(start: boolean): Promise<void>;
+  /** Switches, permission state and find-watch support for find my phone and calls. */
+  getPhoneFeatures(): PhoneFeatures;
+  /** When on, the watch's find-my-phone button rings this phone (background service included). Off also silences a ringing phone. */
+  setFindPhoneEnabled(enabled: boolean): Promise<void>;
+  /** Show incoming calls on the watch. Request READ_PHONE_STATE (and ideally READ_CALL_LOG and READ_CONTACTS) first. */
+  setCallsEnabled(enabled: boolean): Promise<void>;
+  /** Let the watch accept or reject a ringing call. Request ANSWER_PHONE_CALLS first. */
+  setCallControlEnabled(enabled: boolean): Promise<void>;
+
+  /** The alarms last read from or pushed to the watch (empty before the first read). */
+  getAlarms(): WatchAlarms;
+  /** Reads the alarms from the connected watch, stores and returns them. */
+  refreshAlarms(): Promise<WatchAlarms>;
+  /**
+   * Pushes the alarms to the connected watch, then reads them back and resolves with what the
+   * watch holds. Rejects with ERR_INVALID_ARGUMENT for bad slots (1 to 5, unique) or ranges.
+   */
+  setAlarms(alarms: WatchAlarmsUpdate): Promise<WatchAlarms>;
+
+  /** Health Connect availability, granted write permissions, switch and last export. */
+  getHealthConnectStatus(): Promise<HealthConnectStatus>;
+  /**
+   * Shows Health Connect's permission dialog for every write permission not yet granted and
+   * resolves with the status afterwards. Does nothing but resolve when all are granted. After two
+   * denials Android stops showing the dialog: use `openHealthConnectSettings`.
+   */
+  requestHealthConnectPermissions(): Promise<HealthConnectStatus>;
+  /**
+   * Switches the export of every later sync on or off. Switching on needs at least one granted
+   * write permission and first writes everything already stored (backfill), so it can take a
+   * while. Switching off leaves written records in Health Connect.
+   */
+  setHealthConnectEnabled(enabled: boolean): Promise<HealthConnectStatus>;
+  /** Writes all stored data again (idempotent: records are replaced, not duplicated). */
+  backfillHealthConnect(): Promise<HealthConnectExportResult>;
+  /** Opens the Health Connect app settings, where permissions and data can be managed. */
+  openHealthConnectSettings(): Promise<void>;
+
+  /** Weather settings and the outcome of the last push. */
+  getWeatherStatus(): WeatherStatus;
+  /**
+   * Switches weather on or off. On, with the watch connected, it pushes now and then every
+   * `intervalMinutes`; the watch's own weather request is answered either way (with a
+   * "weather disabled" error when off). Requests the phone's location only in `current` mode:
+   * ask for ACCESS_COARSE_LOCATION first.
+   */
+  setWeatherEnabled(enabled: boolean): Promise<void>;
+  /** Display unit on the watch. Values are always sent in °C, as Gadgetbridge does. */
+  setWeatherUnit(unit: 'celsius' | 'fahrenheit'): Promise<void>;
+  setWeatherLocationMode(mode: WeatherLocationMode): Promise<void>;
+  /** 15 to 1440 minutes. */
+  setWeatherIntervalMinutes(minutes: number): Promise<void>;
+  /**
+   * Searches Open-Meteo geocoding ("Bandung" or "Bandung, Indonesia") and stores the first match
+   * as the city. Rejects when nothing matches or the internet is out.
+   */
+  setWeatherCity(query: string): Promise<WeatherPlace>;
+  /** Fetches and pushes now. Rejects with what went wrong (no watch, no location, no network...). */
+  refreshWeather(): Promise<WeatherStatus>;
 }
 
 export default requireNativeModule<HuaweiWearModule>('HuaweiWear');

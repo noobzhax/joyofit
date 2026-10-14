@@ -5,6 +5,7 @@ import { Button } from '@/components/Button';
 import { KeyValue } from '@/components/KeyValue';
 import { Screen, Section } from '@/components/Screen';
 import { BondedRow } from '@/features/device/BondedRow';
+import { FindWatchSection } from '@/features/device/FindWatchSection';
 import { LinkStatus } from '@/features/device/LinkStatus';
 import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
 import { useBondedDevices } from '@/features/device/useBondedDevices';
@@ -115,6 +116,8 @@ export default function DeviceScreen() {
           />
         </Section>
       ) : null}
+
+      {device ? <FindWatchSection /> : null}
     </Screen>
   );
 }

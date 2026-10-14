@@ -15,6 +15,7 @@ internal enum class DownloadFileType(val service2c: FileDownloadService2C.FileTy
   SLEEP_STATE(FileDownloadService2C.FileType.SLEEP_STATE),
   SLEEP_DATA(FileDownloadService2C.FileType.SLEEP_DATA),
   SEQUENCE_DATA(FileDownloadService2C.FileType.SEQUENCE_DATA),
+  GPS(FileDownloadService2C.FileType.GPS),
 }
 
 /** GB HuaweiFileDownloadManager.FileRequest for files the phone asks for. */
@@ -26,6 +27,8 @@ internal class FileRequest private constructor(
   val startTime: Int,
   val endTime: Int,
   val dictId: Int,
+  /** GPS files only: the watch's workout number (GB `FileRequest.workoutId`). */
+  val workoutId: Short = 0,
 ) {
   override fun toString(): String =
     "$filename (${type.name}, ${if (newSync) "service 2C" else "service 0A"}, start=$startTime end=$endTime" +
@@ -40,6 +43,13 @@ internal class FileRequest private constructor(
 
     fun sequenceData(start: Int, end: Int, dictId: Int) =
       FileRequest("sequence_data", DownloadFileType.SEQUENCE_DATA, true, start, end, dictId)
+
+    /**
+     * GB `FileRequest.workoutGpsFileRequest`: new sync asks for `<n>_gps.bin` over service 0x2C (start/end
+     * 0); old sync has no name yet, the 0x0A init answers with the list of the workout's files.
+     */
+    fun workoutGps(newSync: Boolean, workoutId: Short) =
+      FileRequest(if (newSync) "${workoutId.toInt()}_gps.bin" else "", DownloadFileType.GPS, newSync, 0, 0, 0, workoutId)
   }
 }
 
@@ -156,7 +166,7 @@ internal class FileDownloader(
   // Service 0x0A: FileDownloadInit (sleep files) -> FileParameters -> FileInfo -> blocks -> complete.
 
   private suspend fun downloadOldSync(request: FileRequest): ByteArray {
-    val name = request.filename
+    var name = request.filename
     val context: OldSyncContext = when (request.type) {
       DownloadFileType.SLEEP_STATE -> {
         val init = session
@@ -190,6 +200,32 @@ internal class FileDownloader(
         }
         log("FileDownloadInit $name (old sync): reusing file list ${shared.filenames.joinToString(";")}")
         shared
+      }
+      // GB HuaweiFileDownloadManager (old sync, GPS): the init answers with the workout's file list, only the
+      // `_gps.bin` file is downloaded; parameters are fetched with fileType 0x02.
+      DownloadFileType.GPS -> {
+        val label = "workout ${request.workoutId.toInt()} GPS (old sync)"
+        val init = session
+          .request(
+            FileDownloadService0A.FileDownloadInit.GpsFileRequest(params, request.workoutId),
+            REQUEST_MS,
+            "FileDownloadInit $label",
+          )
+          .expect<FileDownloadService0A.FileDownloadInit.Response>("FileDownloadInit $label")
+        val names = init.fileNames.toList()
+        log("FileDownloadInit $label: files=${names.joinToString(";")}")
+        val gpsNames = names.filter { "_gps.bin" in it }
+        if (gpsNames.isEmpty()) throw protocol("$label: no _gps.bin file in $names")
+        if (gpsNames.size > 1) log("$label: ${gpsNames.size} GPS files, downloading the first only")
+        name = gpsNames.first()
+        val parameters = session
+          .request(FileDownloadService0A.FileParameters.Request(params, 0x02.toByte()), REQUEST_MS, "FileParameters $name")
+          .expect<FileDownloadService0A.FileParameters.Response>("FileParameters $name")
+        log(
+          "FileParameters $name: version=${parameters.version} packetSize=${parameters.packetSize} " +
+            "maxBlockSize=${parameters.maxBlockSize} timeout=${parameters.timeout}",
+        )
+        OldSyncContext(names, parameters.maxBlockSize.toInt(), parameters.timeout.toInt())
       }
       DownloadFileType.SEQUENCE_DATA -> throw protocol("$name: unknown download type for old sync")
     }

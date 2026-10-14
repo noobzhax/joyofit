@@ -2,3 +2,4 @@
 // and on native platforms to HuaweiWearModule.ts
 export { default } from './src/HuaweiWearModule';
 export * from './src/HuaweiWear.types';
+export * from './src/HuaweiWearPhone.types';
