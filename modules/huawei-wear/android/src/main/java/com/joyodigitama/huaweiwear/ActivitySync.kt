@@ -25,8 +25,13 @@ internal class StepSample(
   )
 }
 
-internal class SleepSegment(val start: Long, val end: Long, val type: Int) {
-  fun toJs(): Map<String, Any?> = mapOf("start" to start, "end" to end, "type" to type)
+/**
+ * One sleep span. `type` is GB's raw sample kind (frame sleep: the watch's state byte; TruSleep and
+ * dictionary sleep: 0x06 light, 0x07 deep, 0x5656 REM, 0x5658 awake, 0x5659 nap, 1 unknown).
+ * `stage` is GB's `normalizeType` of it as 'light' | 'deep' | 'rem' | 'awake', null when GB has none.
+ */
+internal class SleepSegment(val start: Long, val end: Long, val type: Int, val stage: String?) {
+  fun toJs(): Map<String, Any?> = mapOf("start" to start, "end" to end, "type" to type, "stage" to stage)
 }
 
 internal class SyncResult(
@@ -69,7 +74,7 @@ internal class ActivitySync(
     val end = (System.currentTimeMillis() / 1000).toInt()
     events.log(LogDirection.INFO, null, null, null, "Sync: from=$start to=$end")
 
-    val sleep = fetchSleep(start.toInt(), end)
+    val frameSleep = fetchSleep(start.toInt(), end)
     val samples = fetchSteps(start.toInt(), end)
 
     // GetFitnessTotalsRequest. The Fit 4 can answer without the 0x81 container; then today's
@@ -84,6 +89,12 @@ internal class ActivitySync(
     val totalSteps = totals?.totalSteps ?: today.sumOf { it.steps }
     val totalCalories = totals?.totalCalories ?: today.sumOf { it.calories }
     val totalDistance = totals?.totalDistance ?: today.sumOf { it.distance }
+
+    // GB fetchActivityData: once the totals are in, downloadTruSleepData(start, end) fetches the
+    // TruSleep / dictionary sleep files newer watches use. A failure there is logged and leaves
+    // the step data intact.
+    val trueSleep = SleepSync(session, events).sync(start.toInt(), end)
+    val sleep = (frameSleep + trueSleep).distinctBy { listOf(it.start, it.end, it.type) }.sortedBy { it.start }
 
     events.log(
       LogDirection.INFO,
@@ -133,7 +144,8 @@ internal class ActivitySync(
         val b = IntArray(6) { raw[it].toInt() and 0xFF }
         val startSec = (b[0].toLong() shl 24) or (b[1].toLong() shl 16) or (b[2].toLong() shl 8) or b[3].toLong()
         val durationMin = (b[4] shl 8) or b[5]
-        segments.add(SleepSegment(startSec, startSec + durationMin * 60L, container.type.toInt() and 0xFF))
+        val type = container.type.toInt() and 0xFF
+        segments.add(SleepSegment(startSec, startSec + durationMin * 60L, type, SleepSync.stageForRawKind(type)))
       }
 
       if (count + 1 < maxCount) count += 1 else break

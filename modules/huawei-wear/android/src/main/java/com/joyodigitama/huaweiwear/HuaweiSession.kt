@@ -12,8 +12,10 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiPacket
  * Request/response layer over a [FrameSink]. Owns the [HuaweiPacket.ParamsProvider] shared by every
  * packet, reassembles inbound bytes like GB's ResponseManager.handleData and hands each complete
  * packet to the first pending request with the same serviceId + commandId (GB's
- * `Request.handleResponse(HuaweiPacket)`). Complete packets nobody is waiting for are GB's
- * "asynchronous responses"; they are only logged.
+ * `Request.handleResponse(HuaweiPacket)`). Complete packets without a pending request go to the
+ * [subscribe]r for their serviceId + commandId, if any (GB's non-auto-removed response handlers,
+ * such as the file download's data receiver); the rest are GB's "asynchronous responses" and are
+ * only logged.
  */
 internal class HuaweiSession(
   private val sink: FrameSink,
@@ -25,11 +27,14 @@ internal class HuaweiSession(
     val result = CompletableDeferred<HuaweiPacket>()
   }
 
+  private class Subscription(val serviceId: Byte, val commandId: Byte, val label: String, val handler: (HuaweiPacket) -> Unit)
+
   // Guards [waiters], [closedBy], [received] and [frame]. Also orders ParamsProvider writes made
   // before a request against the read thread's parse of its response.
   private val lock = Any()
   private val waiters = ArrayList<Waiter>()
   private var closedBy: WearException? = null
+  private val subscriptions = ArrayList<Subscription>()
 
   // Reassembly state (ResponseManager.receivedPackets for the single main channel).
   private var received: HuaweiPacket? = null
@@ -43,15 +48,7 @@ internal class HuaweiSession(
    * ERR_TIMEOUT, ERR_PROTOCOL (serialize/parse failure) or ERR_DISCONNECTED (link closed).
    */
   suspend fun request(packet: HuaweiPacket, timeoutMs: Long, label: String): HuaweiPacket {
-    val frames: List<ByteArray> = try {
-      packet.serialize() ?: throw WearException(ErrorCodes.PROTOCOL, "$label: packet serialized to nothing")
-    } catch (e: WearException) {
-      throw e
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      throw WearException(ErrorCodes.PROTOCOL, "$label: request could not be created: ${e.message}", e)
-    }
+    val frames = serialize(packet, label)
 
     val waiter = Waiter(packet.serviceId, packet.commandId, label)
     synchronized(lock) {
@@ -60,22 +57,7 @@ internal class HuaweiSession(
     }
 
     try {
-      val mtu = params.mtu
-      val wire = ArrayList<ByteArray>(frames.size)
-      for ((index, f) in frames.withIndex()) {
-        events.log(
-          LogDirection.TX,
-          packet.serviceId.toInt() and 0xFF,
-          packet.commandId.toInt() and 0xFF,
-          f.toHex(),
-          if (frames.size > 1) "$label (frame ${index + 1}/${frames.size})" else label,
-        )
-        splitToMtu(f, mtu, wire)
-      }
-      sink.write(wire)
-    } catch (e: IOException) {
-      removeWaiter(waiter)
-      throw WearException(ErrorCodes.DISCONNECTED, "$label: write failed: ${e.message}", e)
+      transmit(packet, frames, label)
     } catch (e: Throwable) {
       removeWaiter(waiter)
       throw e
@@ -103,6 +85,58 @@ internal class HuaweiSession(
       throw WearException(ErrorCodes.PROTOCOL, "$label: failed to parse response: ${e.message}", e)
     }
     return response
+  }
+
+  /**
+   * Sends [packet] without waiting for an answer, for commands whose reply (if any) is picked up by
+   * a [subscribe]r, e.g. GB's GetFileBlockRequest, which only starts the watch pushing 0x05 data.
+   */
+  suspend fun send(packet: HuaweiPacket, label: String) {
+    val frames = serialize(packet, label)
+    synchronized(lock) { closedBy?.let { throw it } }
+    transmit(packet, frames, label)
+  }
+
+  /**
+   * Routes complete packets that no pending [request] waits for to [handler] until the returned
+   * handle is closed (GB: a Request whose `autoRemoveFromResponseHandler()` is false, e.g. the
+   * file download manager's FileDataReceiver). The packet is handed over without `parseTlv()`.
+   * [handler] runs on the read thread under the session lock and must not block.
+   */
+  fun subscribe(serviceId: Byte, commandId: Byte, label: String, handler: (HuaweiPacket) -> Unit): AutoCloseable {
+    val subscription = Subscription(serviceId, commandId, label, handler)
+    synchronized(lock) { subscriptions.add(subscription) }
+    return AutoCloseable { synchronized(lock) { subscriptions.remove(subscription) } }
+  }
+
+  private fun serialize(packet: HuaweiPacket, label: String): List<ByteArray> = try {
+    packet.serialize() ?: throw WearException(ErrorCodes.PROTOCOL, "$label: packet serialized to nothing")
+  } catch (e: WearException) {
+    throw e
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    throw WearException(ErrorCodes.PROTOCOL, "$label: request could not be created: ${e.message}", e)
+  }
+
+  private suspend fun transmit(packet: HuaweiPacket, frames: List<ByteArray>, label: String) {
+    try {
+      val mtu = params.mtu
+      val wire = ArrayList<ByteArray>(frames.size)
+      for ((index, f) in frames.withIndex()) {
+        events.log(
+          LogDirection.TX,
+          packet.serviceId.toInt() and 0xFF,
+          packet.commandId.toInt() and 0xFF,
+          f.toHex(),
+          if (frames.size > 1) "$label (frame ${index + 1}/${frames.size})" else label,
+        )
+        splitToMtu(f, mtu, wire)
+      }
+      sink.write(wire)
+    } catch (e: IOException) {
+      throw WearException(ErrorCodes.DISCONNECTED, "$label: write failed: ${e.message}", e)
+    }
   }
 
   /** Fails everything in flight and rejects new requests. Idempotent; the first cause wins. */
@@ -163,12 +197,20 @@ internal class HuaweiSession(
     val service = packet.serviceId.toInt() and 0xFF
     val command = packet.commandId.toInt() and 0xFF
     val waiter = waiters.firstOrNull { it.serviceId == packet.serviceId && it.commandId == packet.commandId }
-    if (waiter == null) {
-      events.log(LogDirection.RX, service, command, raw.toHex(), "asynchronous (no pending request)")
-    } else {
+    val subscription = if (waiter != null) null else subscriptions.firstOrNull { it.serviceId == packet.serviceId && it.commandId == packet.commandId }
+    if (waiter != null) {
       waiters.remove(waiter)
       events.log(LogDirection.RX, service, command, raw.toHex(), "response to ${waiter.label}")
       waiter.result.complete(packet)
+    } else if (subscription != null) {
+      events.log(LogDirection.RX, service, command, raw.toHex(), "pushed (${subscription.label})")
+      try {
+        subscription.handler(packet)
+      } catch (e: Exception) {
+        events.log(LogDirection.ERROR, service, command, null, "${subscription.label}: handler failed: ${e.message ?: e.javaClass.simpleName}")
+      }
+    } else {
+      events.log(LogDirection.RX, service, command, raw.toHex(), "asynchronous (no pending request)")
     }
   }
 

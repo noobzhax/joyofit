@@ -57,12 +57,22 @@ export interface SleepTypeSummary {
   seconds: number;
 }
 
+export interface SleepStageSummary {
+  stage: 'light' | 'deep' | 'rem' | 'awake';
+  count: number;
+  seconds: number;
+}
+
+const SLEEP_STAGES: readonly SleepStageSummary['stage'][] = ['light', 'deep', 'rem', 'awake'];
+
 export interface SleepSummary {
   start: number;
   end: number;
   /** Sum of segment durations (gaps between segments excluded). */
   totalSeconds: number;
   byType: SleepTypeSummary[];
+  /** Segments with a decoded stage, in light, deep, rem, awake order; empty when none carry one. */
+  byStage: SleepStageSummary[];
 }
 
 /**
@@ -80,6 +90,9 @@ export function lastSleepSession(segments: readonly SleepSegment[]): SleepSummar
   }
   const session = sorted.slice(first);
   const byType = new Map<number, SleepTypeSummary>();
+  const byStage = Object.fromEntries(
+    SLEEP_STAGES.map((stage) => [stage, { stage, count: 0, seconds: 0 }]),
+  ) as Record<SleepStageSummary['stage'], SleepStageSummary>;
   let totalSeconds = 0;
   let end = 0;
   for (const seg of session) {
@@ -90,11 +103,16 @@ export function lastSleepSession(segments: readonly SleepSegment[]): SleepSummar
     entry.count += 1;
     entry.seconds += seconds;
     byType.set(seg.type, entry);
+    if (seg.stage) {
+      byStage[seg.stage].count += 1;
+      byStage[seg.stage].seconds += seconds;
+    }
   }
   return {
     start: earliestStart,
     end,
     totalSeconds,
     byType: [...byType.values()].sort((a, b) => a.type - b.type),
+    byStage: SLEEP_STAGES.map((stage) => byStage[stage]).filter((entry) => entry.count > 0),
   };
 }

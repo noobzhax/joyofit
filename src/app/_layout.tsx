@@ -31,6 +31,7 @@ export default function RootLayout() {
             }}>
             <Tabs.Screen name="index" options={{ title: 'Device' }} />
             <Tabs.Screen name="today" options={{ title: 'Today' }} />
+            <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
             <Tabs.Screen name="log" options={{ title: 'Log' }} />
           </Tabs>
         </WatchProvider>

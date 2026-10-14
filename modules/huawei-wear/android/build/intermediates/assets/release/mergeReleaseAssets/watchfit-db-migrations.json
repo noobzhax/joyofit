@@ -1,0 +1,10 @@
+[
+  [
+    "CREATE TABLE step_samples (timestamp INTEGER PRIMARY KEY NOT NULL, steps INTEGER NOT NULL, calories INTEGER NOT NULL, distance INTEGER NOT NULL, heart_rate INTEGER, spo2 INTEGER, resting_heart_rate INTEGER)",
+    "CREATE TABLE sleep_segments (start INTEGER NOT NULL, end INTEGER NOT NULL, type INTEGER NOT NULL, PRIMARY KEY (start, type))",
+    "CREATE TABLE device (address TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, product_model TEXT, software_version TEXT, last_sync INTEGER)"
+  ],
+  [
+    "ALTER TABLE sleep_segments ADD COLUMN stage TEXT"
+  ]
+]

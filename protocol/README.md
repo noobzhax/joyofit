@@ -50,6 +50,47 @@ never found a usable channel.
 | `07` FitnessData | `0C` / `0D` | sleep MessageCount / MessageData | sleep segments `(start, minutes, type)` |
 | `07` | `0A` / `0B` | step MessageCount / MessageData | per-minute steps / kcal / distance / HR / SpO₂ / resting HR |
 | `07` | `03` | FitnessTotals | today's totals |
+| `07` | `02` | UserInfo | height, weight, age, birthday, gender, walk/run step lengths; sent in init when the profile was saved |
+| `07` | `01` | MotionGoal | daily step goal (goal type 1); the calorie and duration goals are not sent |
+| `02` Notifications | `05` | NotificationCapabilities | only asked when `supportsPromptPushMessage` and protocol version 2 (GB default capability byte `0xFF` skips it) |
+| `02` | `02` | NotificationConstraints | content format and maximum content length; asked when `02/01` is supported and protocol version is 2 |
+| `02` | `04` | NotificationState | the watch-side notification switch (`0x81{02:on,03:on}`); sent in init and when forwarding is toggled, if `02/04` is supported |
+| `02` | `01` | NotificationAction | one notification: id, type (`7F` generic, `0F` email), title/sender/text elements, source package, optional key/channel/category/timestamp tags by ExpandCapability |
+| `02` | `06` | NotificationRemoveAction | dismisses one notification on the watch; only when ExpandCapability 94 or 120 is set |
+| `2C` FileDownload | `01` init, `03` info, `04` block request, `05` data (pushed), `06` complete | new-sync file download | `sequence_data` (sleep dictionary 700013), `sleep_state.bin`, `sleep_data.bin` |
+| `0A` FileDownload | `01` init, `02` parameters, `03` info, `04` block request, `05` data (pushed), `06` complete | old-sync file download | `sleep_state.bin` / `sleep_data.bin` when SettingRelated `truSleepNewSync` is false |
+
+## Notifications and profile
+
+The app forwards a phone notification with `02/01` when SupportedCommands lists it (GB
+`supportsNotificationAlert`). Text elements: type `03` title (the app name when the notification has
+none), `02` sender (the app name; GB leaves it empty for non-SMS), `01` text. A text longer than the
+watch's content length is cut to `length - 13` characters plus `...`. ExpandCapability bits that add tags:
+73 reply actions, 77 timestamp (`0x15`), 89 reply key (`0x18`), 94 repeated notify and 120 remove single
+(`0x19` key, `0x1A` id, `0x1B` channel), 256 pictures (not used). Notifications are not acknowledged
+by anything we parse; a missing ack is only logged.
+
+Init appends, after `ConnectStatus` and in GB order: UserInfo `07/02` and MotionGoal `07/01` (only if
+the user saved a profile; each only if the watch lists the command), NotificationCapabilities,
+NotificationConstraints, NotificationState. UserInfo carries the optional gender-unknown (ExpandCapability
+`0x57`) and precision-weight (`0xB3`, weight × 100 in tag `0x0B`) fields. VO2 max is never sent.
+
+## Sleep files (TruSleep / dictionary)
+
+After the frame-based sync, `SleepSync` follows GB's `downloadTruSleepData(start, end)`:
+
+1. Nothing unless SupportedCommands lists FitnessData `07` command `16` (`supportsTruSleep`).
+2. ExpandCapability bit 143 (`supportsDictSleepSync`): download `sequence_data` for dictionary class
+   700013 over service `2C`, parse it with `HuaweiSequenceDataFileParser` and
+   `HuaweiTrueSleepSequenceDataParser` into one-minute stages (watch stage 1 light, 2 REM,
+   3 deep, 4 awake, 5 nap), merged into segments. GB does not fall back to the state/data files when this fails.
+3. Otherwise `sleep_state.bin` and `sleep_data.bin` (service `2C` if SettingRelated tag `02` bit 1 is set,
+   else `0A`). Each 16-byte record of the state file is a `(start, end)` sleep range, stored by GB as one
+   light-sleep span (raw kind `06`). GB does not interpret `sleep_data.bin`; the app only parses it for the log.
+
+GB's P2P data-dictionary sync (`34`/`01`, module `hw.unitedevice.datadictionarysync`) carries skin
+temperature, HRV, emotion, sleep apnea and similar. It carries no sleep stages, steps, heart rate
+or SpO₂, so it is not ported.
 
 ## Auth decision
 

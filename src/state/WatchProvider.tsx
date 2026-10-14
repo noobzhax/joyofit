@@ -4,13 +4,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 
-import { getLastSync, saveSyncResult, SYNC_OVERLAP_SEC, upsertDevice } from '@/db/queries';
+import { getLastSync } from '@/db/queries';
 import { errorMessage } from '@/format';
 import { pushLog } from '@/state/logStore';
 import {
@@ -18,10 +19,8 @@ import {
   type DeviceInfo,
   type FitnessTotals,
   type LinkState,
+  type SyncSummary,
 } from '@/wear';
-
-/** First sync of a watch (no `last_sync` yet) asks for this much history. */
-const FIRST_SYNC_LOOKBACK_SEC = 7 * 24 * 3600;
 
 export type WatchTotals = FitnessTotals & { at: number };
 
@@ -33,9 +32,9 @@ export interface WatchContextValue {
   activeAddress: string | null;
   device: DeviceInfo | null;
   battery: number | null;
-  /** `SyncResult.to` of the last stored sync for the active watch, unix seconds. */
+  /** `SyncSummary.to` of the last stored sync for the active watch, unix seconds. */
   lastSync: number | null;
-  /** Totals reported by the watch in the most recent sync of this app session; `at` = `SyncResult.to`. */
+  /** Totals reported by the watch in the most recent sync seen by this app session; `at` = `SyncSummary.to`. */
   totals: WatchTotals | null;
   /** Bumped after every stored sync so data screens re-query. */
   dataVersion: number;
@@ -62,13 +61,52 @@ export function WatchProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
   const [linkState, setLinkState] = useState<LinkState>(() => HuaweiWear.getState());
   const [error, setError] = useState<string | null>(null);
-  const [activeAddress, setActiveAddress] = useState<string | null>(null);
-  const [device, setDevice] = useState<DeviceInfo | null>(null);
-  const [battery, setBattery] = useState<number | null>(null);
+  // The background service may already own the link when the UI starts; read it synchronously.
+  const [device, setDevice] = useState<DeviceInfo | null>(() => HuaweiWear.getDevice());
+  const [activeAddress, setActiveAddress] = useState<string | null>(() =>
+    HuaweiWear.getState() === 'disconnected'
+      ? null
+      : (HuaweiWear.getDevice()?.address ?? HuaweiWear.getBackgroundStatus().address),
+  );
+  const [battery, setBattery] = useState<number | null>(() => HuaweiWear.getDevice()?.batteryLevel ?? null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [totals, setTotals] = useState<WatchTotals | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const syncing = useRef(false);
+
+  /** Adopts a link that the background service connected while the UI was not watching. */
+  const adoptNativeLink = useCallback(async () => {
+    const info = HuaweiWear.getDevice();
+    const address = info?.address ?? HuaweiWear.getBackgroundStatus().address;
+    if (info) {
+      setDevice(info);
+      setBattery(info.batteryLevel);
+    }
+    setActiveAddress(address);
+    if (address) setLastSync(await getLastSync(db, address));
+  }, [db]);
+
+  const applySummary = useCallback((summary: SyncSummary) => {
+    setLastSync(summary.to);
+    setTotals({ ...summary.totals, at: summary.to });
+    setDataVersion((v) => v + 1);
+  }, []);
+
+  // Last stored sync of the remembered watch, so Today shows it before any connect.
+  useEffect(() => {
+    const address = HuaweiWear.getDevice()?.address ?? HuaweiWear.getBackgroundStatus().address;
+    if (!address) return;
+    let live = true;
+    getLastSync(db, address).then(
+      (last) => {
+        if (live) setLastSync(last);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [db]);
 
   useEventListener(HuaweiWear, 'onStateChange', (event) => {
     setLinkState(event.state);
@@ -78,10 +116,16 @@ export function WatchProvider({ children }: { children: ReactNode }) {
       setActiveAddress(null);
       setDevice(null);
       setBattery(null);
+      return;
     }
+    if ((event.state === 'connected' || event.state === 'syncing') && !device) {
+      void adoptNativeLink().catch((e) => setError(errorMessage(e)));
+    }
+    if (!activeAddress) setActiveAddress(HuaweiWear.getBackgroundStatus().address);
   });
   useEventListener(HuaweiWear, 'onBattery', (event) => setBattery(event.level));
   useEventListener(HuaweiWear, 'onLog', pushLog);
+  useEventListener(HuaweiWear, 'onSyncComplete', applySummary);
 
   const connect = useCallback(
     async (address: string) => {
@@ -89,7 +133,6 @@ export function WatchProvider({ children }: { children: ReactNode }) {
       setActiveAddress(address);
       try {
         const info = await HuaweiWear.connect(address);
-        await upsertDevice(db, info);
         setDevice(info);
         setBattery(info.batteryLevel);
         setLastSync(await getLastSync(db, info.address));
@@ -134,22 +177,13 @@ export function WatchProvider({ children }: { children: ReactNode }) {
     syncing.current = true;
     setError(null);
     try {
-      const last = await getLastSync(db, device.address);
-      const from =
-        last === null
-          ? Math.floor(Date.now() / 1000) - FIRST_SYNC_LOOKBACK_SEC
-          : Math.max(0, last - SYNC_OVERLAP_SEC);
-      const result = await HuaweiWear.syncActivity(from);
-      await saveSyncResult(db, device.address, result);
-      setLastSync(result.to);
-      setTotals({ ...result.totals, at: result.to });
-      setDataVersion((v) => v + 1);
+      applySummary(await HuaweiWear.syncActivity());
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       syncing.current = false;
     }
-  }, [db, device]);
+  }, [device, applySummary]);
 
   const value = useMemo<WatchContextValue>(
     () => ({

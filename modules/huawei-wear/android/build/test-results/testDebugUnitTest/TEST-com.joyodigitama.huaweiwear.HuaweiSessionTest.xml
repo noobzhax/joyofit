@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.joyodigitama.huaweiwear.HuaweiSessionTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:09:57.649Z" hostname="dzul" time="0.215">
+<testsuite name="com.joyodigitama.huaweiwear.HuaweiSessionTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.677Z" hostname="dzul" time="0.02">
   <properties/>
-  <testcase name="concatenatedResponsesCompletePendingRequestsInOrder" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.2"/>
+  <testcase name="concatenatedResponsesCompletePendingRequestsInOrder" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.011"/>
   <testcase name="unsolicitedPacketIsLoggedNotDelivered" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <testcase name="responseSplitAcrossReadsIsReassembled" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <testcase name="corruptFrameIsDroppedAndNextFrameStillParses" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[SLF4J(W): No SLF4J providers were found.
-SLF4J(W): Defaulting to no-operation (NOP) logger implementation
-SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
-]]></system-err>
+  <system-err><![CDATA[]]></system-err>
 </testsuite>

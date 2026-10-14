@@ -55,6 +55,10 @@ internal class HuaweiAuthenticator(
   private val params get() = session.params
   private val random = SecureRandom()
 
+  /** LinkParams protocolVersion (GB `HuaweiSupportProvider.getProtocolVersion()`); valid after [authenticate]. */
+  var protocolVersion: Int = 0
+    private set
+
   /**
    * Runs the whole authentication. Throws [WearException]: ERR_AUTH_FAILED (GB-style reason in the
    * message), ERR_TIMEOUT, ERR_DEVICE_STATUS or ERR_DISCONNECTED.
@@ -133,6 +137,7 @@ internal class HuaweiAuthenticator(
     params.setAuthVersion(response.authVersion)
     params.setAuthAlgo(response.authAlgo)
     params.setEncryptMethod(response.encryptMethod)
+    protocolVersion = response.protocolVersion.toInt() and 0xFF
     events.log(
       LogDirection.INFO,
       null,

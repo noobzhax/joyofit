@@ -38,11 +38,17 @@ export interface StepSample {
   restingHeartRate: number | null;
 }
 
-/** Sleep segment from FitnessData sleep frames; `type` is the raw watch sleep-state byte. */
+export type SleepStage = 'light' | 'deep' | 'rem' | 'awake';
+
+/**
+ * Sleep segment as stored in the database; `type` is the raw watch sleep-state byte and `stage` the
+ * decoded stage, null when the watch gave none.
+ */
 export interface SleepSegment {
   start: number;
   end: number;
   type: number;
+  stage?: SleepStage | null;
 }
 
 export interface FitnessTotals {
@@ -51,11 +57,20 @@ export interface FitnessTotals {
   distance: number;
 }
 
-export interface SyncResult {
+/**
+ * What one finished sync reports. The samples and sleep segments themselves are written to the
+ * database by the native side; read them back with SQL.
+ */
+export interface SyncSummary {
+  /** Start of the requested window, unix seconds. */
   from: number;
+  /** End of the window (= new `device.last_sync`), unix seconds. */
   to: number;
-  samples: StepSample[];
-  sleep: SleepSegment[];
+  /** Number of step samples stored by this sync. */
+  samples: number;
+  /** Number of sleep segments stored by this sync. */
+  sleep: number;
+  /** Today's totals as reported by the watch. */
   totals: FitnessTotals;
 }
 
@@ -79,8 +94,55 @@ export interface BatteryEvent {
   level: number;
 }
 
+/** Emitted after every stored sync, including syncs run by the background service. */
+export interface SyncCompleteEvent extends SyncSummary {}
+
+/** Background connection settings and service state. */
+export interface BackgroundStatus {
+  /** The foreground service keeps the watch connected and syncs on a timer. */
+  enabled: boolean;
+  /** The remembered watch: the last one connected or enabled for background, or null. */
+  address: string | null;
+  /** Name of the remembered watch. */
+  name: string | null;
+  /** The foreground service is running right now. */
+  running: boolean;
+  /**
+   * Auto-reconnect is paused because the user disconnected in the app. Connecting again (or
+   * toggling background off and on) resumes it.
+   */
+  paused: boolean;
+  syncIntervalMinutes: number;
+}
+
+export interface NotificationAccessStatus {
+  /** The user granted notification access to this app in Android settings. */
+  granted: boolean;
+  /** Forwarding to the watch is switched on. */
+  enabled: boolean;
+}
+
+/** An installed launcher app and whether its notifications are forwarded. */
+export interface NotificationApp {
+  packageName: string;
+  label: string;
+  enabled: boolean;
+}
+
+export type UserSex = 'male' | 'female' | 'unknown';
+
+/** Profile and goal sent to the watch. */
+export interface UserProfile {
+  heightCm: number;
+  weightKg: number;
+  birthYear: number;
+  sex: UserSex;
+  dailyStepGoal: number;
+}
+
 export type HuaweiWearModuleEvents = {
   onStateChange: (event: StateEvent) => void;
   onBattery: (event: BatteryEvent) => void;
   onLog: (event: LogEvent) => void;
+  onSyncComplete: (event: SyncCompleteEvent) => void;
 };

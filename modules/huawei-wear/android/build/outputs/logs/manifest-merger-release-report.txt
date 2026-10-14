@@ -1,7 +1,7 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:1:1-6:12
-INJECTED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:1:1-6:12
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:1:1-45:12
+INJECTED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:1:1-45:12
 	package
 		INJECTED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml
 	xmlns:android
@@ -22,12 +22,86 @@ uses-permission#android.permission.BLUETOOTH_CONNECT
 ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:4:3-74
 	android:name
 		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:4:20-71
-uses-feature#android.hardware.bluetooth
-ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:5:3-85
-	android:required
-		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:5:59-82
+uses-permission#android.permission.FOREGROUND_SERVICE
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:5:3-75
 	android:name
-		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:5:17-58
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:5:20-72
+uses-permission#android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:6:3-92
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:6:20-89
+uses-permission#android.permission.POST_NOTIFICATIONS
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:7:3-75
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:7:20-72
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:8:3-79
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:8:20-76
+uses-permission#android.permission.WAKE_LOCK
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:9:3-66
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:9:20-63
+uses-feature#android.hardware.bluetooth
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:3-85
+	android:required
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:59-82
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:10:17-58
+queries
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:13:3-18:13
+intent#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:14:5-17:14
+action#android.intent.action.MAIN
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:7-59
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:15:15-56
+category#android.intent.category.LAUNCHER
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:7-67
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:16:17-64
+application
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:20:3-44:17
+service#com.joyodigitama.huaweiwear.WatchService
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:21:5-24:57
+	android:exported
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:23:7-31
+	android:foregroundServiceType
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:24:7-54
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:22:7-62
+service#com.joyodigitama.huaweiwear.WatchNotificationListener
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:26:5-34:15
+	android:label
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:29:7-31
+	android:exported
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:28:7-30
+	android:permission
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:30:7-81
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:27:7-75
+intent-filter#action:name:android.service.notification.NotificationListenerService
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:31:7-33:23
+action#android.service.notification.NotificationListenerService
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:32:9-91
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:32:17-88
+receiver#com.joyodigitama.huaweiwear.BootReceiver
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:36:5-43:16
+	android:exported
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:38:7-30
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:37:7-62
+intent-filter#action:name:android.intent.action.BOOT_COMPLETED+action:name:android.intent.action.MY_PACKAGE_REPLACED
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:39:7-42:23
+action#android.intent.action.BOOT_COMPLETED
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:40:9-71
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:40:17-68
+action#android.intent.action.MY_PACKAGE_REPLACED
+ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:41:9-76
+	android:name
+		ADDED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml:41:17-73
 uses-sdk
 INJECTED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android/src/main/AndroidManifest.xml

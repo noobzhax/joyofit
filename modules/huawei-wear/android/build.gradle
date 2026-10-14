@@ -12,6 +12,12 @@ android {
     versionCode 1
     versionName "0.1.0"
   }
+  sourceSets {
+    main {
+      // The shared database migrations (also imported by src/db/migrations.ts) ship as an asset.
+      assets.srcDirs += file('../schema')
+    }
+  }
   lintOptions {
     abortOnError false
   }

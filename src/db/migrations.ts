@@ -1,35 +1,14 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import migrationsJson from '../../modules/huawei-wear/schema/watchfit-db-migrations.json';
+
 /**
- * Ordered schema migrations. `PRAGMA user_version` holds the number of migrations already applied,
- * so entry `i` upgrades a database from version `i` to `i + 1`. Never edit a shipped entry; append.
+ * Ordered schema migrations, shared with the native side (it reads the same JSON as an Android
+ * asset). Each entry is a list of single SQL statements. `PRAGMA user_version` holds the number of
+ * migrations already applied, so entry `i` upgrades a database from version `i` to `i + 1`. Never
+ * edit a shipped entry; append.
  */
-const MIGRATIONS: readonly string[] = [
-  `
-  CREATE TABLE step_samples (
-    timestamp INTEGER PRIMARY KEY NOT NULL,
-    steps INTEGER NOT NULL,
-    calories INTEGER NOT NULL,
-    distance INTEGER NOT NULL,
-    heart_rate INTEGER,
-    spo2 INTEGER,
-    resting_heart_rate INTEGER
-  );
-  CREATE TABLE sleep_segments (
-    start INTEGER NOT NULL,
-    end INTEGER NOT NULL,
-    type INTEGER NOT NULL,
-    PRIMARY KEY (start, type)
-  );
-  CREATE TABLE device (
-    address TEXT PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL,
-    product_model TEXT,
-    software_version TEXT,
-    last_sync INTEGER
-  );
-  `,
-];
+const MIGRATIONS: readonly (readonly string[])[] = migrationsJson;
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL');
@@ -41,7 +20,7 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
     );
   }
   for (let version = current; version < MIGRATIONS.length; version++) {
-    const sql = MIGRATIONS[version];
+    const sql = MIGRATIONS[version].join(';\n');
     await db.withExclusiveTransactionAsync(async (txn) => {
       await txn.execAsync(sql);
       await txn.execAsync(`PRAGMA user_version = ${version + 1}`);

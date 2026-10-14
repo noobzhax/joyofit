@@ -7,23 +7,37 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.sqlite.SQLiteException
 import android.os.Build
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants
+
+/** What the notification and profile senders need from the live connection. */
+internal class LinkHandle(
+  val address: String,
+  val session: HuaweiSession,
+  val notificationState: HuaweiNotificationState,
+)
 
 /**
  * The single active session to a watch: RFCOMM transport + packet session + auth/init/sync, and
  * the [LinkState] machine JS observes. At most one [Connection] exists; every failure while
- * connecting (including every authentication failure) tears it down.
+ * connecting (including every authentication failure) tears it down. The JS module and the
+ * background service both drive this one instance.
  */
 internal class WearLink(
   context: Context,
   private val events: WearEvents,
+  private val settings: WearSettings,
+  private val syncStore: SyncStore,
 ) {
   private val appContext = context.applicationContext
   private val store = DeviceStore(appContext)
@@ -44,6 +58,12 @@ internal class WearLink(
 
     @Volatile
     var info: Map<String, Any?>? = null
+
+    @Volatile
+    var handle: LinkHandle? = null
+
+    /** Completes when this connect attempt finishes, so a second caller for the same watch can join it. */
+    val ready = CompletableDeferred<Map<String, Any?>>()
     lateinit var session: HuaweiSession
     val transport = RfcommTransport(
       adapter = adapter,
@@ -58,6 +78,22 @@ internal class WearLink(
   }
 
   fun currentState(): String = state.wire
+
+  /** The live connection for sending notifications and profile data; null unless connected. */
+  fun handle(): LinkHandle? = synchronized(lock) {
+    val connection = current
+    if (connection == null || connection.closed.get() || (state != LinkState.CONNECTED && state != LinkState.SYNCING)) null
+    else connection.handle
+  }
+
+  /** The connected watch, as `connect` returned it; null unless connected. */
+  fun deviceInfo(): Map<String, Any?>? = synchronized(lock) {
+    val connection = current
+    if (connection == null || (state != LinkState.CONNECTED && state != LinkState.SYNCING)) null else connection.info
+  }
+
+  /** True until a HiChain bind with [address] has completed; a bind needs the user to confirm on the watch. */
+  fun needsBind(address: String): Boolean = store.forDevice(address.trim().uppercase(Locale.ROOT)).isFirstConnection
 
   // Bluetooth access
 
@@ -111,19 +147,32 @@ internal class WearLink(
     }
 
     val connection: Connection
+    var joining: Connection? = null
     synchronized(lock) {
-      current?.let { existing ->
+      val existing = current
+      if (existing != null) {
         val info = existing.info
-        if (existing.address == address && state == LinkState.CONNECTED && info != null) return info
-        throw WearException(
-          ErrorCodes.BUSY,
-          "Already ${state.wire} with ${existing.address}; disconnect before connecting again",
-        )
+        if (existing.address == address) {
+          if (info != null && (state == LinkState.CONNECTED || state == LinkState.SYNCING)) return info
+          // Another caller (the background service or JS) is already connecting to this watch.
+          if (info == null && !existing.closed.get()) joining = existing
+        }
+        if (joining == null) {
+          throw WearException(
+            ErrorCodes.BUSY,
+            "Already ${state.wire} with ${existing.address}; disconnect before connecting again",
+          )
+        }
       }
-      connection = Connection(address, adapter.getRemoteDevice(address), adapter)
-      current = connection
-      state = LinkState.CONNECTING
+      if (joining == null) {
+        connection = Connection(address, adapter.getRemoteDevice(address), adapter)
+        current = connection
+        state = LinkState.CONNECTING
+      } else {
+        connection = joining
+      }
     }
+    joining?.let { return it.ready.await() }
     events.state(LinkState.CONNECTING, null)
     events.log(LogDirection.INFO, null, null, null, "Connecting to $address (RFCOMM, SDP ${HuaweiConstants.UUID_SERVICE_HUAWEI_SDP})")
 
@@ -133,10 +182,18 @@ internal class WearLink(
 
       setState(connection, LinkState.AUTHENTICATING)
       val identity = store.forDevice(address)
-      val authMode = HuaweiAuthenticator(connection.session, identity, events).authenticate()
+      val authenticator = HuaweiAuthenticator(connection.session, identity, events)
+      val authMode = authenticator.authenticate()
 
       setState(connection, LinkState.INITIALIZING)
-      val init = HuaweiInitializer(connection.session, events, bondedName(connection.device)).run()
+      val init = HuaweiInitializer(
+        session = connection.session,
+        events = events,
+        bondedName = bondedName(connection.device),
+        protocolVersion = authenticator.protocolVersion,
+        profile = settings.profile,
+        notificationsEnabled = settings.notificationsEnabled,
+      ).run()
 
       val name = bondedName(connection.device) ?: init.deviceName ?: address
       val info = mapOf(
@@ -155,10 +212,13 @@ internal class WearLink(
           throw WearException(ErrorCodes.DISCONNECTED, "Disconnected while connecting")
         }
         connection.info = info
+        connection.handle = LinkHandle(address, connection.session, init.notificationState)
         state = LinkState.CONNECTED
       }
+      rememberWatch(address, name, info)
       events.state(LinkState.CONNECTED, null)
       init.batteryLevel?.let { events.battery(it) }
+      connection.ready.complete(info)
       return info
     } catch (t: Throwable) {
       if (t is CancellationException) {
@@ -177,6 +237,17 @@ internal class WearLink(
       events.log(LogDirection.ERROR, null, null, null, "Connect failed [${failure.errorCode}]: ${failure.message}")
       teardown(connection, failure, failure.message)
       throw failure
+    }
+  }
+
+  /** The watch becomes the one background mode follows, and gets its row in the shared database. */
+  private fun rememberWatch(address: String, name: String, info: Map<String, Any?>) {
+    settings.watchAddress = address
+    settings.watchName = name
+    try {
+      syncStore.upsertDevice(address, name, info["productModel"] as String?, info["softwareVersion"] as String?)
+    } catch (e: SQLiteException) {
+      events.log(LogDirection.ERROR, null, null, null, "Could not store the watch in the database: ${e.message}")
     }
   }
 
@@ -219,6 +290,7 @@ internal class WearLink(
   private fun teardown(connection: Connection, cause: WearException, error: String?) {
     if (!connection.closed.compareAndSet(false, true)) return
     connection.closeCause = cause
+    connection.ready.completeExceptionally(cause)
     connection.session.close(cause)
     connection.transport.close()
     val wasCurrent = synchronized(lock) {
@@ -262,12 +334,16 @@ internal class WearLink(
     }
   }
 
-  suspend fun syncActivity(fromSec: Long): Map<String, Any?> {
+  /**
+   * Pulls sleep, steps and totals since the last stored sync, commits them to the shared database
+   * and reports a summary (also as `onSyncComplete`).
+   */
+  suspend fun syncActivity(): SyncSummary {
     val connection = requireConnected()
     if (state == LinkState.SYNCING) {
       throw WearException(ErrorCodes.BUSY, "A sync is already running")
     }
-    return connection.operationLock.withLock {
+    val summary = connection.operationLock.withLock {
       synchronized(lock) {
         if (current !== connection || state != LinkState.CONNECTED) {
           throw WearException(ErrorCodes.NOT_CONNECTED, "Not connected to a watch (state: ${state.wire})")
@@ -276,7 +352,10 @@ internal class WearLink(
       }
       events.state(LinkState.SYNCING, null)
       try {
-        ActivitySync(connection.session, events).sync(fromSec).toJs()
+        val last = storage { syncStore.lastSync(connection.address) }
+        val from = syncWindowStart(last, System.currentTimeMillis() / 1000)
+        val result = ActivitySync(connection.session, events).sync(from)
+        storage { syncStore.save(connection.address, result) }
       } finally {
         val restored = synchronized(lock) {
           if (current === connection && state == LinkState.SYNCING) {
@@ -289,5 +368,15 @@ internal class WearLink(
         if (restored) events.state(LinkState.CONNECTED, null)
       }
     }
+    events.syncComplete(summary)
+    return summary
   }
+
+  /** Database access off the caller's thread; a failed read or write surfaces as ERR_STORAGE. */
+  private suspend fun <T> storage(block: () -> T): T =
+    try {
+      withContext(Dispatchers.IO) { block() }
+    } catch (e: SQLiteException) {
+      throw WearException(ErrorCodes.STORAGE, "Database error: ${e.message}", e)
+    }
 }

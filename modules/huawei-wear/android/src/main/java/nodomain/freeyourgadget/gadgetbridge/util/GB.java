@@ -18,7 +18,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-// Modified for watch-fit (AGPL-3.0-or-later): minimal subset of GB's util.GB (hexdump/hexStringToByteArray only), copied verbatim.
+// Modified for watch-fit (AGPL-3.0-or-later): minimal subset of GB's util.GB (hexdump/lazyHexdump/hexStringToByteArray only), copied verbatim.
 package nodomain.freeyourgadget.gadgetbridge.util;
 
 import androidx.annotation.NonNull;
@@ -48,6 +48,49 @@ public class GB {
             return "(null)";
         }
         return hexdump(buffer, 0, buffer.length);
+    }
+
+    /**
+     * A hexdump that is only produced if it is written. Pass it to a log statement in place of
+     * {@link #hexdump(byte[])}: slf4j resolves an argument by calling {@code toString()} on it, and
+     * only does so once it knows the statement passes the level in effect.
+     * <p>
+     * This is the form to reach for when a single argument is the expensive part of a statement.
+     * An {@code isDebugEnabled()} block is for when there is more to skip than one argument: two or
+     * more costly arguments, a loop, or a value built up only to be logged.
+     */
+    @NonNull
+    public static Object lazyHexdump(@Nullable final byte[] buffer) {
+        return new LazyHexdump(buffer, 0, -1);
+    }
+
+    /**
+     * @see #lazyHexdump(byte[])
+     */
+    @NonNull
+    public static Object lazyHexdump(@Nullable final byte[] buffer, final int offset, final int length) {
+        return new LazyHexdump(buffer, offset, length);
+    }
+
+    private static final class LazyHexdump {
+        private final byte[] buffer;
+        private final int offset;
+        private final int length;
+
+        LazyHexdump(@Nullable final byte[] buffer, final int offset, final int length) {
+            this.buffer = buffer;
+            this.offset = offset;
+            this.length = length;
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            if (buffer == null) {
+                return "(null)";
+            }
+            return hexdump(buffer, offset, length);
+        }
     }
 
     /**

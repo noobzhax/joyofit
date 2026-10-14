@@ -4,23 +4,40 @@ import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Field
+import expo.modules.kotlin.records.Record
+
+/** `UserProfile` in `HuaweiWear.types.ts`. */
+class UserProfileRecord : Record {
+  @Field var heightCm: Int = 0
+  @Field var weightKg: Double = 0.0
+  @Field var birthYear: Int = 0
+  @Field var sex: String = "unknown"
+  @Field var dailyStepGoal: Int = 0
+}
 
 /**
- * Expo module implementing `HuaweiWearModule.ts`. All protocol work lives in [WearLink]; this class
- * only wires the TS contract (functions + `onStateChange` / `onBattery` / `onLog` events) to it.
+ * Expo module implementing `HuaweiWearModule.ts`. All protocol work lives in [WearLink], reached
+ * through the process-wide [WearRuntime] that the background service shares; this class wires the
+ * TS contract to it and forwards runtime events (`onStateChange` / `onBattery` / `onLog` /
+ * `onSyncComplete`) to JS while the module is alive.
  */
 class HuaweiWearModule : Module() {
   // After OnDestroy the module may no longer emit; a JS reload starts from a fresh module.
   @Volatile
   private var destroyed = false
 
-  private val events = object : WearEvents {
+  private val listener = object : WearEvents {
     override fun state(state: LinkState, error: String?) {
       emit("onStateChange", mapOf("state" to state.wire, "error" to error))
     }
 
     override fun battery(level: Int) {
       emit("onBattery", mapOf("level" to level))
+    }
+
+    override fun syncComplete(summary: SyncSummary) {
+      emit("onSyncComplete", summary.toJs())
     }
 
     override fun log(direction: LogDirection, serviceId: Int?, commandId: Int?, hex: String?, message: String) {
@@ -48,50 +65,114 @@ class HuaweiWearModule : Module() {
     }
   }
 
-  private var link: WearLink? = null
+  // Kept so OnDestroy can still reach the runtime after the React context is gone.
+  @Volatile
+  private var runtimeRef: WearRuntime? = null
 
-  private fun link(): WearLink = synchronized(this) {
-    link ?: WearLink(appContext.reactContext ?: throw Exceptions.ReactContextLost(), events).also { link = it }
-  }
+  private fun runtime(): WearRuntime =
+    runtimeRef ?: WearRuntime.get(appContext.reactContext ?: throw Exceptions.ReactContextLost()).also { runtimeRef = it }
+
+  private fun profileOf(record: UserProfileRecord) = UserProfileData(
+    heightCm = record.heightCm,
+    weightKg = record.weightKg,
+    birthYear = record.birthYear,
+    sex = record.sex,
+    dailyStepGoal = record.dailyStepGoal,
+  )
 
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete")
+
+    OnCreate {
+      val runtime = runtime()
+      runtime.addListener(listener)
+      runtime.ensureServiceRunning()
+    }
 
     AsyncFunction("getBondedDevices") {
-      link().bondedDevices()
+      runtime().link.bondedDevices()
     }
 
     AsyncFunction("connect") Coroutine { address: String ->
-      link().connect(address)
+      runtime().connectFromApp(address)
     }
 
     AsyncFunction("disconnect") {
-      link?.disconnect()
-      Unit
+      runtime().disconnectFromApp()
     }
 
-    // A fresh module (JS reload) is always disconnected.
+    // The link outlives JS reloads when the background service owns it.
     Function("getState") {
-      link?.currentState() ?: LinkState.DISCONNECTED.wire
+      runtime().link.currentState()
+    }
+
+    Function("getDevice") {
+      val runtime = runtime()
+      runtime.link.deviceInfo()?.let { info ->
+        runtime.status.value.battery?.let { info + ("batteryLevel" to it) } ?: info
+      }
     }
 
     AsyncFunction("refreshBattery") Coroutine { ->
-      link().refreshBattery()
+      runtime().link.refreshBattery()
     }
 
-    AsyncFunction("syncActivity") Coroutine { fromSec: Double ->
-      link().syncActivity(fromSec.toLong())
+    AsyncFunction("syncActivity") Coroutine { ->
+      runtime().link.syncActivity().toJs()
     }
 
     AsyncFunction("forgetDevice") { address: String ->
-      link().forget(address)
+      runtime().forget(address)
+    }
+
+    AsyncFunction("setBackgroundEnabled") { address: String? ->
+      runtime().setBackground(address)
+    }
+
+    Function("getBackgroundStatus") {
+      runtime().backgroundStatus()
+    }
+
+    AsyncFunction("setSyncIntervalMinutes") { minutes: Int ->
+      runtime().setSyncInterval(minutes)
+    }
+
+    AsyncFunction("openNotificationAccess") {
+      runtime().openNotificationAccess()
+    }
+
+    Function("getNotificationAccess") {
+      runtime().notificationAccessStatus()
+    }
+
+    AsyncFunction("setNotificationsEnabled") Coroutine { enabled: Boolean ->
+      runtime().setNotificationsEnabled(enabled)
+    }
+
+    AsyncFunction("getNotificationApps") Coroutine { ->
+      runtime().notificationApps()
+    }
+
+    AsyncFunction("setNotificationAppEnabled") { packageName: String, enabled: Boolean ->
+      runtime().settings.setAppChoice(packageName, enabled)
+    }
+
+    Function("getUserProfile") {
+      runtime().settings.profile?.toJs()
+    }
+
+    AsyncFunction("setUserProfile") Coroutine { profile: UserProfileRecord ->
+      runtime().setUserProfile(profileOf(profile))
     }
 
     OnDestroy {
       destroyed = true
-      link?.shutdown()
+      runtimeRef?.let {
+        it.removeListener(listener)
+        it.onModuleDestroyed()
+      }
     }
   }
 

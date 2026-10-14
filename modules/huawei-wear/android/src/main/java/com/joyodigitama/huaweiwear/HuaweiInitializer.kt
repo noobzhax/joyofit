@@ -1,5 +1,6 @@
 // Derived from Gadgetbridge (AGPL-3.0-or-later; see NOTICE): HuaweiSupportProvider.initializeDeviceConfigure and
-// service/devices/huawei/requests/{GetProductInformation,SetTime,GetBatteryLevel,GetSupportedServices,GetSupportedCommands}Request.
+// service/devices/huawei/requests/{GetProductInformation,SetTime,GetBatteryLevel,GetSupportedServices,GetSupportedCommands,
+// SendFitnessUserInfo,SendFitnessGoal,GetNotificationCapabilities,GetNotificationConstraints,SetNotification}Request.
 package com.joyodigitama.huaweiwear
 
 import kotlin.math.abs
@@ -7,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiCoordinator.HuaweiDeviceType
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.AccountRelated
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DeviceConfig
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications
 
 internal class InitResult(
   val productModel: String?,
@@ -15,6 +17,7 @@ internal class InitResult(
   val serialNumber: String?,
   val deviceName: String?,
   val batteryLevel: Int?,
+  val notificationState: HuaweiNotificationState,
 )
 
 /**
@@ -28,10 +31,17 @@ internal class HuaweiInitializer(
   private val events: WearEvents,
   /** Android Bluetooth name of the watch; GB sends gbDevice.getName() in SetUpDeviceStatus. */
   private val bondedName: String?,
+  /** LinkParams protocolVersion (GB `getProtocolVersion()`). */
+  private val protocolVersion: Int,
+  /** Profile and goal the user saved; sent when present. */
+  private val profile: UserProfileData?,
+  /** The notification switch GB sends from `PREF_NOTIFICATION_ENABLE`. */
+  private val notificationsEnabled: Boolean,
 ) {
   private val params get() = session.params
 
   suspend fun run(): InitResult {
+    DeviceCaps.reset()
     var productModel: String? = null
     var softwareVersion: String? = null
     var hardwareVersion: String? = null
@@ -115,6 +125,8 @@ internal class HuaweiInitializer(
         events.log(LogDirection.INFO, null, null, null, "ExpandCapability: ${expandCapabilities?.size ?: 0} bytes")
       }
     }
+    DeviceCaps.supportedCommands = supportedCommands
+    DeviceCaps.expandCapabilities = expandCapabilities
     // SendExtendedAccountRequest (first in GB initializeDynamicServices): no Huawei account, so
     // GB's default empty account is sent. Watches that judge accounts wait for this after a bind.
     if (supports(AccountRelated.id.toInt(), 0x05) && supports(AccountRelated.id.toInt(), 0x06)) {
@@ -129,7 +141,20 @@ internal class HuaweiInitializer(
     }
     if (supports(0x01, DeviceConfig.SettingRelated.id)) {
       soft("SettingRelated") {
-        session.request(DeviceConfig.SettingRelated.Request(params), Timeouts.INIT_MS, "SettingRelated")
+        // GetSettingRelatedRequest.processResponse: the file-sync flags of tag 0x02.
+        val response = session
+          .request(DeviceConfig.SettingRelated.Request(params), Timeouts.INIT_MS, "SettingRelated")
+          .expect<DeviceConfig.SettingRelated.Response>("SettingRelated")
+        DeviceCaps.truSleepNewSync = response.truSleepNewSync
+        DeviceCaps.rriNewSync = response.rriNewSync
+        DeviceCaps.gpsNewSync = response.gpsNewSync
+        events.log(
+          LogDirection.INFO,
+          null,
+          null,
+          null,
+          "SettingRelated: truSleepNewSync=${response.truSleepNewSync} rriNewSync=${response.rriNewSync} gpsNewSync=${response.gpsNewSync}",
+        )
       }
     }
     if (supports(0x01, DeviceConfig.AcceptAgreement.id)) {
@@ -163,7 +188,39 @@ internal class HuaweiInitializer(
       }
     }
 
-    return InitResult(productModel, softwareVersion, hardwareVersion, serialNumber, deviceName, battery)
+    // SendFitnessUserInfoRequest + SendFitnessGoalRequest, once the user has saved a profile.
+    profile?.let { saved ->
+      soft("FitnessProfile") { ProfileSender.sendProfile(session, events, saved) }
+    }
+
+    // GetNotificationCapabilitiesRequest, GetNotificationConstraintsRequest, SetNotificationRequest.
+    val notificationState = HuaweiNotificationState(protocolVersion)
+    if (notificationState.shouldAskCapabilities) {
+      soft("NotificationCapabilities") {
+        notificationState.capabilities = session
+          .request(Notifications.NotificationCapabilities.Request(params), Timeouts.INIT_MS, "NotificationCapabilities")
+          .expect<Notifications.NotificationCapabilities.Response>("NotificationCapabilities")
+          .capabilities
+      }
+    }
+    if (notificationState.shouldAskConstraints) {
+      soft("NotificationConstraints") {
+        notificationState.constraints = session
+          .request(Notifications.NotificationConstraints.Request(params), Timeouts.INIT_MS, "NotificationConstraints")
+          .expect<Notifications.NotificationConstraints.Response>("NotificationConstraints")
+          .constraints
+        events.log(
+          LogDirection.INFO,
+          null,
+          null,
+          null,
+          "NotificationConstraints: contentFormat=${notificationState.contentFormat} contentLength=${notificationState.contentLength}",
+        )
+      }
+    }
+    soft("NotificationState") { ProfileSender.sendNotificationSwitch(session, events, notificationsEnabled) }
+
+    return InitResult(productModel, softwareVersion, hardwareVersion, serialNumber, deviceName, battery, notificationState)
   }
 
   /** GetSupportedCommandsRequest: as many services per request as fit, repeated until none are left. */

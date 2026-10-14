@@ -6,7 +6,7 @@ export type PermissionStatus = 'checking' | 'granted' | 'denied' | 'blocked';
 /** Android 12 (API 31) introduced the runtime BLUETOOTH_CONNECT permission; older versions grant it at install. */
 const RUNTIME_BLUETOOTH_API = 31;
 
-async function ensureBluetoothConnect(): Promise<Exclude<PermissionStatus, 'checking'>> {
+export async function ensureBluetoothConnect(): Promise<Exclude<PermissionStatus, 'checking'>> {
   if (Platform.OS !== 'android' || Number(Platform.Version) < RUNTIME_BLUETOOTH_API) {
     return 'granted';
   }

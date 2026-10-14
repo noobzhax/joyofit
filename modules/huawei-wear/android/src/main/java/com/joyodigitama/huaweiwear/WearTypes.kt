@@ -41,6 +41,9 @@ internal object ErrorCodes {
   const val DEVICE_STATUS = "ERR_DEVICE_STATUS"
   const val TIMEOUT = "ERR_TIMEOUT"
   const val PROTOCOL = "ERR_PROTOCOL"
+  const val STORAGE = "ERR_STORAGE"
+  const val INVALID_ARGUMENT = "ERR_INVALID_ARGUMENT"
+  const val UNSUPPORTED = "ERR_UNSUPPORTED"
 }
 
 /** Every failure surfaced to JS is a [CodedException] with one of [ErrorCodes]. */
@@ -50,9 +53,12 @@ internal class WearException(
   cause: Throwable? = null,
 ) : CodedException(errorCode, message, cause)
 
-/** Sink for everything the native layer reports to JS. Implemented by the Expo module. */
+/** Sink for everything the native layer reports; fans out to JS (when running) and the service notification. */
 internal interface WearEvents {
   fun state(state: LinkState, error: String?)
   fun battery(level: Int)
+
+  /** A sync finished and its rows are committed to the database. */
+  fun syncComplete(summary: SyncSummary)
   fun log(direction: LogDirection, serviceId: Int?, commandId: Int?, hex: String?, message: String)
 }

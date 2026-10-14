@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:09:58.075Z" hostname="dzul" time="0.003">
+<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.841Z" hostname="dzul" time="0.001">
   <properties/>
-  <testcase name="test0x80" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.0"/>
-  <testcase name="testZero" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.001"/>
+  <testcase name="test0x80" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.001"/>
+  <testcase name="testZero" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.0"/>
   <testcase name="testOffset" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.0"/>
   <testcase name="testSingleValue" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.0"/>
   <testcase name="testDoubleValue" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.TestVarInt" time="0.0"/>

@@ -24,6 +24,7 @@ class HuaweiSessionTest {
     val logs: MutableList<Pair<LogDirection, String>> = Collections.synchronizedList(ArrayList())
     override fun state(state: LinkState, error: String?) = Unit
     override fun battery(level: Int) = Unit
+    override fun syncComplete(summary: SyncSummary) = Unit
     override fun log(direction: LogDirection, serviceId: Int?, commandId: Int?, hex: String?, message: String) {
       logs.add(direction to message)
     }

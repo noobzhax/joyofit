@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.joyodigitama.huaweiwear.ProfileSenderTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.717Z" hostname="dzul" time="0.003">
+  <properties/>
+  <testcase name="birthdayIsEncodedAsGbDoes" classname="com.joyodigitama.huaweiwear.ProfileSenderTest" time="0.0"/>
+  <testcase name="ageIsWholeYearsSinceBirthYear" classname="com.joyodigitama.huaweiwear.ProfileSenderTest" time="0.001"/>
+  <testcase name="sexMapsToGbGenderBytes" classname="com.joyodigitama.huaweiwear.ProfileSenderTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

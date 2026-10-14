@@ -5,7 +5,7 @@
     "kind": "Directory"
   },
   "applicationId": "com.joyodigitama.huaweiwear",
-  "variantName": "debug",
+  "variantName": "release",
   "elements": [
     {
       "type": "SINGLE",

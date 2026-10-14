@@ -8,6 +8,7 @@ import { BondedRow } from '@/features/device/BondedRow';
 import { LinkStatus } from '@/features/device/LinkStatus';
 import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
 import { useBondedDevices } from '@/features/device/useBondedDevices';
+import { useBackgroundStatus } from '@/features/settings/useBackgroundStatus';
 import { formatDateTime } from '@/format';
 import { useWatch } from '@/state/WatchProvider';
 
@@ -16,6 +17,7 @@ export default function DeviceScreen() {
   const permission = useBluetoothPermission();
   const bonded = useBondedDevices(permission.status === 'granted');
   const { device } = watch;
+  const { status: background } = useBackgroundStatus();
 
   return (
     <Screen>
@@ -29,6 +31,11 @@ export default function DeviceScreen() {
         {watch.lastSync !== null ? (
           <AppText variant="caption" muted>
             Last sync {formatDateTime(watch.lastSync)}
+          </AppText>
+        ) : null}
+        {background.address ? (
+          <AppText variant="caption" muted>
+            Remembered for background: {background.name ?? background.address}
           </AppText>
         ) : null}
       </Section>

@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:09:58.087Z" hostname="dzul" time="0.056">
+<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:40:48.848Z" hostname="dzul" time="0.024">
   <properties/>
-  <testcase name="testLinkParamsResponseException" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
-  <testcase name="testSupportedCommandsResponseException02" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.003"/>
-  <testcase name="testSupportedCommandsResponseException04" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testLinkParamsResponseException" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testSupportedCommandsResponseException02" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testSupportedCommandsResponseException04" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
   <testcase name="testBondRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
   <testcase name="testBondParamsRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
-  <testcase name="testLinkParamsRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
-  <testcase name="testSupportedServicesRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
-  <testcase name="testProductInformationRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
-  <testcase name="testAuthRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
-  <testcase name="testDateFormatRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
-  <testcase name="testProductInformationResponseException07" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.003"/>
+  <testcase name="testLinkParamsRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testSupportedServicesRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.0"/>
+  <testcase name="testProductInformationRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.0"/>
+  <testcase name="testAuthRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.0"/>
+  <testcase name="testDateFormatRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testProductInformationResponseException07" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.0"/>
   <testcase name="testProductInformationResponseException0A" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.0"/>
-  <testcase name="testSupportedCommandsResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.004"/>
+  <testcase name="testSupportedCommandsResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
   <testcase name="testSupportedServicesResponseException" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
-  <testcase name="testTimeRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.006"/>
-  <testcase name="testSupportedServicesResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.004"/>
-  <testcase name="testSupportedCommandsRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.003"/>
+  <testcase name="testTimeRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.002"/>
+  <testcase name="testSupportedServicesResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
+  <testcase name="testSupportedCommandsRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
   <testcase name="testLinkParamsResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
   <testcase name="testProductInformationResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestDeviceConfig" time="0.001"/>
   <system-out><![CDATA[Crius

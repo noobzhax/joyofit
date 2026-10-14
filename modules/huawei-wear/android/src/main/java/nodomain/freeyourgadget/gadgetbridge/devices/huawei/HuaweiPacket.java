@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-// Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() dispatch limited to DeviceConfig and FitnessData; other packet classes not ported.
+// Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() dispatch limited to the ported packet classes (DeviceConfig, FitnessData, FileDownloadService0A/2C, Notifications constraints/capabilities); other packet classes not ported.
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei;
 
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.HUAWEI_MAGIC;
@@ -33,6 +33,9 @@ import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DeviceConfig;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FitnessData;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileDownloadService0A;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileDownloadService2C;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications;
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 public class HuaweiPacket {
@@ -484,6 +487,48 @@ public class HuaweiPacket {
                         return new FitnessData.MessageCount.Response(paramsProvider).fromPacket(this);
                     case FitnessData.MessageData.sleepId:
                         return new FitnessData.MessageData.SleepResponse(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case Notifications.id:
+                switch (this.commandId) {
+                    case Notifications.NotificationConstraints.id:
+                        return new Notifications.NotificationConstraints.Response(paramsProvider).fromPacket(this);
+                    case Notifications.NotificationCapabilities.id:
+                        return new Notifications.NotificationCapabilities.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case FileDownloadService0A.id:
+                switch (this.commandId) {
+                    case FileDownloadService0A.FileDownloadInit.id:
+                        return new FileDownloadService0A.FileDownloadInit.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService0A.FileParameters.id:
+                        return new FileDownloadService0A.FileParameters.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService0A.FileInfo.id:
+                        return new FileDownloadService0A.FileInfo.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService0A.RequestBlock.id:
+                        return new FileDownloadService0A.RequestBlock.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService0A.BlockResponse.id:
+                        return new FileDownloadService0A.BlockResponse(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt();
+                        return this;
+                }
+            case FileDownloadService2C.id:
+                switch (this.commandId) {
+                    case FileDownloadService2C.FileDownloadInit.id:
+                        return new FileDownloadService2C.FileDownloadInit.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService2C.FileRequestHash.id:
+                        return new FileDownloadService2C.FileRequestHash.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService2C.FileInfo.id:
+                        return new FileDownloadService2C.FileInfo.Response(paramsProvider).fromPacket(this);
+                    case FileDownloadService2C.BlockResponse.id:
+                        return new FileDownloadService2C.BlockResponse(paramsProvider).fromPacket(this);
+                    case FileDownloadService2C.IncomingInitRequest.id:
+                        return new FileDownloadService2C.IncomingInitRequest.Response(paramsProvider).fromPacket(this);
                     default:
                         this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
                         return this;
