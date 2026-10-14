@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-14T06:58:48.966Z" hostname="dzul" time="0.009">
+  <properties/>
+  <testcase name="testTruSleepRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageDataStepResponseNoCount" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageCountResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageDataRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testActivityReminderRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageCountRequest" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageDataStepResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageDataSleepResponse" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testMessageDataStepResponseSingleByte" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.001"/>
+  <testcase name="testSpoData" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestFitnessData" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

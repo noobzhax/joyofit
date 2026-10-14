@@ -1,72 +1,95 @@
-# WatchFit RE — Protocol Reference (living spec)
+# Huawei link protocol: what this app uses
 
-Target device: **Huawei Watch Fit 4 Pro**.
+These notes come from Gadgetbridge (upstream `bb7a1e83`, 2026-10-13). Nothing here has been
+captured from our own watch yet. Gadgetbridge lists the Watch Fit 4 and Fit 4 Pro as supported
+devices (`HuaweiWatchFit4ProCoordinator`). When a capture from a real watch confirms or contradicts
+something below, note it under **Observations**.
 
-This directory is the canonical, human-readable record of what we have discovered about the
-watch's BLE protocol. It exists because the protocol is undocumented; we reverse-engineer it
-experimentally and write down only what we have **observed**.
+## Transport
 
-## Core rule
+| Item | Value | GB source |
+|---|---|---|
+| Link | Bluetooth Classic (BR/EDR) RFCOMM, **not BLE GATT** | `HuaweiBRCoordinator.getConnectionType() = BT_CLASSIC` |
+| SDP service UUID | `82FF3820-8411-400C-B85A-55BDB32CF060` | `HuaweiConstants.UUID_SERVICE_HUAWEI_SDP` |
+| Socket | `createRfcommSocketToServiceRecord` (secure, needs a bond) | `btbr/BtBRQueue.connect` |
+| Advertised name | `HUAWEI WATCH FIT 4-XXX` / `HUAWEI WATCH FIT 4 Pro-XXX` | `HuaweiConstants.HU_WATCHFIT4*_NAME` |
 
-> **Do not document what we have not observed.** (PRD §29)
+The BLE service `0xFE86` (`FE01` write / `FE02` notify) is how older BLE-only Huawei bands connect.
+The Fit 4 is a BR device, so that service doesn't apply to it. This is why the old GATT explorer
+never found a usable channel.
 
-A guess is allowed only at the **HYPOTHESIS** level. Nothing here is "the spec" until it is
-**VERIFIED**.
-
-## Confidence ladder
-
-| Level        | Meaning                                                          |
-|--------------|------------------------------------------------------------------|
-| `UNKNOWN`    | Nothing known yet.                                               |
-| `HYPOTHESIS` | Plausible guess; unsupported by capture. Not actionable.         |
-| `OBSERVED`   | Seen in real traffic; correlation not yet proven.                |
-| `REPRODUCED` | Replayed against the watch; same result reproduced.              |
-| `VERIFIED`   | Reproduced reliably across sessions/devices/reboots. Actionable. |
-
-Only **REPRODUCED** or **VERIFIED** entries may be sent to the watch from app code.
-
-## Method
+## Frame
 
 ```
-Observation → Hypothesis → Experiment → Packet correlation → Replay → Validation → Implementation
+5A | len:u16 BE | slice:u8 | [flag:u8 if sliced] | service:u8 | command:u8 | TLV… | CRC16:u16 BE
 ```
 
-1. Capture BLE traffic (WatchFit RE Packet Log, or an external sniffer).
-2. Correlate a user action with a packet sequence.
-3. Form a command hypothesis. Record it here at `HYPOTHESIS`.
-4. Replay from the GATT Explorer. Observe the response.
-5. If the result matches, upgrade to `REPRODUCED`; repeat until `VERIFIED`.
-6. Implement in the `protocol/` Kotlin package.
+- Unsliced frames: `slice = 0x00` and `len = 1 + 2 + |TLV|`.
+- Sliced frames: `slice` goes 01, 02, …, 03 (last). `flag` is a counter, and service/command
+  appear only in the first slice.
+- The CRC16 covers everything from `5A` up to the CRC field (`CheckSums.getCRC16(…, 0)`).
+- Payloads use nested TLV with varint lengths (`HuaweiTLV`). Tags with bit 7 set are containers.
+- After auth, TLVs are encrypted with AES-CBC or AES-GCM, chosen by `encryptMethod`. Encrypted
+  TLVs use tags `0x7C/0x7D/0x7E` (`HuaweiTLV.encrypt`).
 
-## Files
+## Commands used by the app
 
-- `services.md` — discovered GATT services.
-- `characteristics.md` — discovered characteristics.
-- `packets.md` — frame / packet structure.
-- `authentication.md` — pairing / bonding / app-level auth / challenge-response.
-- `encryption.md` — session keys, cipher, IV, if any.
-- `commands.md` — command catalogue (one entry per decoded command).
-- `observations.md` — raw capture notes, timelines, open questions.
+| Service | Cmd | Name | Purpose |
+|---|---|---|---|
+| `01` DeviceConfig | `01` | LinkParams | protocol version, slice size, MTU, server nonce, auth version/algo, `deviceSupportType`, encrypt method |
+| `01` | `16` | DeviceStatus | decides whether a HiChain bind is needed |
+| `01` | `33` | SecurityNegotiation | returns `authType` (HiChain vs HiChain Lite) |
+| `01` | `2C` | PinCode | the watch supplies the PIN used by HiChain on first pairing |
+| `01` | `28` | HiChain | 4-step ISO exchange: op 1 = bind, op 2 = auth; HKDF-SHA256 session key |
+| `01` | `13` | Auth | HMAC challenge/response (normal and HiChain Lite modes) |
+| `01` | `0F` / `0E` | BondParams / Bond | sends the encrypted bonding key (HiChain Lite / BLE) |
+| `01` | `07` | ProductInfo | model, firmware, hardware, serial |
+| `01` | `05` | TimeRequest | read/set watch time |
+| `01` | `08` | BatteryLevel | battery % |
+| `01` | `02` / `03` | SupportedServices / SupportedCommands | capability discovery |
+| `07` FitnessData | `0C` / `0D` | sleep MessageCount / MessageData | sleep segments `(start, minutes, type)` |
+| `07` | `0A` / `0B` | step MessageCount / MessageData | per-minute steps / kcal / distance / HR / SpO₂ / resting HR |
+| `07` | `03` | FitnessTotals | today's totals |
 
-## Command entry template (commands.md)
+## Auth decision
 
+```mermaid
+flowchart TD
+  LP[LinkParams] --> DS[DeviceStatus]
+  DS -->|status -1/0/1| HC{deviceSupportType}
+  DS -->|other| UNSUP[GB: unimplemented → app fails with ERR_DEVICE_STATUS]
+  HC -->|1,3,4| SN[SecurityNegotiation]
+  HC -->|2| SN
+  HC -->|0| NORMAL[Auth only BR]
+  SN -->|authType 0x0186A0 or HiChain3| HICHAIN[PinCode on first pair → HiChain op1 bind → op2 auth]
+  SN -->|authType 1/2| LITE[Auth → BondParams → Bond]
+  HICHAIN --> CFG
+  LITE --> CFG
+  NORMAL --> CFG
+  CFG[ProductInfo → Time → Battery → SupportedServices/Commands]
 ```
-### <NAME>
 
-Characteristic: <uuid>
-Confidence:     UNKNOWN | HYPOTHESIS | OBSERVED | REPRODUCED | VERIFIED
+The watch can only be bound to one phone app at a time. Binding it to this app replaces its
+binding to Huawei Health, and the reverse is also true.
 
-Request:
-<hex bytes>
+## Observations
 
-Response:
-<hex bytes>
+### 2026-10-14: first connect, Watch Fit 4 (SYA-B29, `Seiya-B29F`), firmware 6.1.0.117(SP20C00M05)
 
-Notes:
-<what it does, how it was confirmed, caveats>
-```
+Phone: Xiaomi 15T Pro (Android). The watch had been unbound from Huawei Health and then paired
+in Android Bluetooth settings.
 
-## Status
+- RFCOMM via SDP UUID connected in about 0.2 s.
+- LinkParams: protocolVersion `0x02`, deviceSupportType `0x04`, authVersion `0x01`,
+  authAlgo `0x00`, encryptMethod `0x00` (AES-CBC), bondState `0x00`, MTU 990, sliceSize 1022.
+- DeviceStatus returned `0x01`, so the HiChain path was taken.
+- SecurityNegotiation returned authType `5` → **HiChain3**.
+- First-pair sequence: PinCode, then HiChain op1 steps 1–4, then op2 steps 1–3. Every token and
+  MAC check passed, and the whole exchange took about 0.6 s. The watch's PIN came over the link
+  (no typed PIN needed).
+- After auth the TLVs are encrypted (tags `7C/7D`). ProductInfo, SetTime (drift 1 s), Battery
+  (71 %) and SupportedServices all decrypted and parsed.
+- SupportedServices: `01 02 04 07 08 09 0a 0b 0c 0f 14 16 17 18 19 1a 1b 20 25 27 2a 2b 2e 30
+  32 34 35`. `07` (FitnessData) is present.
 
-**All services, characteristics, packets, and commands start at UNKNOWN.** Populate as the
-watch is reverse-engineered.
+So Gadgetbridge's HiChain3 path works unchanged on the Fit 4.

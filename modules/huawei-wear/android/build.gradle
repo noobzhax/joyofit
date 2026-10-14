@@ -1,0 +1,29 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.joyodigitama.huaweiwear'
+version = '0.1.0'
+
+android {
+  namespace "com.joyodigitama.huaweiwear"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+  testOptions {
+    unitTests.returnDefaultValues = true
+  }
+}
+
+dependencies {
+  implementation 'org.slf4j:slf4j-api:2.0.17'
+  implementation 'androidx.annotation:annotation:1.9.1'
+  testImplementation 'junit:junit:4.13.2'
+  // android.jar ships org.json as stubs; JVM unit tests need the real implementation.
+  testImplementation 'org.json:json:20250517'
+}

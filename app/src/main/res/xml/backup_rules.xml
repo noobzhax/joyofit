@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<full-backup-content>
-    <!-- Privacy: do not back up local health/protocol data off-device. -->
-    <exclude domain="database" path="." />
-    <exclude domain="file" path="watchfit-logs/" />
-</full-backup-content>

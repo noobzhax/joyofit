@@ -1,0 +1,18 @@
+<lint-module
+    format="1"
+    dir="/home/dzul/Documents/JoyoDigitama/watch-fit/modules/huawei-wear/android"
+    name=":huawei-wear"
+    type="LIBRARY"
+    maven="com.joyodigitama.huaweiwear:huawei-wear:0.1.0"
+    agpVersion="8.12.0"
+    buildFolder="build"
+    bootClassPath="/home/dzul/android-sdk/platforms/android-36/android.jar:/home/dzul/android-sdk/build-tools/35.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-36"
+    neverShrinking="true">
+  <lintOptions
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

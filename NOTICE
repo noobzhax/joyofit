@@ -1,0 +1,17 @@
+WatchFit
+Copyright (C) 2026 dzulfikar08
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version. See LICENSE.
+
+The Huawei protocol implementation in
+modules/huawei-wear/android/src/main/java/nodomain/freeyourgadget/gadgetbridge/
+and the Kotlin session layer in modules/huawei-wear/android/src/main/java/com/joyodigitama/huaweiwear/
+are derived from Gadgetbridge (https://codeberg.org/Freeyourgadget/Gadgetbridge),
+upstream commit bb7a1e83a29837153bf0c3a50e9869dec3dac0dd, licensed AGPL-3.0-or-later.
+Original copyright notices are retained in each ported file; modified files carry a
+"Modified for watch-fit" line.
+
+Huawei and HUAWEI WATCH FIT are trademarks of Huawei Technologies Co., Ltd. This project is not
+affiliated with or endorsed by Huawei.
