@@ -162,9 +162,62 @@ class WatchfaceTest {
   }
 
   @Test
-  fun randomNameIsNineDigitsAndVersionOne() {
-    val name = WatchfacePackages.randomName(Random(1))
-    assertTrue(Regex("^\\d{9}_1\\.0\\.0$").matches(name))
+  fun randomNameKeepsTheFacesOwnVersion() {
+    val name = WatchfacePackages.randomName(Random(1), "2.8.2")
+    assertTrue(name, Regex("^\\d{9}_2\\.8\\.2$").matches(name))
+  }
+
+  @Test
+  fun randomNameFallsBackToAHuaweiHealthStyleVersion() {
+    for (version in listOf(null, "", "abc", "2", "2.x", "2_1", "2.1 beta")) {
+      val name = WatchfacePackages.randomName(Random(7), version)
+      assertTrue(name, Regex("^\\d{9}_(10|[1-9])\\.(10|[1-9])\\.(10|[1-9])$").matches(name))
+    }
+  }
+
+  @Test
+  fun randomVersionStaysInOneToTen() {
+    val random = Random(3)
+    repeat(500) {
+      val parts = WatchfacePackages.randomVersion(random).split('.').map { it.toInt() }
+      assertEquals(3, parts.size)
+      assertTrue(parts.all { it in 1..10 })
+    }
+  }
+
+  private fun faceVersion(version: String) = WatchfaceDescription("t", "", "a", "d", "HWHD13", version, "", "", false)
+
+  @Test
+  fun versionGateFollowsHuaweiHealthMajorEqualAndMinorNotAbove() {
+    val logs = ArrayList<String>()
+    val others = "2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,2.10"
+    for (ok in listOf("2.1.1", "2.8.2", "2.10.5", "2.10")) {
+      WatchfacePackages.checkVersion(faceVersion(ok), "2.10", others) { logs.add(it) }
+    }
+    assertTrue(logs.isEmpty())
+    for (bad in listOf("1.0.0", "2.11.0", "3.1.0")) {
+      try {
+        WatchfacePackages.checkVersion(faceVersion(bad), "2.10", others) { }
+        fail("expected a refusal for $bad")
+      } catch (e: WearException) {
+        assertEquals(ErrorCodes.INVALID_ARGUMENT, e.errorCode)
+        assertTrue(e.message!!.contains("up to 2.10"))
+      }
+    }
+  }
+
+  @Test
+  fun versionGateAcceptsAnOtherVersionTheWatchLists() {
+    WatchfacePackages.checkVersion(faceVersion("1.5.0"), "2.10", "1.5,2.1") { }
+  }
+
+  @Test
+  fun versionGateLeavesUnreadableVersionsToTheWatch() {
+    val logs = ArrayList<String>()
+    WatchfacePackages.checkVersion(faceVersion(""), "2.10", "") { logs.add(it) }
+    WatchfacePackages.checkVersion(faceVersion("2.1.0"), "weird", "") { logs.add(it) }
+    assertEquals(2, logs.size)
+    assertTrue(logs.all { it.contains("not checked") })
   }
 
   // Fake 0x27 watch
@@ -199,6 +252,20 @@ class WatchfaceTest {
     val dropUploads: Boolean = false,
     val ignoreOperations: Boolean = false,
     val answerNames: Boolean = true,
+    /** 0x7f of the answer to a 27/03 that names a face the watch does not have; null leaves the tag out. */
+    val announceCode: Int? = 100000,
+    /** Tag 0x04 of that answer; null leaves it out. */
+    val needReceive: Int? = 1,
+    /** The watch does not answer a 27/03 that names a face it does not have. */
+    val silentAnnounce: Boolean = false,
+    /** Tag 0x11 of the params answer; null leaves it out. */
+    val capability: Int? = null,
+    /** The watch sends no 27/05 after the upload. */
+    val confirm: Boolean = true,
+    /** The watch reports the uploaded face deleted (27/05 type 3) right behind the confirmation and does not keep it. */
+    val removeAfterConfirm: Boolean = false,
+    /** 0x7f of the answer to an activation of the uploaded face (after the upload); null answers like an announcement. */
+    val rejectActivation: Int? = null,
   ) : FrameSink {
     lateinit var session: HuaweiSession
     val messages: MutableList<Msg> = Collections.synchronizedList(ArrayList())
@@ -236,14 +303,13 @@ class WatchfaceTest {
     }
 
     private fun respond(m: Msg): List<ByteArray> = when {
-      m.service == 0x27 && m.command == 0x01 ->
-        listOf(
-          tlvFrame(
-            0x27,
-            0x01,
-            HuaweiTLV().put(0x01, "6.0.0").put(0x02, width).put(0x03, height).put(0x04, 1.toByte()).put(0x05, 1.toByte()),
-          ),
-        )
+      m.service == 0x27 && m.command == 0x01 -> {
+        val params = HuaweiTLV()
+          .put(0x01, "2.10").put(0x02, width).put(0x03, height).put(0x04, 1.toByte()).put(0x05, 0.toByte())
+          .put(0x06, "2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,2.10")
+        if (capability != null) params.put(0x11, capability)
+        listOf(tlvFrame(0x27, 0x01, params))
+      }
       m.service == 0x27 && m.command == 0x02 -> {
         val list = HuaweiTLV()
         for (face in faces) {
@@ -263,15 +329,29 @@ class WatchfaceTest {
         val id = m.tlv!!.getString(0x01)
         val version = m.tlv.getString(0x02)
         val op = m.tlv.getByte(0x03).toInt()
-        if (!ignoreOperations) {
-          if (op == 1) {
-            faces.forEach { it.type = it.type and 1.inv() }
-            faces.firstOrNull { it.id == id && it.version == version }?.let { it.type = it.type or 1 }
-          } else if (op == 2) {
-            faces.removeAll { it.id == id }
+        val known = faces.any { it.id == id && it.version == version }
+        if (op == 1 && !known) {
+          // Announcement of a face the watch does not have: nothing changes, the watch only answers.
+          if (silentAnnounce) {
+            emptyList()
+          } else {
+            val answer = HuaweiTLV().put(0x01, id).put(0x02, version)
+            if (needReceive != null) answer.put(0x04, needReceive.toByte())
+            val code = if (uploadName.isNotEmpty() && rejectActivation != null) rejectActivation else announceCode
+            if (code != null) answer.put(0x7f, code)
+            listOf(tlvFrame(0x27, 0x03, answer))
           }
+        } else {
+          if (!ignoreOperations) {
+            if (op == 1) {
+              faces.forEach { it.type = it.type and 1.inv() }
+              faces.firstOrNull { it.id == id && it.version == version }?.let { it.type = it.type or 1 }
+            } else if (op == 2) {
+              faces.removeAll { it.id == id }
+            }
+          }
+          listOf(tlvFrame(0x27, 0x03, HuaweiTLV().put(0x7f, 100000)))
         }
-        listOf(tlvFrame(0x27, 0x03, HuaweiTLV().put(0x7f, 100000)))
       }
       m.service == 0x28 && m.command == 0x02 -> {
         uploadName = m.tlv!!.getString(0x01)
@@ -298,13 +378,19 @@ class WatchfaceTest {
         }
       }
       m.service == 0x28 && m.command == 0x07 -> {
-        if (!dropUploads) {
+        if (!dropUploads && !removeAfterConfirm) {
           val id = uploadName.substringBefore('_')
           faces.add(Face(id, uploadName.substringAfter('_'), "Night Run", 0))
         }
-        listOf(
-          tlvFrame(0x27, 0x05, HuaweiTLV().put(0x01, uploadName.substringBefore('_')).put(0x02, uploadName.substringAfter('_')).put(0x03, 2)),
-        )
+        val id = uploadName.substringBefore('_')
+        val version = uploadName.substringAfter('_')
+        if (!confirm) {
+          emptyList()
+        } else {
+          val frames = arrayListOf(tlvFrame(0x27, 0x05, HuaweiTLV().put(0x01, id).put(0x02, version).put(0x03, 2)))
+          if (removeAfterConfirm) frames.add(tlvFrame(0x27, 0x05, HuaweiTLV().put(0x01, id).put(0x02, version).put(0x03, 3).put(0x04, 0.toByte())))
+          frames
+        }
       }
       else -> emptyList()
     }
@@ -315,7 +401,7 @@ class WatchfaceTest {
     val session = HuaweiSession(watch, events).also { it.params.setSecretKey(ByteArray(16)) }
     watch.session = session
     DeviceCaps.supportedCommands = mapOf(0x27 to byteArrayOf(1, 2, 3, 5, 6))
-    return Triple(watch, WatchfaceOps(session, events, uploadStallMs = 2_000, confirmWaitMs = 500, queryMs = 400), events)
+    return Triple(watch, WatchfaceOps(session, events, uploadStallMs = 2_000, confirmWaitMs = 500, settleMs = 200, queryMs = 400), events)
   }
 
   @After
@@ -331,7 +417,9 @@ class WatchfaceTest {
 
     assertEquals(408, list.screen!!.width)
     assertEquals(480, list.screen!!.height)
-    assertEquals("6.0.0", list.screen!!.maxVersion)
+    assertEquals("2.10", list.screen!!.maxVersion)
+    assertEquals("2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,2.10", list.screen!!.otherVersions)
+    assertFalse(list.screen!!.supportsSignature)
     assertEquals(listOf("1000", "2000"), list.faces.map { it.id })
     assertEquals(listOf("Factory", "Mine"), list.faces.map { it.name })
     assertEquals(listOf(true, false), list.faces.map { it.isFactory })
@@ -341,7 +429,22 @@ class WatchfaceTest {
     val names = watch.all(0x27, 0x06).single().tlv!!
     assertEquals(2, names.getObject(0x82).getObjects(0x83).size)
     assertTrue(events.logs.any { it.contains("WatchfaceParams: width=408 height=480") })
+    // Every tag the watch sent is logged in the clear, text as text and the rest as hex.
+    assertTrue(events.logs.any { it.contains("WatchfaceParams TLV: 01=\"2.10\"") && it.contains("06=\"2.1,2.2") })
     assertTrue(events.logs.any { it.contains("1000_1.0.0") && it.contains("[active]") })
+  }
+
+  @Test
+  fun listReadsTheCapabilityBitsHuaweiHealthUses() = runBlocking {
+    val (_, ops, events) = setup(WatchSim(capability = 0b1100))
+
+    val screen = ops.list().screen!!
+
+    assertEquals(0b1100, screen.supportCapability)
+    assertTrue(screen.supportsSignature)
+    assertTrue(screen.supportsDialUnite)
+    assertTrue(events.logs.any { it.contains("capability=0xc") })
+    assertTrue(events.logs.any { it.contains("watch face signature=true") })
   }
 
   @Test
@@ -467,8 +570,8 @@ class WatchfaceTest {
     assertEquals(binary.size, result.bytes)
     assertEquals(0, result.uploadStatus)
     assertEquals(2, result.confirmReportType)
-    // reportType 2: the phone asked for it to become active, and this watch did it.
-    assertEquals(1, watch.all(0x27, 0x03).size)
+    // The announcement first, then reportType 2: the phone asked for the face to become active and this watch did it.
+    assertEquals(2, watch.all(0x27, 0x03).size)
     assertTrue(result.active)
     assertEquals("Installed and active.", result.message)
     assertEquals(binary.size to binary.size, progress.last())
@@ -531,7 +634,7 @@ class WatchfaceTest {
     val session = HuaweiSession(rejecting, events).also { it.params.setSecretKey(ByteArray(16)) }
     sim.session = session
     DeviceCaps.supportedCommands = mapOf(0x27 to byteArrayOf(1, 2, 3, 5, 6))
-    val ops = WatchfaceOps(session, events, uploadStallMs = 1_000, confirmWaitMs = 100, queryMs = 400)
+    val ops = WatchfaceOps(session, events, uploadStallMs = 1_000, confirmWaitMs = 100, settleMs = 100, queryMs = 400)
 
     try {
       ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "5_1.0.0")
@@ -540,5 +643,176 @@ class WatchfaceTest {
       assertEquals(ErrorCodes.UPLOAD_REJECTED, e.errorCode)
       assertEquals(140008, e.statusCode)
     }
+  }
+
+  // Install: Huawei Health's announcement (27/03) before the upload
+
+  private fun index(watch: WatchSim, service: Int, command: Int) =
+    watch.messages.indexOfFirst { it.service == service && it.command == command }
+
+  @Test
+  fun installAnnouncesTheFaceWithTheOperationBeforeAnythingIsUploaded() = runBlocking {
+    val (watch, ops, events) = setup()
+
+    ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "123456789_2.1.0")
+
+    assertTrue("27/03 comes before 28/02", index(watch, 0x27, 0x03) in 0 until index(watch, 0x28, 0x02))
+    val announce = watch.all(0x27, 0x03).first().tlv!!
+    assertEquals("123456789", announce.getString(0x01))
+    assertEquals("2.1.0", announce.getString(0x02))
+    assertEquals(1, announce.getByte(0x03).toInt())
+    assertEquals(listOf(0x01, 0x02, 0x03), announce.get().map { it.tag.toInt() })
+    assertTrue(events.logs.any { it.contains("announce 123456789_2.1.0 TLV before encryption: 01=\"123456789\" 02=\"2.1.0\" 03=01") })
+    assertTrue(events.logs.any { it.contains("watch answered status=100000 needReceive=1") })
+    // The file info that follows carries the name, size, type and the two watch face tags, in the clear in the log.
+    assertTrue(events.logs.any { it.contains("FileInfoSend TLV before encryption: 01=\"123456789_2.1.0\"") && it.contains("05=\"123456789\" 06=\"2.1.0\"") })
+  }
+
+  @Test
+  fun installNamesTheFaceAfterItsOwnVersionByDefault() = runBlocking {
+    val (watch, ops, _) = setup()
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> })
+
+    val name = watch.all(0x28, 0x02).single().tlv!!.getString(0x01)
+    assertTrue(name, Regex("^\\d{9}_2\\.1\\.0$").matches(name))
+    assertEquals("2.1.0", result.version)
+  }
+
+  @Test
+  fun installStopsWhenTheWatchRefusesTheAnnouncement() = runBlocking {
+    val (watch, ops, _) = setup(WatchSim(announceCode = 100014, needReceive = null, capability = 8))
+
+    try {
+      ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "123456789_2.1.0")
+      fail("expected a refusal")
+    } catch (e: WearException) {
+      assertEquals(ErrorCodes.UPLOAD_REJECTED, e.errorCode)
+      assertEquals(100014, e.statusCode)
+      assertTrue(e.message!!.contains("signature"))
+    }
+    assertTrue("nothing was uploaded", watch.all(0x28, 0x02).isEmpty())
+  }
+
+  @Test
+  fun anAnnouncementCodeOfNoteIsDescribedWithoutInventingAMeaning() {
+    assertTrue(describeAnnounceCode(100007).contains("signature failure"))
+    assertTrue(describeAnnounceCode(100015).contains("not documented"))
+    assertTrue(describeAnnounceCode(4242).contains("4242"))
+    assertTrue(describeAnnounceCode(4242).contains("not documented"))
+  }
+
+  @Test
+  fun anAnswerWithoutStatusOrNeedReceiveMeansUpload() = runBlocking {
+    val (watch, ops, _) = setup(WatchSim(announceCode = null, needReceive = null))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "55_2.1.0")
+
+    assertEquals(1, watch.all(0x28, 0x02).size)
+    assertTrue(result.listed)
+  }
+
+  @Test
+  fun installUploadsNothingWhenTheWatchHasTheFaceAlready() = runBlocking {
+    val (watch, ops, events) = setup(WatchSim(needReceive = 0))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "66_2.1.0")
+
+    assertTrue(watch.all(0x28, 0x02).isEmpty())
+    assertNull(result.uploadStatus)
+    assertNull(result.confirmReportType)
+    assertFalse("the sim only knows the face after an upload", result.listed)
+    assertTrue(events.logs.any { it.contains("needReceive=0") && it.contains("nothing is uploaded") })
+  }
+
+  @Test
+  fun installUploadsAnywayWhenTheAnnouncementIsNotAnswered() = runBlocking {
+    val (watch, ops, events) = setup(WatchSim(silentAnnounce = true))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "88_2.1.0")
+
+    assertEquals(1, watch.all(0x28, 0x02).size)
+    assertTrue(result.listed)
+    assertTrue(events.logs.any { it.contains("no answer from the watch") })
+  }
+
+  @Test
+  fun installRefusesAFaceTheWatchsVersionRangeDoesNotCover() = runBlocking {
+    val (watch, ops, _) = setup()
+    val old = WatchfacePackages.parse(hwt()).let { WatchfacePackage(WatchfaceDescription("t", "", "a", "d", "HWHD13", "1.0.0", "", "", false), it.binary, null) }
+
+    try {
+      ops.install(old, { _, _ -> }, "9_1.0.0")
+      fail("expected a refusal")
+    } catch (e: WearException) {
+      assertEquals(ErrorCodes.INVALID_ARGUMENT, e.errorCode)
+    }
+    assertTrue("not announced either", watch.all(0x27, 0x03).isEmpty())
+    assertTrue(watch.all(0x28, 0x02).isEmpty())
+  }
+
+  @Test
+  fun aMissingConfirmationOnASignatureCapableWatchIsExplained() = runBlocking {
+    val (_, ops, _) = setup(WatchSim(dropUploads = true, confirm = false, capability = 8))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "77_2.1.0")
+
+    assertFalse(result.listed)
+    assertNull(result.confirmReportType)
+    assertTrue(result.message.contains("sent no install confirmation (27/05)"))
+    assertTrue(result.message.contains("signature capability"))
+  }
+
+  @Test
+  fun aMissingConfirmationOnAWatchWithoutTheCapabilityDoesNotBlameTheSignature() = runBlocking {
+    val (_, ops, _) = setup(WatchSim(dropUploads = true, confirm = false))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "77_2.1.0")
+
+    assertTrue(result.message.contains("sent no install confirmation (27/05)"))
+    assertFalse(result.message.contains("signature"))
+  }
+
+  // The behaviour seen on a Watch Fit 4 Pro (capability 0x3d): the unsigned face is confirmed, its activation is
+  // refused with 100014, and the watch reports it deleted about 3 s later.
+
+  @Test
+  fun aFaceTheWatchDeletesAfterConfirmingItIsReportedWithTheSignatureReason() = runBlocking {
+    val (watch, ops, events) = setup(WatchSim(removeAfterConfirm = true, rejectActivation = 100014, capability = 0x3d))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "5551_2.1.0")
+
+    assertFalse(result.listed)
+    assertFalse(result.active)
+    assertEquals(2, result.confirmReportType)
+    assertTrue(result.message, result.message.startsWith("The watch received the face and then deleted it"))
+    assertTrue(result.message.contains("code 100014"))
+    assertTrue(result.message.contains("27/05 type 3"))
+    assertTrue(result.message.contains("Huawei-issued signature"))
+    assertTrue(events.logs.any { it.contains("the watch reports 5551_2.1.0 deleted") })
+    assertTrue(events.logs.any { it.contains("activation status=100014") && it.contains("removed by the watch=true") })
+    // The announcement, then the activation the confirmation asks for.
+    assertEquals(listOf(1, 1), watch.all(0x27, 0x03).map { it.tlv!!.getByte(0x03).toInt() })
+  }
+
+  @Test
+  fun aRefusedActivationAloneIsReportedWithTheSignatureReason() = runBlocking {
+    val (_, ops, _) = setup(WatchSim(rejectActivation = 100007, dropUploads = true, capability = 0x3d))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "5552_2.1.0")
+
+    assertFalse(result.listed)
+    assertTrue(result.message, result.message.contains("code 100007"))
+    assertFalse(result.message.contains("27/05 type 3"))
+  }
+
+  @Test
+  fun aKeptFaceIsNotBlamedOnTheSignature() = runBlocking {
+    val (_, ops, _) = setup(WatchSim(capability = 0x3d))
+
+    val result = ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "5553_2.1.0")
+
+    assertTrue(result.listed)
+    assertEquals("Installed and active.", result.message)
   }
 }

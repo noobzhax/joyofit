@@ -50,7 +50,7 @@ internal class PhoneFeatures(
         attached = session
         subscriptions += session.subscribe(FindPhone.id, FindPhone.Response.id, "find phone") { onFindPhone(it) }
         subscriptions += session.subscribe(Calls.id, Calls.AnswerCallResponse.id, "call answer") { onCallAnswer(it) }
-        subscriptions += session.subscribe(DataSync.id, DataSync.ConfigCommand.id, "datasync config") { onDataSyncConfig(it) }
+        // DataSync (37) packets, including the find-device replies, are handled by DataSyncService.
       }
       LinkState.DISCONNECTED -> detach()
       else -> Unit
@@ -142,20 +142,8 @@ internal class PhoneFeatures(
     data.configDataList = listOf(config)
     val packet = DataSync.ConfigCommand.Request(handle.session.params, FIND_DEVICE_SRC_PACKAGE, FIND_DEVICE_DST_PACKAGE, data)
     log("Find watch: ${if (start) "start" else "stop"}")
-    // GB's SendDataSyncConfigCommand has addToResponse = false: the reply is only logged by onDataSyncConfig.
+    // GB's SendDataSyncConfigCommand has addToResponse = false: the reply is only logged, by DataSyncService (the one 0x37 subscriber).
     handle.session.send(packet, "FindWatch ${if (start) "start" else "stop"}")
-  }
-
-  /** The watch's DataSync config packets (replies and its own find-device events); GB's HuaweiDataSyncFindDevice only logs them. */
-  private fun onDataSyncConfig(packet: HuaweiPacket) {
-    try {
-      packet.parseTlv()
-      val response = packet as DataSync.ConfigCommand.Response
-      val items = response.data.configDataList?.joinToString { "id=${it.configId} action=${it.configAction} data=${it.configData?.toHex() ?: "-"}" } ?: "none"
-      log("DataSync config from ${response.srcPackage} to ${response.dstPackage}: code=${response.data.code} $items")
-    } catch (e: Exception) {
-      error("DataSync config: could not parse: ${e.message}")
-    }
   }
 
   // Alarms

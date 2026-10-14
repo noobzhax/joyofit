@@ -15,6 +15,7 @@ import { useColorScheme } from 'react-native';
 
 import { migrate } from '@/db/migrations';
 import { CloudProvider } from '@/state/CloudProvider';
+import { MealsProvider } from '@/state/MealsProvider';
 import { WatchProvider } from '@/state/WatchProvider';
 import { fonts, useColors } from '@/theme';
 
@@ -46,60 +47,64 @@ export default function RootLayout() {
       <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
         <WatchProvider>
           <CloudProvider>
-            <StatusBar style="auto" />
-            {/* Keyed by scheme: the tab bar kept its first colors when the theme flipped while the app was open. */}
-            <Tabs
-              key={scheme}
-              screenOptions={{
-                headerShown: false,
-                sceneStyle: { backgroundColor: colors.background },
-                tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.hairline },
-                tabBarActiveTintColor: colors.primary,
-                tabBarInactiveTintColor: colors.mutedForeground,
-                tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
-              }}>
-              <Tabs.Screen
-                name="index"
-                options={{
-                  title: 'Today',
-                  tabBarIcon: ({ focused, color, size }) => (
-                    <Ionicons name={focused ? 'today' : 'today-outline'} size={size} color={color} />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="workouts"
-                options={{
-                  title: 'Workouts',
-                  tabBarIcon: ({ focused, color, size }) => (
-                    <Ionicons name={focused ? 'fitness' : 'fitness-outline'} size={size} color={color} />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="watch"
-                options={{
-                  title: 'Watch',
-                  tabBarIcon: ({ focused, color, size }) => (
-                    <Ionicons name={focused ? 'watch' : 'watch-outline'} size={size} color={color} />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="settings"
-                options={{
-                  title: 'Settings',
-                  tabBarIcon: ({ focused, color, size }) => (
-                    <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
-                  ),
-                }}
-              />
-              {/* Old deep links; each redirects to where the screen lives now. */}
-              <Tabs.Screen name="today" options={{ href: null }} />
-              <Tabs.Screen name="log" options={{ href: null }} />
-              <Tabs.Screen name="alarms" options={{ href: null }} />
-              <Tabs.Screen name="watchfaces" options={{ href: null }} />
-            </Tabs>
+            <MealsProvider>
+              <StatusBar style="auto" />
+              {/* Keyed by scheme: the tab bar kept its first colors when the theme flipped while the app was open. */}
+              <Tabs
+                key={scheme}
+                screenOptions={{
+                  headerShown: false,
+                  sceneStyle: { backgroundColor: colors.background },
+                  tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.hairline },
+                  tabBarActiveTintColor: colors.primary,
+                  tabBarInactiveTintColor: colors.mutedForeground,
+                  tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
+                }}>
+                <Tabs.Screen
+                  name="index"
+                  options={{
+                    title: 'Today',
+                    tabBarIcon: ({ focused, color, size }) => (
+                      <Ionicons name={focused ? 'today' : 'today-outline'} size={size} color={color} />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="workouts"
+                  options={{
+                    title: 'Workouts',
+                    tabBarIcon: ({ focused, color, size }) => (
+                      <Ionicons name={focused ? 'fitness' : 'fitness-outline'} size={size} color={color} />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="watch"
+                  options={{
+                    title: 'Watch',
+                    tabBarIcon: ({ focused, color, size }) => (
+                      <Ionicons name={focused ? 'watch' : 'watch-outline'} size={size} color={color} />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="settings"
+                  options={{
+                    title: 'Settings',
+                    tabBarIcon: ({ focused, color, size }) => (
+                      <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+                    ),
+                  }}
+                />
+                {/* Old deep links; each redirects to where the screen lives now. */}
+                <Tabs.Screen name="today" options={{ href: null }} />
+                <Tabs.Screen name="log" options={{ href: null }} />
+                <Tabs.Screen name="alarms" options={{ href: null }} />
+                <Tabs.Screen name="watchfaces" options={{ href: null }} />
+                {/* Pushed from Today; draws its own header (see HealthScreen). */}
+                <Tabs.Screen name="health" options={{ href: null }} />
+              </Tabs>
+            </MealsProvider>
           </CloudProvider>
         </WatchProvider>
       </SQLiteProvider>

@@ -44,6 +44,12 @@ internal class WearLink(
   private val appContext = context.applicationContext
   private val store = DeviceStore(appContext)
 
+  /**
+   * Extra steps of an activity sync that other features add (the P2P health dictionary sync): run under the operation lock after the
+   * workouts, each one logged and isolated, so a failing one never fails the sync whose rows are already committed.
+   */
+  internal val syncExtensions = java.util.concurrent.CopyOnWriteArrayList<suspend (HuaweiSession) -> Unit>()
+
   private val lock = Any()
   private var current: Connection? = null
 
@@ -359,7 +365,20 @@ internal class WearLink(
         val from = syncWindowStart(last, System.currentTimeMillis() / 1000)
         val result = ActivitySync(connection.session, events).sync(from)
         val stored = storage { syncStore.save(connection.address, result) }
-        stored.withWorkouts(syncWorkouts(connection))
+        val summary = stored.withWorkouts(syncWorkouts(connection))
+        for (extension in syncExtensions) {
+          try {
+            extension(connection.session)
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: WearException) {
+            if (e.errorCode == ErrorCodes.DISCONNECTED) throw e
+            events.log(LogDirection.ERROR, null, null, null, "Sync extension failed: ${e.message}")
+          } catch (e: Exception) {
+            events.log(LogDirection.ERROR, null, null, null, "Sync extension failed: ${e.message ?: e.javaClass.simpleName}")
+          }
+        }
+        summary
       } finally {
         val restored = synchronized(lock) {
           if (current === connection && state == LinkState.SYNCING) {

@@ -23,7 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTruSleepParser
  *
  * GB's P2P data-dictionary sync (HuaweiP2PDataDictionarySyncService) is a different mechanism: it
  * carries skin temperature, HRV, emotion, sleep apnea and similar, never sleep stages, steps, heart
- * rate or SpO2, so it is not ported.
+ * rate or SpO2; it is ported in HealthMetricsSync.kt (class 700013, sleep detail, stays here as a file download).
  */
 internal class SleepSync(
   private val session: HuaweiSession,

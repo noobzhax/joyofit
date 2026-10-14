@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-// Modified for watch-fit (AGPL-3.0-or-later): WatchfaceOperation.Response parses the optional status tag 0x7f (GB leaves the answer unparsed), so the exact code the watch returns can be logged.
+// Modified for watch-fit (AGPL-3.0-or-later): WatchfaceOperation.Response parses the status tag 0x7f, the "need receive" tag 0x04 and the id / version echo (GB leaves the answer unparsed); WatchfaceParams.Response also reads the capability tags Huawei Health uses (0x11 capability bits, 0x17 sync, 0x18 mode, 0x7f status).
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets;
 
 import java.util.ArrayList;
@@ -35,6 +35,14 @@ public class Watchface {
         public byte supportFileType = 1;
         public byte sort = 1;
         public String otherWatchfaceVersions = "";
+        /** Tag 0x11 (Huawei Health `supportCapability`), -1 when the watch did not send it. Bit 2 (value 4) dial unite, bit 3 (8) watch face signature. */
+        public int supportCapability = -1;
+        /** Tag 0x17, -1 when absent. */
+        public int supportSync = -1;
+        /** Tag 0x18 (0 = GT mode, 1 = AP mode), -1 when absent. */
+        public int mode = -1;
+        /** Tag 0x7f, -1 when absent. */
+        public int status = -1;
     }
 
     public static class InstalledWatchfaceInfo {
@@ -121,6 +129,10 @@ public class Watchface {
                 this.params.sort = this.tlv.getByte(0x05);
                 if (this.tlv.contains(0x06))
                     this.params.otherWatchfaceVersions = this.tlv.getString(0x06);
+                this.params.supportCapability = this.tlv.getAsInteger(0x11, -1);
+                this.params.supportSync = this.tlv.getAsInteger(0x17, -1);
+                this.params.mode = this.tlv.getAsInteger(0x18, -1);
+                this.params.status = this.tlv.getAsInteger(0x7f, -1);
             }
         }
     }
@@ -182,6 +194,11 @@ public class Watchface {
         public static class Response extends HuaweiPacket {
             /** The watch's status in tag 0x7f, or -1 when the answer has none. */
             public int code = -1;
+            /** Tag 0x04 (Huawei Health `needReceive`): 1 the watch wants the file, 0 it has the face already; -1 when absent. */
+            public int needReceive = -1;
+            /** Tags 0x01 / 0x02, empty when absent. */
+            public String watchfaceId = "";
+            public String watchfaceVersion = "";
 
             public Response(ParamsProvider paramsProvider) {
                 super(paramsProvider);
@@ -189,8 +206,14 @@ public class Watchface {
 
             @Override
             public void parseTlv() throws HuaweiPacket.ParseException {
-                if (this.tlv != null && this.tlv.contains(0x7f))
-                    this.code = this.tlv.getAsInteger(0x7f);
+                if (this.tlv == null)
+                    return;
+                this.code = this.tlv.getAsInteger(0x7f, -1);
+                this.needReceive = this.tlv.getAsInteger(0x04, -1);
+                if (this.tlv.contains(0x01))
+                    this.watchfaceId = this.tlv.getString(0x01);
+                if (this.tlv.contains(0x02))
+                    this.watchfaceVersion = this.tlv.getString(0x02);
             }
         }
     }

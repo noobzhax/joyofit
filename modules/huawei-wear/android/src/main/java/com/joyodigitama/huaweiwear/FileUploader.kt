@@ -8,17 +8,28 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeoutOrNull
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiPacket
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTLV
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileUpload
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Watchface
 
 /** The status the watch answers with when it accepts a file (GB `resp.result != 100000`, the 0x7f tags it sends as "ok"). */
 internal const val UPLOAD_OK = 100000
 
+/** `reportType` of 27/05 (Huawei Health `REPORT_STATUS_WATCHFACE_TRANSFER_SUCCESS` / `_DELETE`). */
+internal const val WATCHFACE_TRANSFERRED = 2
+internal const val WATCHFACE_DELETED = 3
+
 /** GB `FileUploadInfo` file types (`FileUpload.Filetype`). */
 internal const val FILE_TYPE_WATCHFACE: Byte = FileUpload.Filetype.watchface
 
+/**
+ * Where a P2P file goes (GB `FileUploadInfo.setSrcPackage` ...): the sending module package, the watch app package and both
+ * fingerprints, sent as tags 0x08 to 0x0c of the 28/02 file info.
+ */
+internal class P2pRoute(val srcPackage: String, val dstPackage: String, val srcFingerprint: String, val dstFingerprint: String)
+
 /** What GB's `UploadDataBuffer` holds: the bytes to send and their SHA-256, which the watch asks for. */
-internal class UploadFile(val fileName: String, val fileType: Byte, val data: ByteArray) {
+internal class UploadFile(val fileName: String, val fileType: Byte, val data: ByteArray, val route: P2pRoute? = null) {
   val sha256: ByteArray by lazy { MessageDigest.getInstance("SHA-256").digest(data) }
 }
 
@@ -31,7 +42,27 @@ internal class UploadOutcome(
   val confirmReportType: Int?,
   /** The watch asked for the new face to be made active (reportType 2) and we sent the command. */
   val activateRequested: Boolean,
+  /** The status in the watch's answer to that activation command (tag 0x7f); null when it sent none or did not answer. */
+  val activateCode: Int? = null,
+  /** The watch confirmed the face and then reported it deleted (27/05 reportType 3) within the settle window. */
+  val removedByWatch: Boolean = false,
 )
+
+/**
+ * The tags of [tlv] for the log, in the clear: GB encrypts them on the wire, so this is the only way to see what
+ * the watch is really sent. A printable value is shown as text, everything else as hex.
+ */
+internal fun describeTlv(tlv: HuaweiTLV?): String {
+  if (tlv == null) return "(none)"
+  val entries = tlv.get()
+  if (entries.isEmpty()) return "(empty)"
+  return entries.joinToString(" ") { entry ->
+    val tag = (entry.tag.toInt() and 0xFF).toString(16).padStart(2, '0')
+    val value = entry.value
+    val text = if (value.size > 1 && value.all { it in 0x20..0x7E }) String(value, Charsets.US_ASCII) else null
+    if (text != null) "$tag=\"$text\"" else "$tag=${value.toHex()}"
+  }
+}
 
 /**
  * The 0x28 chunk packet. GB's `FileNextChunkSend.serialize()` is never used: the chunk is cut into
@@ -58,10 +89,11 @@ private class ChunkPacket(
  * watch 28/03 file id                               phone 28/03 FileHashSend(id, SHA-256)
  * watch 28/04 params (unit, max apply, no_encrypt)  phone 28/04 ack
  * watch 28/05 (bytesUploaded, nextChunkSize)        phone 28/06 chunk, in unit-size packets   (repeats)
- * watch 28/07 result                                phone 28/07 result ack
+ * watch 28/07 result (tag 02: 1 = file accepted)    phone 28/07 result ack
  * watch 27/05 watch face confirm (reportType)       phone 27/05 confirm, and 27/03 "active" when reportType is 2
  * ```
  *
+ * For a watch face the caller has already announced it with 27/03 ([WatchfaceOps.install]), as Huawei Health does.
  * A 28/08 from the watch is its error report. Every watch message must arrive within [stallMs] of
  * the previous one. Failures throw [WearException]: ERR_UPLOAD_REJECTED with the exact code the
  * watch returned, ERR_TIMEOUT, ERR_PROTOCOL or ERR_DISCONNECTED.
@@ -72,6 +104,7 @@ internal class FileUploader(
   private val onProgress: (bytes: Int, total: Int) -> Unit = { _, _ -> },
   private val stallMs: Long = STALL_MS,
   private val confirmWaitMs: Long = CONFIRM_WAIT_MS,
+  private val settleMs: Long = SETTLE_MS,
 ) {
   private val params get() = session.params
 
@@ -86,6 +119,8 @@ internal class FileUploader(
     var resultSent = false
     var confirmReportType: Int? = null
     var activateRequested = false
+    var activateCode: Int? = null
+    var removedByWatch = false
   }
 
   suspend fun upload(file: UploadFile): UploadOutcome {
@@ -109,10 +144,13 @@ internal class FileUploader(
         // The Fit 4 does not list service 0x28 in SupportedServices, but GB sends the upload without checking.
         log("the watch did not list FileUpload (28/02) as supported; trying anyway, like GB")
       }
-      session.send(
-        FileUpload.FileInfoSend.Request(params, file.data.size, file.fileName, file.fileType, null, null, null, null),
-        "FileUpload FileInfoSend ${file.fileName}",
+      val route = file.route
+      val info = FileUpload.FileInfoSend.Request(
+        params, file.data.size, file.fileName, file.fileType,
+        route?.srcPackage, route?.dstPackage, route?.srcFingerprint, route?.dstFingerprint,
       )
+      log("FileInfoSend TLV before encryption: ${describeTlv(info.getTlv())}")
+      session.send(info, "FileUpload FileInfoSend ${file.fileName}")
 
       while (!state.resultSent) {
         val packet = next(incoming, stallMs) ?: throw stalled(state)
@@ -122,13 +160,22 @@ internal class FileUploader(
       if (file.fileType == FILE_TYPE_WATCHFACE && state.confirmReportType == null) {
         waitForConfirm(state, incoming)
       }
+      if (file.fileType == FILE_TYPE_WATCHFACE && state.confirmReportType == WATCHFACE_TRANSFERRED) {
+        waitForRemoval(state, incoming)
+      }
       onProgress(file.data.size, file.data.size)
-      log("complete ${file.fileName}: ${state.chunks} chunk requests, result status=${state.resultStatus ?: "none"}, confirm reportType=${state.confirmReportType ?: "none"}")
+      log(
+        "complete ${file.fileName}: ${state.chunks} chunk requests, result status=${state.resultStatus ?: "none"}, " +
+          "confirm reportType=${state.confirmReportType ?: "none"}, activation status=${state.activateCode ?: "none"}, " +
+          "removed by the watch=${state.removedByWatch}",
+      )
       return UploadOutcome(
         fileId = (state.fileId ?: 0).toInt() and 0xFF,
         resultStatus = state.resultStatus,
         confirmReportType = state.confirmReportType,
         activateRequested = state.activateRequested,
+        activateCode = state.activateCode,
+        removedByWatch = state.removedByWatch,
       )
     } finally {
       for (s in subscriptions) s.close()
@@ -153,8 +200,10 @@ internal class FileUploader(
       FileUpload.FileHashSend.id -> {
         val response = parsed<FileUpload.FileHashSend.Response>(packet, "FileHashSend")
         state.fileId = response.fileId
-        log("FileHashSend: watch assigned file id ${response.fileId.toInt() and 0xFF}, sending SHA-256")
-        session.send(FileUpload.FileHashSend.Request(params, state.file.sha256, response.fileId), "FileUpload hash")
+        log("FileHashSend: watch assigned file id ${response.fileId.toInt() and 0xFF}, sending SHA-256 (watch TLV: ${describeTlv(packet.getTlv())})")
+        val hash = FileUpload.FileHashSend.Request(params, state.file.sha256, response.fileId)
+        log("FileHashSend TLV before encryption: ${describeTlv(hash.getTlv())}")
+        session.send(hash, "FileUpload hash")
       }
       FileUpload.FileUploadConsultAck.id -> {
         val response = parsed<FileUpload.FileUploadConsultAck.Response>(packet, "FileUploadConsultAck")
@@ -178,7 +227,7 @@ internal class FileUploader(
           ?: throw protocol("the watch reported a result before it assigned a file id")
         val status = try {
           packet.parseTlv()
-          (packet as? FileUpload.FileUploadResult.Response)?.status?.toInt()
+          (packet as? FileUpload.FileUploadResult.Response)?.status?.takeIf { it >= 0 }
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
@@ -186,7 +235,7 @@ internal class FileUploader(
           null
         }
         state.resultStatus = status
-        log("FileUploadResult: watch status=${status ?: "unreadable"}; sending the result ack (GB does not look at the status)")
+        log("FileUploadResult: watch status=${status ?: "unreadable"} (Huawei Health reads it as the validity result, 1 = the file was accepted; watch TLV: ${describeTlv(packet.getTlv())}); sending the result ack")
         state.resultSent = true
         session.send(FileUpload.FileUploadResult.Request(params, fileId), "FileUpload result ack")
       }
@@ -229,13 +278,25 @@ internal class FileUploader(
     )
   }
 
-  /** GB `handleWatchface`: answer the confirm; reportType 2 means "make the uploaded face active". */
+  /**
+   * GB `handleWatchface` and Huawei Health `WatchFaceDeviceService.handleReportStatus`: every report is acknowledged.
+   * reportType 2 (transfer success) means "make the uploaded face active" (Huawei Health calls `applyWatchFace` without
+   * a signature at this point); reportType 3 is the watch reporting a face deleted.
+   */
   private suspend fun handleConfirm(state: UploadState, packet: HuaweiPacket) {
     val response = parsed<Watchface.WatchfaceConfirm.Response>(packet, "WatchfaceConfirm")
-    state.confirmReportType = response.reportType
     log("WatchfaceConfirm: ${response.fileName} reportType=${response.reportType}")
     session.send(Watchface.WatchfaceConfirm.Request(params, response.fileName), "WatchfaceConfirm ${response.fileName}")
-    if (response.reportType == 0x02) {
+    if (response.reportType == WATCHFACE_DELETED) {
+      if (response.fileName == state.file.fileName) {
+        state.removedByWatch = true
+        log("the watch reports ${response.fileName} deleted")
+      }
+      return
+    }
+    if (state.confirmReportType != null) return
+    state.confirmReportType = response.reportType
+    if (response.reportType == WATCHFACE_TRANSFERRED) {
       state.activateRequested = true
       try {
         val answer = session.request(
@@ -244,6 +305,7 @@ internal class FileUploader(
           "WatchfaceOperation active ${response.fileName}",
         )
         val code = (answer as? Watchface.WatchfaceOperation.Response)?.code?.takeIf { it >= 0 }
+        state.activateCode = code
         log("WatchfaceOperation active ${response.fileName}: watch answered ${code ?: "no status"}")
       } catch (e: CancellationException) {
         throw e
@@ -264,6 +326,20 @@ internal class FileUploader(
         log("no WatchfaceConfirm from the watch within ${confirmWaitMs}ms")
         return
       }
+      handle(state, packet)
+      waited += (System.nanoTime() - started) / 1_000_000
+    }
+  }
+
+  /**
+   * A watch that does not keep a face (no Huawei signature, see [WatchfaceOps.install]) confirms it, then sends a
+   * 27/05 reportType 3 for it about 3 s later; the face list read before that still shows it. Listen for it.
+   */
+  private suspend fun waitForRemoval(state: UploadState, incoming: Channel<HuaweiPacket>) {
+    var waited = 0L
+    while (!state.removedByWatch && waited < settleMs) {
+      val started = System.nanoTime()
+      val packet = next(incoming, settleMs - waited) ?: return
       handle(state, packet)
       waited += (System.nanoTime() - started) / 1_000_000
     }
@@ -319,8 +395,15 @@ internal class FileUploader(
     /** How long the watch may stay silent between two of its messages. */
     const val STALL_MS = 60_000L
 
-    /** How long to wait for the 27/05 confirmation after the transfer finished. */
-    const val CONFIRM_WAIT_MS = 10_000L
+    /**
+     * How long to wait for the 27/05 confirmation after the transfer finished. Huawei Health keeps its install
+     * state for 60 s (`HwWatchFaceManager.applyWatchFace` posts `mResetInstallState` after 60000 ms) and has no
+     * shorter limit; the watch unpacks and verifies the face after the last chunk.
+     */
+    const val CONFIRM_WAIT_MS = 60_000L
+
+    /** How long to keep listening after the confirmation for the watch to report the face deleted; it took about 3.4 s. */
+    const val SETTLE_MS = 8_000L
 
     private const val POLL_MS = 500L
 

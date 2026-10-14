@@ -1,6 +1,11 @@
 // Derived from Gadgetbridge (AGPL-3.0-or-later; see NOTICE): service/devices/huawei/HuaweiWatchfaceManager
 // (requestWatchfaceList, updateWatchfaceNames, setWatchface, deleteWatchface, getFullFileName) and
 // requests/{GetWatchfaceParams,GetWatchfacesList,GetWatchfacesNames,SendWatchfaceOperation}.
+//
+// The install flow follows Huawei Health 17.0.8.300 (RE of its "install from a .hwt file" path):
+// com.huawei.watchface.f2.{b,a} (local install), HwWatchFaceBtManager.{sendOperateType,handleApply,getDeviceInfo,
+// handleDeviceInfoTlv} and WatchFaceWearService.sendWatchFace. GB uploads without announcing the face; Huawei Health
+// always sends 27/03 first.
 package com.joyodigitama.huaweiwear
 
 import android.content.Context
@@ -22,7 +27,24 @@ internal class WatchfaceScreen(
   val supportFileType: Int,
   val sort: Int,
   val otherVersions: String,
-)
+  /** Tag 0x11, Huawei Health's `supportCapability` bit field; -1 when the watch did not send it. */
+  val supportCapability: Int = -1,
+  /** Tag 0x17, -1 when absent. */
+  val supportSync: Int = -1,
+  /** Tag 0x18 (0 = GT mode, 1 = AP mode), -1 when absent. */
+  val mode: Int = -1,
+) {
+  /** Huawei Health `isSupportWatchfaceSignature`: capability bit 3 (value 8). */
+  val supportsSignature: Boolean get() = supportCapability >= 0 && (supportCapability and CAPABILITY_SIGNATURE) != 0
+
+  /** Huawei Health `isSupportDialUnite`: capability bit 2 (value 4). */
+  val supportsDialUnite: Boolean get() = supportCapability >= 0 && (supportCapability and CAPABILITY_DIAL_UNITE) != 0
+
+  companion object {
+    const val CAPABILITY_DIAL_UNITE = 4
+    const val CAPABILITY_SIGNATURE = 8
+  }
+}
 
 /** One entry of the watch's face list (GB `InstalledWatchfaceInfo`) with the name from 0x27/0x06. */
 internal class WatchfaceEntry(
@@ -118,6 +140,25 @@ internal fun watchfaceOperationPacket(params: HuaweiPacket.ParamsProvider, id: S
     it.setTlv(HuaweiTLV().put(0x01, id).put(0x02, version).put(0x03, operation))
   }
 
+/** Huawei Health `WatchFaceWearService.isSignFailErrorCode`. */
+internal val SIGNATURE_FAILURE_CODES = setOf(100007, 100014)
+
+/** The watch's answer to the 27/03 that announces a face before its upload; null for a field the watch did not send. */
+internal class Announcement(val code: Int?, val needReceive: Int?)
+
+/**
+ * Huawei Health's reading of a refused announcement (`WatchFaceWearService.isSignFailErrorCode`: 100007 and 100014;
+ * `HwWatchFaceBtManager.dealReport` passes 100015 on to its UI as well).
+ */
+internal fun describeAnnounceCode(code: Int): String = when (code) {
+  100007, 100014 ->
+    "The watch refused the face before the upload (code $code). Huawei Health treats 100007 and 100014 as a watch face " +
+      "signature failure: it fetches a signature for the face from Huawei's servers and sends it in this request, which " +
+      "JoyoFit cannot do."
+  100015 -> "The watch refused the face before the upload (code 100015). Huawei Health shows this code in its own UI; its meaning is not documented."
+  else -> "The watch refused the face before the upload with code $code; what it means is not documented."
+}
+
 /**
  * Watch face list, set active, delete and install over the 0x27 / 0x28 services, on a connected
  * [session]. The callers serialize these with the link's operation lock.
@@ -127,6 +168,7 @@ internal class WatchfaceOps(
   private val events: WearEvents,
   private val uploadStallMs: Long = FileUploader.STALL_MS,
   private val confirmWaitMs: Long = FileUploader.CONFIRM_WAIT_MS,
+  private val settleMs: Long = FileUploader.SETTLE_MS,
   private val queryMs: Long = Timeouts.QUERY_MS,
 ) {
   private val params get() = session.params
@@ -159,11 +201,21 @@ internal class WatchfaceOps(
       return null
     }
     val p = response.params
+    log("WatchfaceParams TLV: ${describeTlv(response.getTlv())}")
     log(
       "WatchfaceParams: width=${p.width} height=${p.height} (screen ${p.height}*${p.width}) maxVersion=${p.maxVersion} " +
-        "supportFileType=${p.supportFileType.toInt()} sort=${p.sort.toInt()} otherWatchfaceVersions=${p.otherWatchfaceVersions}",
+        "supportFileType=${p.supportFileType.toInt()} sort=${p.sort.toInt()} otherWatchfaceVersions=${p.otherWatchfaceVersions} " +
+        "capability=${if (p.supportCapability >= 0) "0x" + p.supportCapability.toString(16) else "not sent"} " +
+        "supportSync=${if (p.supportSync >= 0) p.supportSync else "not sent"} mode=${if (p.mode >= 0) p.mode else "not sent"}",
     )
-    return WatchfaceScreen(p.maxVersion, p.width, p.height, p.supportFileType.toInt(), p.sort.toInt(), p.otherWatchfaceVersions)
+    val screen = WatchfaceScreen(
+      p.maxVersion, p.width, p.height, p.supportFileType.toInt(), p.sort.toInt(), p.otherWatchfaceVersions,
+      p.supportCapability, p.supportSync, p.mode,
+    )
+    if (p.supportCapability >= 0) {
+      log("WatchfaceParams capability: watch face signature=${screen.supportsSignature} (bit 8), dial unite=${screen.supportsDialUnite} (bit 4)")
+    }
+    return screen
   }
 
   /** GB requestWatchfaceList + updateWatchfaceNames: 0x27/0x02, then 0x27/0x06 for the names. */
@@ -248,16 +300,49 @@ internal class WatchfaceOps(
   }
 
   /**
-   * GB `onInstallApp` for a watch face: validate against the watch's screen, upload as file type 1 with a
-   * random `<nine digits>_1.0.0` name, then ask the watch for its list to see whether the face arrived.
+   * Huawei Health sends 27/03 (id, version, operation 1) before it uploads anything (`applyWatchFace` ->
+   * `OperateWatchFaceService.sendApplyWatchFaceCommand`, then `transferFile` straight after, without waiting).
+   * The watch answers with a status (tag 0x7f: absent or 100000 is fine) and `needReceive` (tag 0x04: 1 = send the
+   * file, 0 = it has this face already). GB does not send it. A status other than success ends the install here.
+   */
+  private suspend fun announce(id: String, version: String): Announcement {
+    val label = "WatchfaceOperation announce ${id}_$version"
+    val packet = watchfaceOperationPacket(params, id, version, Watchface.WatchfaceOperation.operationActive)
+    log("$label TLV before encryption: ${describeTlv(packet.getTlv())}")
+    val answer = try {
+      session.request(packet, queryMs, label)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: WearException) {
+      if (e.errorCode != ErrorCodes.TIMEOUT) throw e
+      log("$label: no answer from the watch; Huawei Health does not wait for one either, uploading anyway")
+      return Announcement(null, null)
+    }
+    val response = answer as? Watchface.WatchfaceOperation.Response
+    val code = response?.code?.takeIf { it >= 0 }
+    val needReceive = response?.needReceive?.takeIf { it >= 0 }
+    log("$label: watch answered status=${code ?: "none"} needReceive=${needReceive ?: "none"} TLV ${describeTlv(answer.getTlv())}")
+    if (code != null && code != 0 && code != UPLOAD_OK) {
+      throw WearException(ErrorCodes.UPLOAD_REJECTED, describeAnnounceCode(code), statusCode = code)
+    }
+    return Announcement(code, needReceive)
+  }
+
+  /**
+   * The Huawei Health flow for a face from a file (`com.huawei.watchface.f2`): check the face against the watch's
+   * screen and version range, announce it with 27/03, upload it as file type 1 under `<id>_<version>`, wait for the
+   * watch's 27/05 confirmation, then ask for the face list to see whether the face arrived.
    */
   suspend fun install(
     pkg: WatchfacePackage,
     progress: (bytes: Int, total: Int) -> Unit,
-    fileName: String = WatchfacePackages.randomName(),
+    fileName: String = WatchfacePackages.randomName(version = pkg.description.version),
   ): InstallResult {
     requireService()
     val description = pkg.description
+    val separator = fileName.indexOf('_')
+    val id = fileName.substring(0, separator)
+    val version = fileName.substring(separator + 1)
     log(
       "Install \"${description.title}\" v${description.version} by ${description.author} (theme ${description.screen}, " +
         "${WatchfaceResolutions.screenByThemeVersion(description.screen)}, ${pkg.binary.size} bytes) as $fileName",
@@ -265,16 +350,20 @@ internal class WatchfaceOps(
     val screen = readScreen()
     if (screen != null) {
       WatchfacePackages.checkResolution(description, screen.height, screen.width) { log(it) }
+      WatchfacePackages.checkVersion(description, screen.maxVersion, screen.otherVersions) { log(it) }
     } else {
       log("the watch's screen size is unknown; the package is not checked against it")
     }
 
-    val outcome = FileUploader(session, events, progress, uploadStallMs, confirmWaitMs)
-      .upload(UploadFile(fileName, FILE_TYPE_WATCHFACE, pkg.binary))
+    val announcement = announce(id, version)
+    val outcome = if (announcement.needReceive == 0) {
+      log("the watch reports it has ${id}_$version already (needReceive=0); nothing is uploaded")
+      null
+    } else {
+      FileUploader(session, events, progress, uploadStallMs, confirmWaitMs, settleMs)
+        .upload(UploadFile(fileName, FILE_TYPE_WATCHFACE, pkg.binary))
+    }
 
-    val separator = fileName.indexOf('_')
-    val id = fileName.substring(0, separator)
-    val version = fileName.substring(separator + 1)
     val after = try {
       list()
     } catch (e: CancellationException) {
@@ -284,10 +373,12 @@ internal class WatchfaceOps(
       log("the list after the upload could not be read: ${e.message}", error = true)
       null
     }
-    val face = after?.faces?.firstOrNull { it.id == id }
+    val face = after?.faces?.firstOrNull { it.id == id }?.takeIf { outcome?.removedByWatch != true }
+    val refused = outcome != null && (outcome.removedByWatch || (face == null && outcome.activateCode in SIGNATURE_FAILURE_CODES))
     val message = when {
+      refused -> refusedMessage(outcome!!, screen)
       after == null -> "Uploaded, but the watch did not answer when asked for its watch faces, so the result is unverified."
-      face == null -> "The upload finished (watch status ${outcome.resultStatus ?: "none"}) but the watch does not list the new face."
+      face == null -> notListedMessage(outcome, screen)
       face.isCurrent -> "Installed and active."
       else -> "Installed."
     }
@@ -298,13 +389,50 @@ internal class WatchfaceOps(
       version = version,
       name = description.title.ifEmpty { id },
       bytes = pkg.binary.size,
-      uploadStatus = outcome.resultStatus,
-      confirmReportType = outcome.confirmReportType,
+      uploadStatus = outcome?.resultStatus,
+      confirmReportType = outcome?.confirmReportType,
       listed = face != null,
       active = face?.isCurrent == true,
       message = message,
       list = after,
     )
+  }
+
+  /**
+   * Observed on a Watch Fit 4 Pro (27/01 tag 0x11 = 0x3d): without a signature in the announcement the watch accepts the
+   * file, confirms it (27/05 type 2), answers the activation with 100014 and reports the face deleted (27/05 type 3)
+   * about 3 s later. Huawei Health sends the signature, fetched from Huawei's servers, in tag 0x08 of the announcement.
+   */
+  private fun refusedMessage(outcome: UploadOutcome, screen: WatchfaceScreen?): String = buildString {
+    append("The watch received the face and then deleted it")
+    val signs = ArrayList<String>()
+    outcome.activateCode?.takeIf { it != 0 && it != UPLOAD_OK }?.let { signs.add("it answered the activation with code $it") }
+    if (outcome.removedByWatch) signs.add("it reported the face deleted (27/05 type 3)")
+    if (signs.isNotEmpty()) append(" (${signs.joinToString(" and ")})")
+    append(".")
+    if (screen?.supportsSignature == true) {
+      append(
+        " This watch reports the watch face signature capability and expects a Huawei-issued signature in the 27/03 " +
+          "announcement, as Huawei Health sends it. JoyoFit cannot get one, so a face that Huawei did not sign is thrown " +
+          "away. Huawei's test procedure for .hwt files uses Huawei Health logged in with a Huawei developer account.",
+      )
+    }
+  }
+
+  private fun notListedMessage(outcome: UploadOutcome?, screen: WatchfaceScreen?): String = buildString {
+    if (outcome == null) {
+      append("The watch said it had the face already but does not list it.")
+      return@buildString
+    }
+    append("The upload finished (watch status ${outcome.resultStatus ?: "none"}) but the watch does not list the new face")
+    if (outcome.confirmReportType == null) append(" and sent no install confirmation (27/05)")
+    append(".")
+    if (screen?.supportsSignature == true) {
+      append(
+        " This watch reports the watch face signature capability. Huawei Health sends a Huawei-issued signature with " +
+          "the 27/03 request; JoyoFit cannot, so the watch may be discarding faces that carry none.",
+      )
+    }
   }
 
   private fun log(message: String, error: Boolean = false) =
@@ -331,7 +459,7 @@ internal class WatchfaceController(
     link.handle() ?: throw notConnected()
     val bytes = withContext(Dispatchers.IO) { readUri(uri) }
     val pkg = WatchfacePackages.parse(bytes)
-    val fileName = WatchfacePackages.randomName()
+    val fileName = WatchfacePackages.randomName(version = pkg.description.version)
     var lastEmit = 0L
     val progress = { done: Int, total: Int ->
       val now = System.nanoTime() / 1_000_000

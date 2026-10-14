@@ -1,3 +1,4 @@
+import type { WatchMealLoggedEvent } from './HuaweiWearDiet.types';
 import type { UploadProgressEvent, UploadResultEvent } from './HuaweiWearWatchface.types';
 
 export type LinkState =
@@ -273,4 +274,5 @@ export type HuaweiWearModuleEvents = {
   onUploadResult: (event: UploadResultEvent) => void;
   onSyncComplete: (event: SyncCompleteEvent) => void;
   onHeartRate: (event: HeartRateEvent) => void;
+  onWatchMealLogged: (event: WatchMealLoggedEvent) => void;
 };

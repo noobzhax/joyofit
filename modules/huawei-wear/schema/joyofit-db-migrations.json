@@ -31,5 +31,18 @@
     "CREATE TRIGGER sleep_segments_rev_update AFTER UPDATE ON sleep_segments WHEN NEW.rev = OLD.rev BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'sleep_segments'; UPDATE sleep_segments SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'sleep_segments') WHERE rowid = NEW.rowid; END",
     "CREATE TRIGGER workouts_rev_insert AFTER INSERT ON workouts BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'workouts'; UPDATE workouts SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'workouts') WHERE rowid = NEW.rowid; END",
     "CREATE TRIGGER workouts_rev_update AFTER UPDATE ON workouts WHEN NEW.rev = OLD.rev BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'workouts'; UPDATE workouts SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'workouts') WHERE rowid = NEW.rowid; END"
+  ],
+  [
+    "CREATE TABLE diet_day (date TEXT PRIMARY KEY NOT NULL, meals_json TEXT NOT NULL, goals_json TEXT NOT NULL DEFAULT '{}', updated_at INTEGER NOT NULL, pushed_at INTEGER)",
+    "CREATE TABLE body_metrics (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+  ],
+  [
+    "CREATE TABLE cycle_periods (start TEXT PRIMARY KEY NOT NULL, end TEXT, modified INTEGER NOT NULL)",
+    "CREATE TABLE cycle_days (day TEXT PRIMARY KEY NOT NULL, flow INTEGER NOT NULL DEFAULT 0, cramps INTEGER NOT NULL DEFAULT 0, modified INTEGER NOT NULL)"
+  ],
+  [
+    "CREATE TABLE health_metrics (type TEXT NOT NULL, ts INTEGER NOT NULL, last_ts INTEGER NOT NULL, value REAL, values_json TEXT NOT NULL, PRIMARY KEY (type, ts))",
+    "CREATE INDEX health_metrics_by_ts ON health_metrics (ts)",
+    "CREATE TABLE health_metric_status (type TEXT PRIMARY KEY NOT NULL, dict_class INTEGER NOT NULL, title TEXT NOT NULL, supported INTEGER NOT NULL, gate TEXT NOT NULL, checked_at INTEGER NOT NULL, synced_at INTEGER, rows_added INTEGER, note TEXT)"
   ]
 ]

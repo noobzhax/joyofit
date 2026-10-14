@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.Collections
+import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTLV
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileUpload
@@ -210,7 +211,7 @@ class FileUploadTest {
     val standard = StandardWatch(file, unit = 64, chunk = 300)
     val (watch, session, events) = setup { standard.respond(it) }
 
-    val outcome = FileUploader(session, events, { done, total -> progress.add(done to total) }, stallMs = 2_000, confirmWaitMs = 2_000)
+    val outcome = FileUploader(session, events, { done, total -> progress.add(done to total) }, stallMs = 2_000, confirmWaitMs = 2_000, settleMs = 100)
       .upload(UploadFile("123456789_1.0.0", FILE_TYPE_WATCHFACE, file))
 
     assertArrayEquals(file, standard.received)
@@ -269,7 +270,7 @@ class FileUploadTest {
     val standard = StandardWatch(file, unit = 128, chunk = 500, noEncrypt = true, confirmReport = 1)
     val (watch, session, events) = setup(decryptChunks = false) { standard.respond(it) }
 
-    val outcome = FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 2_000)
+    val outcome = FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 2_000, settleMs = 100)
       .upload(UploadFile("42_1.0.0", FILE_TYPE_WATCHFACE, file))
 
     assertArrayEquals(file, standard.received)
@@ -286,7 +287,7 @@ class FileUploadTest {
     val standard = StandardWatch(file, unit = 700, chunk = 2000)
     val (watch, session, events) = setup { standard.respond(it) }
 
-    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 2_000).upload(UploadFile("9_1.0.0", FILE_TYPE_WATCHFACE, file))
+    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 2_000, settleMs = 100).upload(UploadFile("9_1.0.0", FILE_TYPE_WATCHFACE, file))
 
     assertArrayEquals(file, standard.received)
     assertEquals(listOf(0, 1, 2), standard.packetIndexes)
@@ -306,7 +307,7 @@ class FileUploadTest {
       }
     }
 
-    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 200).upload(UploadFile("5_1.0.0", FILE_TYPE_WATCHFACE, file))
+    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 200, settleMs = 100).upload(UploadFile("5_1.0.0", FILE_TYPE_WATCHFACE, file))
 
     assertArrayEquals(file, standard.received)
     assertTrue(events.logs.any { it.contains("only 100 are left") })
@@ -380,7 +381,7 @@ class FileUploadTest {
       }
     }
 
-    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 200).upload(UploadFile("1_1.0.0", FILE_TYPE_WATCHFACE, file))
+    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 200, settleMs = 100).upload(UploadFile("1_1.0.0", FILE_TYPE_WATCHFACE, file))
 
     assertArrayEquals(file, standard.received)
     assertTrue(events.logs.any { it.contains("another file id; ignored") })
@@ -526,5 +527,51 @@ class FileUploadTest {
     assertTrue(FileUploader.describeUploadCode(140008, "x").contains("already has"))
     assertTrue(FileUploader.describeUploadCode(140009, "x").contains("free space"))
     assertTrue(FileUploader.describeUploadCode(1, "file info").contains("code 1"))
+  }
+
+  @Test
+  fun describeTlvShowsPrintableValuesAsTextAndTheRestAsHex() {
+    val tlv = HuaweiTLV().put(0x01, "123456789_2.8.2").put(0x02, 1_000_000).put(0x03, 1.toByte()).put(0x0a, ByteArray(0)).put(0x7f, 100000)
+    assertEquals("01=\"123456789_2.8.2\" 02=000F4240 03=01 0a= 7f=000186A0", describeTlv(tlv))
+    assertEquals("(empty)", describeTlv(HuaweiTLV()))
+    assertEquals("(none)", describeTlv(null))
+  }
+
+  @Test
+  fun fileInfoAndHashAreLoggedInTheClearBeforeEncryption() = runBlocking {
+    val file = payload(1000)
+    val standard = StandardWatch(file, unit = 64, chunk = 300)
+    val (_, session, events) = setup { standard.respond(it) }
+
+    FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 2_000, settleMs = 100).upload(UploadFile("123456789_2.8.2", FILE_TYPE_WATCHFACE, file))
+
+    assertTrue(
+      events.logs.toString(),
+      events.logs.any { it.contains("FileInfoSend TLV before encryption: 01=\"123456789_2.8.2\" 02=000003E8 03=01 05=\"123456789\" 06=\"2.8.2\"") },
+    )
+    assertTrue(events.logs.any { it.contains("FileHashSend TLV before encryption: 01=07 03=${sha256(file).toHex()}") })
+  }
+
+  @Test
+  fun aConfirmationThatArrivesSecondsAfterTheResultIsStillHandled() = runBlocking {
+    val file = payload(100)
+    val standard = StandardWatch(file, unit = 64, chunk = 100, confirmReport = null)
+    var live: HuaweiSession? = null
+    val (_, session, events) = setup { m ->
+      if (m.service == 0x28 && m.command == 0x07) {
+        thread {
+          Thread.sleep(400)
+          live!!.onData(tlvFrame(0x27, 0x05, HuaweiTLV().put(0x01, "8").put(0x02, "1.0.0").put(0x03, 2)))
+        }
+      }
+      standard.respond(m)
+    }
+    live = session
+
+    val outcome = FileUploader(session, events, stallMs = 2_000, confirmWaitMs = 3_000, settleMs = 100).upload(UploadFile("8_1.0.0", FILE_TYPE_WATCHFACE, file))
+
+    assertEquals(2, outcome.confirmReportType)
+    assertTrue(outcome.activateRequested)
+    assertEquals(1, standard.requests.size)
   }
 }

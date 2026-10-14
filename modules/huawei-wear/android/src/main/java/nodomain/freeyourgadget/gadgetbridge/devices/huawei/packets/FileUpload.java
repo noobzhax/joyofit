@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
-// Modified for watch-fit (AGPL-3.0-or-later): FileUploadResult.Response.status is public (GB: package-private), so the status the watch reports can be logged.
+// Modified for watch-fit (AGPL-3.0-or-later): FileUploadResult.Response.status is public and an int (GB: a package-private byte that nothing reads). Huawei Health reads tag 0x02 as the "validity result" of any width and treats 1 as success.
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiPacket;
@@ -225,7 +225,8 @@ public class FileUpload {
         }
 
         public static class Response extends HuaweiPacket {
-            public byte status = 0;
+            /** Tag 0x02, Huawei Health's `validity_result` (1 = the watch accepted the file); -1 when the tag is absent. */
+            public int status = -1;
 
             public Response(ParamsProvider paramsProvider) {
                 super(paramsProvider);
@@ -233,7 +234,7 @@ public class FileUpload {
 
             @Override
             public void parseTlv() throws HuaweiPacket.ParseException {
-                this.status = this.tlv.getByte(0x02);
+                this.status = this.tlv.getAsInteger(0x02, -1);
             }
         }
     }

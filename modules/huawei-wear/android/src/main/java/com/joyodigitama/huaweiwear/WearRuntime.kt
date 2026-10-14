@@ -65,9 +65,12 @@ internal class WearRuntime private constructor(context: Context) {
       status.update { it.copy(state = state, note = if (state == LinkState.DISCONNECTED) it.note else null) }
       listeners.forEach { it.state(state, error) }
       if (state == LinkState.DISCONNECTED || state == LinkState.CONNECTED) controller?.onLinkChanged()
+      dataSync.onLinkState(state)
       features.onLinkState(state)
       weather.onLinkState(state)
       liveHeartRate.onLinkState(state)
+      extras.onLinkState(state)
+      p2p.onLinkState(state)
     }
 
     override fun battery(level: Int) {
@@ -78,6 +81,7 @@ internal class WearRuntime private constructor(context: Context) {
     override fun syncComplete(summary: SyncSummary) {
       status.update { it.copy(lastSyncSec = summary.to) }
       healthConnect.onSyncComplete(summary)
+      extras.onSyncComplete(summary)
       listeners.forEach { it.syncComplete(summary) }
     }
 
@@ -100,6 +104,10 @@ internal class WearRuntime private constructor(context: Context) {
     override fun heartRate(bpm: Int, tsMs: Long) {
       listeners.forEach { it.heartRate(bpm, tsMs) }
     }
+
+    override fun watchMealLogged(payload: Map<String, Any?>) {
+      listeners.forEach { it.watchMealLogged(payload) }
+    }
   }
 
   /** Same fan-out the link reports through; background code logs here so the Log tab shows it. */
@@ -113,6 +121,16 @@ internal class WearRuntime private constructor(context: Context) {
   val weather = WeatherController(appContext, weatherSettings, link, events, scope)
   val watchfaces = WatchfaceController(appContext, link, events)
   val liveHeartRate = LiveHeartRate(link, settings, events, scope)
+  val dataSync = DataSyncService(link, events, scope)
+  val activityGoals = ActivityGoals(appContext, dataSync, events, settings)
+  val bodyMetrics = BodyMetrics(appContext, syncStore, dataSync, events, settings)
+  val diet = DietSync(appContext, syncStore, dataSync, events, settings, activityGoals, bodyMetrics)
+  val extras = WatchExtras(appContext, syncStore, link, events, scope)
+  val p2p = P2pController(appContext, P2pSettings(appContext), link, settings, syncStore, events, scope)
+
+  init {
+    DataSyncFeatures.install(this)
+  }
 
   fun addListener(listener: WearEvents) {
     listeners.add(listener)

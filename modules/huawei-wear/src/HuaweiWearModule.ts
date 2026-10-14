@@ -19,7 +19,17 @@ import type {
   WeatherStatus,
 } from './HuaweiWear.types';
 import type { PhoneFeatures, WatchAlarms, WatchAlarmsUpdate } from './HuaweiWearPhone.types';
+import type { CycleOverview, CycleSwitches, SafetyStatus, SosRelayTest } from './HuaweiWearExtras.types';
+import type {
+  ActivityGoals,
+  ActivityGoalsStatus,
+  BodyMetrics,
+  BodyMetricsUpdate,
+  DietDay,
+  DietStatus,
+} from './HuaweiWearDiet.types';
 import type { WatchfaceInstallResult, WatchfaceList } from './HuaweiWearWatchface.types';
+import type { CoursesStatus, HealthyLivingStatus, RunningCourse, RunningCoursePushResult } from './HuaweiWearP2p.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   /** Bonded classic-Bluetooth devices. Requires BLUETOOTH_CONNECT on Android 12+. */
@@ -173,6 +183,85 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   setActiveWatchface(id: string): Promise<WatchfaceList>;
   /** Deletes the face with this id; resolves with the list read afterwards, rejects if the face is still there. */
   deleteWatchface(id: string): Promise<WatchfaceList>;
+
+  /** Fall detection and SOS SMS relay state, the sleep report switch and what the watch reports for them. */
+  getSafety(): SafetyStatus;
+  /**
+   * Sets the watch's fall detection switch. Rejects with ERR_UNSUPPORTED unless the watch reports DataSync configs and
+   * SupportedCommands `0x33/01`; resolves with whether the packet went out. The state shown afterwards is the watch's own report.
+   */
+  setFallDetection(enabled: boolean): Promise<boolean>;
+  /** Asks the watch for its fall detection switch; the answer updates `getSafety().fallSwitch`. Resolves with whether the query went out. */
+  queryFallDetection(): Promise<boolean>;
+  /** Lets the phone send the SMS the watch asks for (SOS). Off by default. Needs SEND_SMS (request it first); no SMS leaves the phone while off. */
+  setSosRelayEnabled(enabled: boolean): Promise<void>;
+  /** What an SOS request would do right now (switch, permission, SIM). Sends nothing, to nobody. */
+  testSosRelay(): SosRelayTest;
+  /** The morning sleep report on the watch. On by default. */
+  setSleepReportEnabled(enabled: boolean): Promise<void>;
+  /** Pushes the report for the latest stored night now, ignoring the once-a-morning rules. Resolves with "sent" or why not. */
+  sendSleepReportNow(): Promise<string>;
+
+  /** The cycle log, estimates and switches. Predictions are an average-cycle estimate. */
+  getCycle(): Promise<CycleOverview>;
+  /** Shows the cycle calendar on the watch (switches, capability, data when it asks). Off by default. */
+  setCycleEnabled(enabled: boolean): Promise<void>;
+  setCycleSwitches(switches: CycleSwitches): Promise<void>;
+  /** Logs a period starting on `day` (`YYYY-MM-DD`). Rejects with ERR_INVALID_ARGUMENT when it overlaps one or another is still open. */
+  startPeriod(day: string): Promise<void>;
+  /** Ends the open period on `day`. */
+  endPeriod(day: string): Promise<void>;
+  /** Adds a finished past period. */
+  addPeriod(start: string, end: string): Promise<void>;
+  deletePeriod(start: string): Promise<void>;
+  /** Flow and cramps of a day, 0 to 3 each. */
+  logCycleDay(day: string, flow: number, cramps: number): Promise<void>;
+
+  /**
+   * Stores the day (the latest one only; JoyoRogo is the source of truth, so the day's meals are replaced, but a watch
+   * quick-logged meal not yet confirmed by `markWatchMealsSynced` is kept) and, when the watch is connected, pushes the goals
+   * (configs 900300023 / 900300022) and the day's meal slots (SamplePoint 600002). Also sent on every connect and when the watch
+   * asks. Resolves true when it reached the watch, false when stored only. Rejects with ERR_INVALID_ARGUMENT for a bad date,
+   * meal type or number.
+   */
+  setDietDay(day: DietDay): Promise<boolean>;
+  getDietStatus(): DietStatus;
+  /** Sends the stored day again (goals and meals). Resolves true when it reached the watch. */
+  pushDietNow(): Promise<boolean>;
+  /** JS wrote these watch-logged meals (`onWatchMealLogged`) to JoyoRogo; native stops keeping them apart. */
+  markWatchMealsSynced(ids: string[]): Promise<void>;
+
+  getBodyMetrics(): BodyMetrics;
+  /** Stores the set fields and, when connected, pushes the weight (event 5 dictionary 10006) and resting metabolism (500018) if they changed. */
+  setBodyMetrics(update: BodyMetricsUpdate): Promise<BodyMetrics>;
+
+  getActivityGoals(): ActivityGoalsStatus;
+  /**
+   * Stores the ring goals and reminders and sends them (configs 900200006..11 and the bundle 900200002); also sent on every
+   * connect. The steps goal is also the profile's daily step goal. Resolves true when everything reached the watch.
+   */
+  setActivityGoals(goals: ActivityGoals): Promise<boolean>;
+  sendActivityGoals(): Promise<boolean>;
+
+  /** Healthy Living (P2P module `healthmodel`): the switch, whether the watch asked, the last report. */
+  getHealthyLiving(): HealthyLivingStatus;
+  /** On by default; takes effect on the next connect when switching on, at once when switching off. */
+  setHealthyLivingEnabled(enabled: boolean): Promise<void>;
+  /**
+   * Sends today's tasks to the watch now, as Huawei Health does after data changes. Resolves false when the watch has not asked
+   * for tasks yet (its protocol version is unknown); rejects with ERR_UNSUPPORTED when the feature is not available on the link.
+   */
+  pushHealthyLiving(): Promise<boolean>;
+
+  /** The experimental running-course push (P2P module `fitness`): switch and Huawei's gates. Off by default. */
+  getCourses(): CoursesStatus;
+  setCoursesEnabled(enabled: boolean): Promise<void>;
+  /**
+   * Sends the course to the watch as a P2P file (`<id>courseInfo.bin`). EXPERIMENTAL and unverified on the wire. Rejects with
+   * ERR_UNSUPPORTED while the switch is off or the watch sets neither ExpandCapability 41 nor 169, ERR_INVALID_ARGUMENT for a bad
+   * course, ERR_UPLOAD_REJECTED with the watch's code when it refuses the file.
+   */
+  pushRunningCourse(course: RunningCourse): Promise<RunningCoursePushResult>;
 }
 
 export default requireNativeModule<HuaweiWearModule>('HuaweiWear');

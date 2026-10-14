@@ -5,7 +5,8 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Metric } from '@/components/Metric';
-import { Screen, Section } from '@/components/Screen';
+import { NavRow } from '@/components/NavRow';
+import { Card, Screen, Section } from '@/components/Screen';
 import { Notice, Skeleton } from '@/components/States';
 import { StatTile } from '@/components/StatTile';
 import { HourlyBars } from '@/features/today/HourlyBars';
@@ -162,6 +163,16 @@ export default function TodayScreen() {
       <Section title="Last night's sleep" icon="moon" tint="sleep">
         {loading ? <Skeleton width="50%" height={38} /> : <SleepSummaryView summary={view?.sleep ?? null} />}
       </Section>
+
+      <Card>
+        <NavRow
+          icon="pulse"
+          tint="heart"
+          title="Health metrics"
+          subtitle="Skin temperature, HRV, stress and more"
+          onPress={() => router.push('/health')}
+        />
+      </Card>
     </Screen>
   );
 }

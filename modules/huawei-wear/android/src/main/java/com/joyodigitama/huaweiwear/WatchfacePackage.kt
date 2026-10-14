@@ -196,9 +196,53 @@ internal object WatchfacePackages {
     }
   }
 
-  /** GB `HuaweiWatchfaceManager.getRandomName`: `<nine digits>_1.0.0`. */
-  fun randomName(random: Random = Random()): String =
-    String.format(Locale.ROOT, "%09d_1.0.0", random.nextInt(1_000_000_000))
+  /** Huawei Health `HwWatchFaceManager.getRandomVersion`: three numbers from 1 to 10, joined by dots. */
+  fun randomVersion(random: Random = Random()): String =
+    String.format(Locale.ROOT, "%d.%d.%d", random.nextInt(10) + 1, random.nextInt(10) + 1, random.nextInt(10) + 1)
+
+  private val usableVersion = Regex("^\\d+(\\.\\d+){1,3}$")
+
+  /**
+   * The `<id>_<version>` the face is uploaded under. The id is nine random digits (GB `getRandomName`; Huawei Health's
+   * local install always uses `000000001`, which would make two installed faces share an id). The version is the
+   * face's own, like a store face (`2184389193_2.10.5`), when it is a plain dotted number; otherwise a random one in
+   * Huawei Health's style. GB always used `1.0.0`, a version below the 2.1 to 2.10 range this watch lists.
+   */
+  fun randomName(random: Random = Random(), version: String? = null): String {
+    val usable = version?.trim()?.takeIf { usableVersion.matches(it) } ?: randomVersion(random)
+    return String.format(Locale.ROOT, "%09d_%s", random.nextInt(1_000_000_000), usable)
+  }
+
+  /** The leading `major.minor` of a version such as `2.10.5`, or null when it has none. */
+  fun majorMinor(version: String): Pair<Int, Int>? {
+    val parts = version.trim().split('.')
+    if (parts.size < 2) return null
+    val major = parts[0].toIntOrNull() ?: return null
+    val minor = parts[1].toIntOrNull() ?: return null
+    return major to minor
+  }
+
+  /**
+   * Huawei Health `f2.d` (`verifyWatchFaceVersion`) with the watch's other versions as its compatible list: the
+   * face's `<version>` has the watch's major version and a minor no higher than the watch's maximum, or is listed
+   * among the other versions the watch accepts. A version that cannot be read on either side is left to the watch.
+   */
+  fun checkVersion(description: WatchfaceDescription, maxVersion: String, otherVersions: String, log: (String) -> Unit) {
+    val face = majorMinor(description.version)
+    val max = majorMinor(maxVersion)
+    if (face == null || max == null) {
+      log("watch face version '${description.version}' or the watch's maximum '$maxVersion' cannot be read; not checked")
+      return
+    }
+    if (face.first == max.first && face.second <= max.second) return
+    if (otherVersions.split(',').any { majorMinor(it) == face }) return
+    throw WearException(
+      ErrorCodes.INVALID_ARGUMENT,
+      "This watch face was made for watch face version ${face.first}.${face.second} (description.xml version " +
+        "${description.version}), but the watch supports up to $maxVersion" +
+        (if (otherVersions.isNotBlank()) " (and $otherVersions)" else "") + ". Export it again from Theme Studio Pro for the Watch Fit 4.",
+    )
+  }
 
   private fun bad(message: String): Nothing = throw WearException(ErrorCodes.INVALID_ARGUMENT, message)
 }

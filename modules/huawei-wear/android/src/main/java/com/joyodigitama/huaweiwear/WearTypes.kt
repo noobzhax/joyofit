@@ -75,4 +75,7 @@ internal interface WearEvents {
 
   /** A live heart-rate reading pushed by the watch (`onHeartRate`); [tsMs] is the phone's receive time. */
   fun heartRate(bpm: Int, tsMs: Long) = Unit
+
+  /** The watch logged meals itself (`onWatchMealLogged`): `{date, meals:[{id, eatTime, kcal, whichMeal}]}`. */
+  fun watchMealLogged(payload: Map<String, Any?>) = Unit
 }

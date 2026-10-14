@@ -3,4 +3,7 @@
 export { default } from './src/HuaweiWearModule';
 export * from './src/HuaweiWear.types';
 export * from './src/HuaweiWearPhone.types';
+export * from './src/HuaweiWearExtras.types';
+export * from './src/HuaweiWearDiet.types';
 export * from './src/HuaweiWearWatchface.types';
+export * from './src/HuaweiWearP2p.types';

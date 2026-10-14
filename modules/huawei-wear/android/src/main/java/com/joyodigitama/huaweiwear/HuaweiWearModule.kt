@@ -77,6 +77,10 @@ class HuaweiWearModule : Module() {
       emit("onHeartRate", mapOf("bpm" to bpm, "ts" to tsMs))
     }
 
+    override fun watchMealLogged(payload: Map<String, Any?>) {
+      emit("onWatchMealLogged", payload)
+    }
+
     private fun emit(name: String, payload: Map<String, Any?>) {
       if (destroyed) return
       try {
@@ -106,7 +110,7 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged")
 
     OnCreate {
       val runtime = runtime()
@@ -211,6 +215,9 @@ class HuaweiWearModule : Module() {
     // Find my watch / find my phone, calls and alarms (PhoneFeaturesModuleApi.kt).
     phoneFeaturesApi { runtime() }
 
+    // Calorie intake, body metrics and activity-ring goals over DataSync (DietModuleApi.kt).
+    dietApi { runtime() }
+
     // Health Connect export: status, permission request, enable + backfill (HealthConnectModuleApi.kt).
     healthConnectApi { runtime() }
 
@@ -219,6 +226,12 @@ class HuaweiWearModule : Module() {
 
     // Watch faces: list, install a .hwt, set active, delete (WatchfaceModuleApi.kt).
     watchfaceApi { runtime() }
+
+    // Fall detection, SOS SMS relay, morning sleep report and the cycle calendar (WatchExtrasModuleApi.kt).
+    watchExtrasApi { runtime() }
+
+    // P2P (service 0x34): Healthy Living replies and the experimental running courses (P2pModuleApi.kt).
+    p2pApi { runtime() }
 
     OnDestroy {
       destroyed = true

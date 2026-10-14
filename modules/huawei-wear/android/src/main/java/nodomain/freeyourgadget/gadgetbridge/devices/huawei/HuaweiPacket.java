@@ -19,6 +19,7 @@
 // Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the Workout service (0x17).
 // Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() dispatch limited to the ported packet classes (DeviceConfig, FitnessData, FileDownloadService0A/2C, Notifications constraints/capabilities); other packet classes not ported.
 // Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the FileUpload (0x28) and Watchface (0x27) services; WatchfaceOperation (0x27/0x03) is parsed too (GB leaves it generic).
+// Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the P2P service (0x34/0x01, packets/P2P.java).
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei;
 
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.HUAWEI_MAGIC;
@@ -43,6 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Alarms;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Calls;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DataSync;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FindPhone;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.P2P;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Workout;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Weather;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileUpload;
@@ -560,6 +562,14 @@ public class HuaweiPacket {
                         return new Alarms.EventAlarmsList.Response(paramsProvider).fromPacket(this);
                     case Alarms.SmartAlarmList.id:
                         return new Alarms.SmartAlarmList.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case P2P.id:
+                switch (this.commandId) {
+                    case P2P.P2PCommand.id:
+                        return new P2P.P2PCommand.Response(paramsProvider).fromPacket(this);
                     default:
                         this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
                         return this;
