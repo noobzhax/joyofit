@@ -43,6 +43,7 @@ flowchart LR
 | Auth: HiChain (first bind with on-watch confirmation, then reconnect), HiChain Lite, normal | implemented (ported from GB) |
 | Product info, time sync, battery | implemented |
 | Sync per-minute steps / kcal / distance / HR / SpO₂ / resting HR, sleep segments, today's totals | implemented |
+| Heart rate, SpO₂ and TruSleep switched on in the watch on every connect (Settings → Watch & sync → Heart rate and sensors, default on; optional high/low heart-rate alerts, default off); live heart rate on Today while it is on screen; the hero shows the live bpm, else the newest stored one with its age, else `--` | implemented, ported from GB; the realtime push layout is a guess (GB has no parser), unverified on the Fit 4 |
 | Local storage + Today screen + raw packet log (copy to clipboard) | implemented |
 | Sleep stages from TruSleep / dictionary files (file download services 0x2C and 0x0A) | implemented, gated like GB; unverified on the Fit 4 |
 | Background mode: foreground service keeps the watch connected, reconnects with backoff, syncs every 30 min (configurable), starts on boot | implemented; unverified on the Fit 4 |
@@ -51,7 +52,7 @@ flowchart LR
 | Write steps, distance, calories, heart rate, SpO₂, resting HR, sleep and workouts to Health Connect (for JoyoRogo and others), also from the background service | implemented; unverified on the Fit 4 |
 | Workouts (sport sessions): totals, heart rate, pace splits, swim data and the GPS track, shown in the Workouts tab (stats, heart-rate bars, route as an SVG polyline, no map) | implemented, ported from GB; unverified on the Fit 4 |
 | Weather on the watch: current conditions and a 24 h / 8 day forecast from Open-Meteo (no key) for the phone's coarse location or a chosen city, pushed on connect, when the watch asks, and every hour (configurable) | implemented, ported from GB; unverified on the Fit 4 |
-| Find my watch (phone → watch) from the Device tab | implemented, ported from GB; unverified on the Fit 4 |
+| Find my watch (phone → watch) from the Watch tab | implemented, ported from GB; unverified on the Fit 4 |
 | Find my phone (watch → phone): loud ringtone on the alarm volume, vibration, notification with Stop; works from the background service | implemented, ported from GB; unverified on the Fit 4 |
 | Incoming calls on the watch (caller name or number), accept / reject from the watch | implemented, ported from GB; unverified on the Fit 4 |
 | Alarms: read the five event alarms and the smart alarm, add, edit, delete, enable, push | implemented, ported from GB; unverified on the Fit 4 |
@@ -59,7 +60,7 @@ flowchart LR
 
 The protocol layer is covered by the Gadgetbridge packet, TLV and crypto tests plus our own
 session reassembly tests and fake-watch tests for downloads and watch face upload, 222 JVM tests in total. **It has not yet been run against a real Fit 4.**
-The first connect is the real test. When you do it, save the Log tab (Copy) and add the
+The first connect is the real test. When you do it, save the log (Settings → Advanced → Log → Copy) and add the
 link parameters to `protocol/README.md` → Observations.
 
 ## Using it
@@ -67,13 +68,14 @@ link parameters to `protocol/README.md` → Observations.
 1. Unbind the watch from Huawei Health. The watch can only be bound to one app at a time; a
    factory reset of the watch also works.
 2. Pair the watch in **Android Settings → Bluetooth**. It shows up as `HUAWEI WATCH FIT 4-XXX`.
-3. Open JoyoFit → **Device** → grant Nearby devices → tap the watch → **Connect**.
+3. Open JoyoFit → **Watch** → grant Nearby devices → tap the watch → **Connect**.
    - On the first connect, confirm the pairing on the watch within 30 s.
-4. Go to **Today** and tap **Sync**. The first sync pulls the last 7 days. Each later sync starts
+4. Go to **Today** and tap **Sync now** (or pull down). The first sync pulls the last 7 days. Each later sync starts
    from the previous one, with 1 h of overlap.
-5. **Settings** has the background toggle and sync interval, notification forwarding, and your
-   profile and step goal. The watch you last connected from **Device** is the one background mode follows.
-6. **Log** shows every TX/RX frame in hex.
+5. **Settings** is a grouped menu: Watch & sync (background toggle, sync interval, heart rate and sensors), Notifications & calls,
+   Weather, Health & cloud, Profile & goal and Advanced. The watch you last connected from **Watch** is the one
+   background mode follows.
+6. **Settings → Advanced → Log** shows every TX/RX frame in hex.
 
 ### Background mode
 
@@ -83,7 +85,7 @@ starts, reconnects after a drop (5 s, doubling up to 5 min; at once when Bluetoo
 watch's ACL link comes up), and syncs and reads the battery on a timer. After a reboot it starts again.
 Sync results are written to the database by native code, so data accumulates while the app is closed.
 
-- The first bind still has to be confirmed on the watch from the Device tab; the service never starts a bind.
+- The first bind still has to be confirmed on the watch from the Watch tab; the service never starts a bind.
 - Tapping **Disconnect** in the app pauses auto-reconnect until you connect again.
 - Android 13+ asks for the notification permission when you enable it. Without it the service still
   runs but its notification is hidden.
@@ -94,7 +96,7 @@ Sync results are written to the database by native code, so data accumulates whi
 In Settings, grant **notification access** (on Android 13+ a sideloaded app must first be allowed
 under App info → ⋮ → *Allow restricted settings*), then switch on forwarding. Ongoing notifications,
 group summaries, local-only ones, calls, media controls, progress bars and JoyoFit's own are skipped.
-Apps you have not chosen are on, except system apps; **Choose apps** overrides either way.
+Apps you have not chosen are on, except system apps; **Notification apps** (Settings → Notifications & calls) overrides either way.
 Notifications only reach the watch while it is connected, so use background mode to keep it connected.
 
 ### Weather
@@ -116,9 +118,9 @@ when the watch connects, whenever the watch asks for it (opening its weather app
 
 ### Find my watch, find my phone, calls and alarms
 
-- **Find my watch**: Device tab → *Ring the watch* / *Stop ringing* (watch connected, and it must report
+- **Find my watch**: Watch tab → *Ring the watch* / *Stop ringing* (watch connected, and it must report
   find-device support).
-- **Find my phone**: on by default in Settings → *Find, calls and alarms*. When you press find-phone on the
+- **Find my phone**: on by default in Settings → *Notifications & calls*. When you press find-phone on the
   watch, the phone rings in a loop on the **alarm** stream at maximum volume (your alarm volume is restored
   afterwards), vibrates, and posts a high-priority notification with **Stop**. It stops when the watch says
   stop or when you tap Stop; either way the phone then tells the watch it stopped, like Gadgetbridge. It needs
@@ -129,13 +131,13 @@ when the watch connects, whenever the watch asks for it (opening its weather app
   calls from the watch* on (needs the Answer phone calls permission), the watch's accept and reject buttons
   call `TelecomManager.acceptRingingCall()` / `endCall()`. There is no mute button: the watch protocol
   Gadgetbridge knows only has accept and reject. Outgoing calls are not shown.
-- **Alarms**: Settings → *Watch alarms*. The screen reads the watch whenever it opens with the watch connected,
+- **Alarms**: Watch tab → *Alarms*. The screen reads the watch whenever it opens with the watch connected,
   keeps the last copy on the phone, and every change pushes the whole list and shows what the watch reports
   back. Five event alarms (name, time, weekdays) and, if the watch has one, the smart alarm.
 
 ### Watch faces
 
-**Settings** (or the **Device** tab, once the watch is connected) → *Watch faces*. The screen reads the watch's face list when it
+**Watch** tab → *Watch faces*. The screen reads the watch's face list when it
 opens: name, id and version, an *(active)* marker, and *preinstalled* for the factory faces. *Set active* switches the watch to
 that face, *Delete* removes it (not offered for preinstalled faces). After each of these the app reads the list again and
 reports an error if the watch did not do what it was asked.
@@ -152,6 +154,20 @@ The upload shows a progress bar; the watch pulls the data in chunks of its own c
 - Only one operation runs on the link at a time: a sync that starts during an upload waits for it.
 - GB does not check for the `0x28` upload service in the watch's service list, and neither do we; the Fit 4 does not list it.
 
+## JoyoFit Studio
+
+[`web/`](web/README.md) is a watch face editor for the Fit 4 and Fit 4 Pro, hosted as a Cloudflare Worker with static assets
+at <https://joyofit-studio.dzulfikar-at.workers.dev>. You design a 408 x 480 face in the browser (time, date, analog hands,
+steps, heart rate and battery, progress rings, images, solid, gradient or photo backgrounds, six templates) against a
+simulated watch, and export a `.hwt` that this app installs with **Watch faces → Install from file**. Nothing leaves the
+browser. It builds on [`packages/hwt`](packages/hwt/README.md), the TypeScript `.hwt` codec.
+
+- Faces are unofficial and unsigned; whether the Fit 4 accepts them is the open question above.
+- Elements whose value ids are known only from sample faces are marked *Unconfirmed* and can be left out of the export;
+  elements with no known id (calories, AM/PM) are *Preview only* and never exported. The export dialog lists both, plus
+  the package size against Huawei's limits.
+- Setup, tests, deploy and the element-to-layout mapping are in [`web/README.md`](web/README.md).
+
 ## Permissions
 
 | Permission | Why |
@@ -166,11 +182,11 @@ The upload shows a progress bar; the watch pulls the data in chunks of its own c
 | `READ_PHONE_STATE`, `READ_CALL_LOG`, `READ_CONTACTS` | show incoming calls on the watch: call state, the caller's number, the contact name (runtime prompt from Settings; only the first is required) |
 | `ANSWER_PHONE_CALLS` | accept or reject a call from the watch (runtime prompt from Settings) |
 | `android.permission.health.WRITE_STEPS`, `WRITE_DISTANCE`, `WRITE_ACTIVE_CALORIES_BURNED`, `WRITE_HEART_RATE`, `WRITE_RESTING_HEART_RATE`, `WRITE_OXYGEN_SATURATION`, `WRITE_SLEEP`, `WRITE_EXERCISE` | write the watch data to Health Connect (asked from Settings through Health Connect's own dialog; write only, no read) |
-| `INTERNET` | fetch the weather and search cities from Open-Meteo; sign in with JoyoRogo and upload to the JoyoFit cloud server (Settings → Cloud) |
+| `INTERNET` | fetch the weather and search cities from Open-Meteo; sign in with JoyoRogo and upload to the JoyoFit cloud server (Settings → Health & cloud → Cloud) |
 | `ACCESS_COARSE_LOCATION` | weather for the phone's position (runtime prompt from Settings → Weather; not needed in city mode) |
 
 There is no `QUERY_ALL_PACKAGES`: the app chooser lists launcher apps through a `<queries>` entry.
-Internet use: weather (Open-Meteo forecast and city search, only while weather is switched on) and, after you sign in under Settings → Cloud, JoyoRogo's auth server and your JoyoFit cloud server.
+Internet use: weather (Open-Meteo forecast and city search, only while weather is switched on) and, after you sign in under Settings → Health & cloud → Cloud, JoyoRogo's auth server and your JoyoFit cloud server.
 
 ## Health Connect / JoyoRogo
 
@@ -181,7 +197,7 @@ and `ActiveCaloriesBurned` (`apps/native/src/lib/health-connect.ts`), and aggreg
 ones with Health Connect's own `aggregateRecord`, which is why steps, distance and energy are
 written per minute rather than as daily totals.
 
-Turn it on in **Settings → Health Connect → Write to Health Connect**. Android shows the Health
+Turn it on in **Settings → Health & cloud → Write to Health Connect**. Android shows the Health
 Connect permission dialog; allow every type (JoyoRogo needs `Steps`, `Distance`,
 `ActiveCaloriesBurned`, `SleepSession` and `ExerciseSession`). Enabling it also writes everything
 already in the local database once; **Write everything again** repeats that. After that every sync
@@ -214,7 +230,7 @@ The export needs Health Connect: built into Android 14+, a Play Store app on And
 
 ## Cloud sync
 
-Settings → **Cloud** signs in with your **JoyoRogo account** and uploads the local database to a
+Settings → Health & cloud → **Cloud** signs in with your **JoyoRogo account** and uploads the local database to a
 separate Cloudflare Worker you deploy yourself ([`server/`](server/README.md): Hono, D1, R2). Upload only: the
 app does not read from the cloud yet, and the Huawei-export importer is not written (the server already
 has `POST /v1/imports`, which stores a raw file in R2 and records an `imports` row for it).
@@ -289,7 +305,7 @@ Keep `JAVA_HOME` pointed at JDK 17 and `ANDROID_HOME` at the SDK.
 ## Layout
 
 ```
-src/app/                  expo-router tabs: index (Device), today, workouts (list + detail stack), settings, log; alarms and watchfaces reached from Settings
+src/app/                  expo-router: four tabs, index (Today), workouts (list + detail stack), watch (status, alarms, faces stack), settings (menu stack, with Log and About); /today, /log, /alarms and /watchfaces redirect to their new place
 src/state/                WatchProvider (link state, events), log ring buffer
 src/db/                   expo-sqlite migrations (from the shared JSON) + read queries + cloud cursors (cloud.ts)
 src/cloud/                JoyoRogo sign-in (better-auth client), cloud API client with retries, incremental uploader
@@ -303,6 +319,7 @@ modules/huawei-wear/
   android/src/test/java/                    Gadgetbridge tests + HuaweiSessionTest
 protocol/README.md        protocol reference + observations
 server/                   JoyoFit cloud Worker (Hono, D1, R2): see server/README.md
+web/                      JoyoFit Studio watch face editor (Vite + React, Cloudflare Worker with static assets): see web/README.md
 ```
 
 ## Updating from Gadgetbridge

@@ -19,6 +19,13 @@ export function listStepSamplesSince(db: SQLiteDatabase, sinceSec: number): Prom
   );
 }
 
+/** The newest stored heart-rate reading of any day, or null when the watch never recorded one. */
+export function getLatestHeartRate(db: SQLiteDatabase): Promise<{ bpm: number; timestamp: number } | null> {
+  return db.getFirstAsync<{ bpm: number; timestamp: number }>(
+    'SELECT heart_rate AS bpm, timestamp FROM step_samples WHERE heart_rate > 0 ORDER BY timestamp DESC LIMIT 1',
+  );
+}
+
 /** Segments that end at or after `sinceSec`, oldest first. */
 export function listSleepSince(db: SQLiteDatabase, sinceSec: number): Promise<SleepSegment[]> {
   return db.getAllAsync<SleepSegment>(

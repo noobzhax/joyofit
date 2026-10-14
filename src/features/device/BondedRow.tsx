@@ -2,7 +2,8 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { space } from '@/theme';
+import { IconChip } from '@/components/IconChip';
+import { spacing } from '@/theme';
 import type { BondedDevice, LinkState } from '@/wear';
 
 interface BondedRowProps {
@@ -38,15 +39,20 @@ export function BondedRow({
   }
 
   return (
-    <View style={[styles.row, !device.supported && styles.dimmed]}>
-      <View style={styles.text}>
-        <AppText variant="title">{device.name || 'Unnamed device'}</AppText>
-        <AppText variant="mono" muted>
-          {device.address}
-        </AppText>
-        <AppText variant="caption" muted>
-          {device.supported ? 'Huawei Watch Fit 4 / Fit 4 Pro' : 'Not a supported watch'}
-        </AppText>
+    <View style={styles.row}>
+      <View style={[styles.header, !device.supported && styles.dimmed]}>
+        <IconChip icon="watch" tint={isActive ? 'link' : 'neutral'} />
+        <View style={styles.text}>
+          <AppText variant="bodyStrong" numberOfLines={1}>
+            {device.name || 'Unnamed device'}
+          </AppText>
+          <AppText variant="mono" muted>
+            {device.address}
+          </AppText>
+          <AppText variant="caption" muted>
+            {device.supported ? 'Huawei Watch Fit 4 / Fit 4 Pro' : 'Not a supported watch'}
+          </AppText>
+        </View>
       </View>
       <View style={styles.actions}>
         {isActive ? (
@@ -64,7 +70,7 @@ export function BondedRow({
           />
         )}
         {device.supported ? (
-          <Button label="Forget pairing" variant="danger" disabled={!idle && !isActive} onPress={confirmForget} />
+          <Button label="Forget pairing" variant="destructive" disabled={!idle && !isActive} onPress={confirmForget} />
         ) : null}
       </View>
     </View>
@@ -72,8 +78,9 @@ export function BondedRow({
 }
 
 const styles = StyleSheet.create({
-  row: { gap: space.md },
-  dimmed: { opacity: 0.5 },
-  text: { gap: 2 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  row: { gap: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  dimmed: { opacity: 0.55 },
+  text: { flex: 1, gap: 2 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

@@ -1,5 +1,6 @@
-import { WatchfacesScreen } from '@/features/watchfaces/WatchfacesScreen';
+import { Redirect } from 'expo-router';
 
-export default function WatchfacesRoute() {
-  return <WatchfacesScreen />;
+/** Watch faces live under the Watch tab; `joyofit:///watchfaces` keeps working. */
+export default function WatchfacesRedirect() {
+  return <Redirect href="/watch/faces" />;
 }

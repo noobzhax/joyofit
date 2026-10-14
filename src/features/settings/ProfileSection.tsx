@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import type { IconName } from '@/components/IconChip';
+import { Field } from '@/components/Input';
 import { Section } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
+import { Notice } from '@/components/States';
+import { DEFAULT_STEP_GOAL } from '@/features/today/useStepGoal';
 import { errorMessage } from '@/format';
-import { radius, usePalette } from '@/theme';
 import { HuaweiWear, type UserProfile, type UserSex } from '@/wear';
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -14,7 +17,7 @@ const DEFAULT_PROFILE: UserProfile = {
   weightKg: 70,
   birthYear: 1990,
   sex: 'unknown',
-  dailyStepGoal: 8000,
+  dailyStepGoal: DEFAULT_STEP_GOAL,
 };
 
 const SEXES: readonly { value: UserSex; label: string }[] = [
@@ -52,28 +55,23 @@ function parseFields(fields: Fields, sex: UserSex): UserProfile | string {
   return { heightCm: height, weightKg: Math.round(weight * 10) / 10, birthYear, sex, dailyStepGoal };
 }
 
-interface FieldProps {
+interface NumberFieldProps {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
+  icon: IconName;
   decimal?: boolean;
 }
 
-function NumberField({ label, value, onChangeText, decimal }: FieldProps) {
-  const palette = usePalette();
+function NumberField({ label, value, onChangeText, icon, decimal }: NumberFieldProps) {
   return (
-    <View style={styles.field}>
-      <AppText variant="caption" muted>
-        {label}
-      </AppText>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
-        style={[styles.input, { borderColor: palette.border, color: palette.text }]}
-      />
-    </View>
+    <Field
+      label={label}
+      icon={icon}
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
+    />
   );
 }
 
@@ -116,16 +114,15 @@ export function ProfileSection() {
   };
 
   return (
-    <Section title="Profile and goal">
+    <Section title="Profile and goal" icon="person">
       <AppText variant="caption" muted>
-        The watch uses these for calories and its step goal. Nothing is sent to the watch until you
-        save.
+        The watch uses these for calories and its step goal. Nothing is sent until you save.
       </AppText>
-      <NumberField label="Height (cm)" value={fields.height} onChangeText={edit('height')} />
-      <NumberField label="Weight (kg)" value={fields.weight} onChangeText={edit('weight')} decimal />
-      <NumberField label="Birth year" value={fields.birthYear} onChangeText={edit('birthYear')} />
+      <NumberField label="Height (cm)" value={fields.height} onChangeText={edit('height')} icon="resize" />
+      <NumberField label="Weight (kg)" value={fields.weight} onChangeText={edit('weight')} icon="barbell" decimal />
+      <NumberField label="Birth year" value={fields.birthYear} onChangeText={edit('birthYear')} icon="calendar" />
       <View style={styles.field}>
-        <AppText variant="caption" muted>
+        <AppText variant="label" muted>
           Sex
         </AppText>
         <Segmented
@@ -137,24 +134,13 @@ export function ProfileSection() {
           }}
         />
       </View>
-      <NumberField label="Daily step goal" value={fields.steps} onChangeText={edit('steps')} />
-      {message ? (
-        <AppText variant="caption" danger={message.danger} muted={!message.danger} selectable>
-          {message.text}
-        </AppText>
-      ) : null}
+      <NumberField label="Daily step goal" value={fields.steps} onChangeText={edit('steps')} icon="footsteps" />
+      {message ? <Notice tone={message.danger ? 'danger' : 'info'}>{message.text}</Notice> : null}
       <Button label="Save" variant="primary" onPress={save} loading={saving} />
     </Section>
   );
 }
 
 const styles = StyleSheet.create({
-  field: { gap: 4 },
-  input: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    fontSize: 15,
-  },
+  field: { gap: 6 },
 });

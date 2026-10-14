@@ -40,6 +40,32 @@ export function heartRateStats(samples: readonly StepSample[]): HeartRateStats |
   return stats;
 }
 
+/** A live reading older than this no longer counts as live (the watch pushes about one a second). */
+export const LIVE_FRESH_MS = 20_000;
+
+export interface HeartReading {
+  bpm: number;
+  /** Unix seconds the reading was taken (stored sample) or received (live). */
+  timestamp: number;
+  /** Pushed by the watch within {@link LIVE_FRESH_MS}. */
+  live: boolean;
+}
+
+/**
+ * What the hero shows: the live reading while it is fresh, else the newest of the last live reading
+ * and the newest stored one; null when there is neither. `live.ts` is unix milliseconds.
+ */
+export function pickHeartReading(
+  live: { bpm: number; ts: number } | null,
+  stored: { bpm: number; timestamp: number } | null,
+  nowMs: number,
+): HeartReading | null {
+  const received = live ? { bpm: live.bpm, timestamp: Math.floor(live.ts / 1000) } : null;
+  if (live && received && nowMs - live.ts < LIVE_FRESH_MS) return { ...received, live: true };
+  const newest = received && (!stored || received.timestamp >= stored.timestamp) ? received : stored;
+  return newest ? { bpm: newest.bpm, timestamp: newest.timestamp, live: false } : null;
+}
+
 /** Steps summed per local clock hour (index 0..23). */
 export function hourlySteps(samples: readonly StepSample[]): number[] {
   const bins = new Array<number>(24).fill(0);

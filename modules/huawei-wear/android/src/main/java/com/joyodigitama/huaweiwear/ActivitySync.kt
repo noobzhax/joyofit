@@ -158,7 +158,11 @@ internal class ActivitySync(
   private suspend fun fetchSteps(start: Int, end: Int): List<StepSample> {
     val samples = ArrayList<StepSample>()
     val maxCount = messageCount(FitnessData.MessageCount.stepId, start, end, "StepDataCount")
-    if (maxCount <= 0) return samples
+    if (maxCount <= 0) {
+      events.log(LogDirection.INFO, null, null, null, "Sync HR: no step frames to count")
+      return samples
+    }
+    val stats = StepFrameStats()
 
     var count = 0
     var requests = 0
@@ -189,6 +193,7 @@ internal class ActivitySync(
       }
 
       for (container in response.containers) {
+        stats.add(container)
         if (container.parsedData == null) {
           events.log(LogDirection.ERROR, null, null, null, "$label: ${container.parsedDataError}")
           continue
@@ -212,6 +217,7 @@ internal class ActivitySync(
         throw WearException(ErrorCodes.PROTOCOL, "StepData paging did not converge after $requests requests (count=$maxCount)")
       }
     }
+    events.log(LogDirection.INFO, null, null, null, "Sync HR: ${stats.summary()}")
     return samples
   }
 

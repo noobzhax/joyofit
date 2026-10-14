@@ -52,6 +52,10 @@ never found a usable channel.
 | `07` | `03` | FitnessTotals | today's totals |
 | `07` | `02` | UserInfo | height, weight, age, birthday, gender, walk/run step lengths; sent in init when the profile was saved |
 | `07` | `01` | MotionGoal | daily step goal (goal type 1); the calorie and duration goals are not sent |
+| `07` | `16` / `17` / `1C` / `24` | TruSleep / EnableAutomaticHeartrate / EnableRealtimeHeartRate / EnableAutomaticSpo | one boolean (`01`), encrypted. GB sends these only when a setting changes (all default off, none in its init queue); JoyoFit sends TruSleep, continuous HR and SpO₂ on every connect when SupportedCommands lists them. `1C` is GB's realtime mode: it replaces `17` there and its boolean is the automatic-HR flag; JoyoFit sends `1C` on while Today is on screen and `1C` off + `17` (user's setting) after |
+| `07` | `1D` / `22` / `25` | HighHeartRateAlert / LowHeartRateAlert / LowSpoAlert | `01` enabled, `02` threshold bpm (only when enabled). GB offers high 100 to 150, low 40 to 50. JoyoFit sends the two heart-rate alerts at connect only when on, and on change; `25` has no setting in JoyoFit and is never sent |
+| `07` / `17` | `23` / `17` | NotifyRestHeartRate / Workout NotifyHeartRate | capability notifications GB sends at init when `07/23` / `17/17` are listed: TLV `01` = int 1 / int 3 |
+| `07` | `1C` (pushed) | realtime heart rate | not parsed by GB. JoyoFit subscribes to `07/1C` and takes the first single-byte value of 30 to 250 from the TLV (containers searched too); the raw frame is in the log, so the real layout can be read from there |
 | `02` Notifications | `05` | NotificationCapabilities | only asked when `supportsPromptPushMessage` and protocol version 2 (GB default capability byte `0xFF` skips it) |
 | `02` | `02` | NotificationConstraints | content format and maximum content length; asked when `02/01` is supported and protocol version is 2 |
 | `02` | `04` | NotificationState | the watch-side notification switch (`0x81{02:on,03:on}`); sent in init and when forwarding is toggled, if `02/04` is supported |

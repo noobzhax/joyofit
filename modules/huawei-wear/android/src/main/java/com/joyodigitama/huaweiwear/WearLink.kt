@@ -195,6 +195,7 @@ internal class WearLink(
         protocolVersion = authenticator.protocolVersion,
         profile = settings.profile,
         notificationsEnabled = settings.notificationsEnabled,
+        healthSensors = settings.healthSensors,
       ).run()
 
       val name = bondedName(connection.device) ?: init.deviceName ?: address

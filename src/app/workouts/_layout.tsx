@@ -1,18 +1,13 @@
 import { Stack } from 'expo-router';
 
-import { usePalette } from '@/theme';
+import { useStackOptions } from '@/components/navigation';
+
+export const unstable_settings = { initialRouteName: 'index' };
 
 export default function WorkoutsLayout() {
-  const palette = usePalette();
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: palette.surface },
-        headerTintColor: palette.text,
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: palette.background },
-      }}>
-      <Stack.Screen name="index" options={{ title: 'Workouts' }} />
+    <Stack screenOptions={useStackOptions()}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="[id]" options={{ title: 'Workout' }} />
     </Stack>
   );

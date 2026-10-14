@@ -4,32 +4,32 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { formatPacketId } from '@/features/log/formatLog';
 import { formatClockMs } from '@/format';
-import { usePalette, type Palette } from '@/theme';
+import { fonts, useColors, type Colors } from '@/theme';
 import type { LogEvent } from '@/wear';
 
-function directionColor(direction: LogEvent['direction'], palette: Palette): string {
+function directionColor(direction: LogEvent['direction'], colors: Colors): string {
   switch (direction) {
     case 'tx':
-      return palette.accent;
+      return colors.primary;
     case 'error':
-      return palette.danger;
+      return colors.destructive;
     case 'rx':
-      return palette.text;
+      return colors.foreground;
     case 'info':
-      return palette.textMuted;
+      return colors.mutedForeground;
   }
 }
 
 export const LogRow = memo(function LogRow({ event }: { event: LogEvent }) {
-  const palette = usePalette();
+  const colors = useColors();
   const id = formatPacketId(event);
   return (
-    <View style={[styles.row, { borderBottomColor: palette.border }]}>
+    <View style={[styles.row, { borderBottomColor: colors.hairline }]}>
       <View style={styles.head}>
         <AppText variant="mono" muted>
           {formatClockMs(event.ts)}
         </AppText>
-        <AppText variant="mono" style={{ color: directionColor(event.direction, palette), fontWeight: '700' }}>
+        <AppText variant="mono" style={{ color: directionColor(event.direction, colors), fontFamily: fonts.bold }}>
           {event.direction.toUpperCase()}
         </AppText>
         {id ? (

@@ -1,50 +1,67 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import type { ComponentProps } from 'react';
+import { ActivityIndicator, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { radius, usePalette } from '@/theme';
+import { PressableScale } from '@/components/PressableScale';
+import { fontSize, fonts, HIT, radius, spacing, useColors } from '@/theme';
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  /** `inverse` is the light button for the dark watch panel. */
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'inverse';
   disabled?: boolean;
   loading?: boolean;
+  icon?: IconName;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function Button({ label, onPress, variant = 'secondary', disabled, loading }: ButtonProps) {
-  const palette = usePalette();
+export function Button({
+  label,
+  onPress,
+  variant = 'secondary',
+  disabled,
+  loading,
+  icon,
+  style,
+}: ButtonProps) {
+  const colors = useColors();
   const inactive = disabled || loading;
-  const filled = variant === 'primary';
-  const tint = variant === 'danger' ? palette.danger : filled ? palette.onAccent : palette.text;
+  const scheme = {
+    primary: { bg: colors.primary, fg: colors.primaryForeground },
+    secondary: { bg: colors.muted, fg: colors.foreground },
+    ghost: { bg: 'transparent', fg: colors.primary },
+    destructive: { bg: colors.destructiveSoft, fg: colors.destructive },
+    inverse: { bg: colors.heroForeground, fg: colors.hero },
+  }[variant];
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       disabled={inactive}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        {
-          backgroundColor: filled ? palette.accent : 'transparent',
-          borderColor: filled ? palette.accent : variant === 'danger' ? palette.danger : palette.border,
-          opacity: inactive ? 0.45 : pressed ? 0.75 : 1,
-        },
-      ]}>
-      {loading ? <ActivityIndicator size="small" color={tint} /> : null}
-      <Text style={[styles.label, { color: tint }]}>{label}</Text>
-    </Pressable>
+      style={[styles.base, { backgroundColor: scheme.bg }, style]}>
+      {loading ? <ActivityIndicator size="small" color={scheme.fg} /> : null}
+      {!loading && icon ? <Ionicons name={icon} size={18} color={scheme.fg} /> : null}
+      <Text style={[styles.label, { color: scheme.fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    minHeight: HIT,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
-  label: { fontSize: 15, fontWeight: '600' },
+  label: { fontFamily: fonts.medium, fontSize: fontSize.base },
 });

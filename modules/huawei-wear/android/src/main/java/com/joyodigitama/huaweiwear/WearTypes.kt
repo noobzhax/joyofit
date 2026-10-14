@@ -72,4 +72,7 @@ internal interface WearEvents {
 
   /** A watch face install finished (`onUploadResult`); [code] is the watch's status when it gave one. */
   fun uploadResult(ok: Boolean, fileName: String, code: Int?, message: String) = Unit
+
+  /** A live heart-rate reading pushed by the watch (`onHeartRate`); [tsMs] is the phone's receive time. */
+  fun heartRate(bpm: Int, tsMs: Long) = Unit
 }

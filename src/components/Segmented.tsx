@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { radius, usePalette } from '@/theme';
+import { PressableScale } from '@/components/PressableScale';
+import { fontSize, fonts, radius, useColors } from '@/theme';
 
 interface SegmentedProps<T extends string | number> {
   options: readonly { value: T; label: string }[];
@@ -10,39 +11,39 @@ interface SegmentedProps<T extends string | number> {
   disabled?: boolean;
 }
 
-/** Single-choice row of buttons; the selected one is filled with the accent color. */
+/** Single-choice pill control; the selected option is filled with the primary color. */
 export function Segmented<T extends string | number>({
   options,
   value,
   onChange,
   disabled,
 }: SegmentedProps<T>) {
-  const palette = usePalette();
+  const colors = useColors();
   return (
-    <View style={styles.row} accessibilityRole="radiogroup">
+    <View
+      style={[styles.row, { backgroundColor: colors.muted }, disabled && styles.disabled]}
+      accessibilityRole="radiogroup">
       {options.map((option) => {
         const selected = option.value === value;
         return (
-          <Pressable
+          <PressableScale
             key={option.value}
             accessibilityRole="radio"
+            accessibilityLabel={option.label}
             accessibilityState={{ selected, disabled: !!disabled }}
             disabled={disabled}
+            scaleTo={0.96}
             onPress={() => onChange(option.value)}
-            style={({ pressed }) => [
-              styles.base,
-              {
-                backgroundColor: selected ? palette.accent : 'transparent',
-                borderColor: selected ? palette.accent : palette.border,
-                opacity: disabled ? 0.45 : pressed ? 0.75 : 1,
-              },
-            ]}>
+            style={[styles.option, selected && { backgroundColor: colors.primary }]}>
             <Text
-              style={[styles.label, { color: selected ? palette.onAccent : palette.text }]}
+              style={[
+                styles.label,
+                { color: selected ? colors.primaryForeground : colors.foreground },
+              ]}
               numberOfLines={1}>
               {option.label}
             </Text>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>
@@ -50,15 +51,15 @@ export function Segmented<T extends string | number>({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 8 },
-  base: {
+  row: { flexDirection: 'row', borderRadius: radius.pill, padding: 3, gap: 2 },
+  disabled: { opacity: 0.55 },
+  option: {
     flex: 1,
-    minHeight: 44,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    minHeight: 48,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  label: { fontSize: 14, fontWeight: '600' },
+  label: { fontFamily: fonts.medium, fontSize: fontSize.sm },
 });

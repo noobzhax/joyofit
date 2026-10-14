@@ -36,3 +36,19 @@ export function formatDateTime(sec: number): string {
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+/** `14:05` for today, `Oct 12, 14:05` for any other day. Unix seconds, local time. */
+export function formatSyncTime(sec: number): string {
+  const d = new Date(sec * 1000);
+  if (d.toDateString() === new Date().toDateString()) return formatClock(sec);
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${formatClock(sec)}`;
+}
+
+/** `just now`, `5 min ago`, `3 h ago`; older than a day falls back to {@link formatSyncTime}. Unix seconds. */
+export function formatAgo(sec: number, nowSec: number): string {
+  const ago = Math.max(0, nowSec - sec);
+  if (ago < 60) return 'just now';
+  if (ago < 3600) return `${Math.floor(ago / 60)} min ago`;
+  if (ago < 86_400) return `${Math.floor(ago / 3600)} h ago`;
+  return formatSyncTime(sec);
+}

@@ -1,125 +1,176 @@
-import { Linking } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { KeyValue } from '@/components/KeyValue';
+import { Metric } from '@/components/Metric';
 import { Screen, Section } from '@/components/Screen';
-import { BondedRow } from '@/features/device/BondedRow';
-import { FindWatchSection } from '@/features/device/FindWatchSection';
-import { LinkStatus } from '@/features/device/LinkStatus';
-import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
-import { useBondedDevices } from '@/features/device/useBondedDevices';
-import { WatchfacesSection } from '@/features/settings/WatchfacesSection';
-import { useBackgroundStatus } from '@/features/settings/useBackgroundStatus';
-import { formatDateTime } from '@/format';
+import { Notice, Skeleton } from '@/components/States';
+import { StatTile } from '@/components/StatTile';
+import { HourlyBars } from '@/features/today/HourlyBars';
+import { SleepSummaryView } from '@/features/today/SleepSummaryView';
+import { isLinkUp } from '@/features/device/linkState';
+import {
+  heartRateStats,
+  hourlySteps,
+  lastSleepSession,
+  pickHeartReading,
+  sumTotals,
+} from '@/features/today/stats';
+import { useLiveHeartRate } from '@/features/today/useLiveHeartRate';
+import { useStepGoal } from '@/features/today/useStepGoal';
+import { useTodayData } from '@/features/today/useTodayData';
+import { WatchHero } from '@/features/today/WatchHero';
+import { formatClock, formatCount, formatDistance } from '@/format';
+import { useNow } from '@/hooks/useNow';
 import { useWatch } from '@/state/WatchProvider';
+import { spacing, useColors } from '@/theme';
 
-export default function DeviceScreen() {
-  const watch = useWatch();
-  const permission = useBluetoothPermission();
-  const bonded = useBondedDevices(permission.status === 'granted');
-  const { device } = watch;
-  const { status: background } = useBackgroundStatus();
+/** Splits `1.23 km` into its number and unit. */
+function splitDistance(meters: number): { value: string; unit: string } {
+  const [value, unit] = formatDistance(meters).split(' ');
+  return { value, unit };
+}
+
+const WEEKDAY_FORMAT: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+
+/** How often the hero re-checks whether the live reading is stale and re-words "5 min ago". */
+const HERO_TICK_MS = 5_000;
+
+export default function TodayScreen() {
+  const router = useRouter();
+  const colors = useColors();
+  const { linkState, device, battery, lastSync, totals, error, dataVersion, sync } = useWatch();
+  const { data, error: loadError } = useTodayData(dataVersion);
+  const goal = useStepGoal();
+  const live = useLiveHeartRate(isLinkUp(linkState));
+
+  const view = useMemo(() => {
+    if (!data) return null;
+    const watchTotals = totals && totals.at >= data.dayStart ? totals : null;
+    return {
+      totals: watchTotals ?? sumTotals(data.samples),
+      totalsFromWatch: watchTotals !== null,
+      heart: heartRateStats(data.samples),
+      hourly: hourlySteps(data.samples),
+      sleep: lastSleepSession(data.sleep),
+      hasSamples: data.samples.length > 0,
+    };
+  }, [data, totals]);
+
+  const canSync = linkState === 'connected' && device !== null;
+  const syncing = linkState === 'syncing';
+  const loading = view === null && loadError === null;
+  const distance = splitDistance(view?.totals.distance ?? 0);
+  const nowMs = useNow(HERO_TICK_MS);
+  const heartReading = pickHeartReading(live, data?.latestHeart ?? null, nowMs);
 
   return (
-    <Screen>
-      <Section title="Link">
-        <LinkStatus state={watch.linkState} />
-        {watch.error ? (
-          <AppText variant="caption" danger selectable>
-            {watch.error}
-          </AppText>
-        ) : null}
-        {watch.lastSync !== null ? (
-          <AppText variant="caption" muted>
-            Last sync {formatDateTime(watch.lastSync)}
-          </AppText>
-        ) : null}
-        {background.address ? (
-          <AppText variant="caption" muted>
-            Remembered for background: {background.name ?? background.address}
-          </AppText>
-        ) : null}
-      </Section>
-
-      <Section title="Before you connect">
-        <AppText variant="caption">
-          Pair the watch in Android Bluetooth settings first. It has to appear in the list below.
-        </AppText>
-        <AppText variant="caption">
-          The watch must not be bound to Huawei Health. Unbind it there, or the watch will refuse
-          this app.
-        </AppText>
-        <AppText variant="caption">
-          The first connect needs a confirmation on the watch screen. Keep it awake and accept the
-          prompt.
-        </AppText>
-      </Section>
-
-      <Section title="Paired watches">
-        {permission.status === 'checking' ? (
-          <AppText variant="caption" muted>
-            Checking Bluetooth permission.
-          </AppText>
-        ) : permission.status !== 'granted' ? (
-          <>
-            <AppText variant="caption" danger>
-              Bluetooth permission is needed to list paired watches and open the connection.
-            </AppText>
-            {permission.status === 'blocked' ? (
-              <Button label="Open app settings" onPress={() => void Linking.openSettings()} />
-            ) : (
-              <Button label="Allow Bluetooth" variant="primary" onPress={() => void permission.request()} />
-            )}
-          </>
-        ) : (
-          <>
-            {bonded.error ? (
-              <AppText variant="caption" danger>
-                Could not read paired devices: {bonded.error}
-              </AppText>
-            ) : null}
-            {bonded.devices.length === 0 && !bonded.loading && !bonded.error ? (
-              <AppText variant="caption" muted>
-                No paired Bluetooth devices. Pair the watch in Android Bluetooth settings, then
-                refresh.
-              </AppText>
-            ) : null}
-            {bonded.devices.map((d) => (
-              <BondedRow
-                key={d.address}
-                device={d}
-                linkState={watch.linkState}
-                activeAddress={watch.activeAddress}
-                onConnect={(address) => void watch.connect(address)}
-                onDisconnect={() => void watch.disconnect()}
-                onForget={(address) => void watch.forget(address)}
+    <Screen
+      title="Today"
+      caption={new Date().toLocaleDateString(undefined, WEEKDAY_FORMAT)}
+      refresh={{ refreshing: syncing, onRefresh: () => void sync(), enabled: canSync }}>
+      <View style={styles.stack}>
+        <WatchHero
+          linkState={linkState}
+          deviceName={device ? (device.productModel ?? device.name) : null}
+          steps={view?.totals.steps ?? 0}
+          goal={goal}
+          heart={heartReading}
+          nowSec={Math.floor(nowMs / 1000)}
+          onEnableHeartRate={() => router.push('/settings/sync')}
+          battery={battery}
+          lastSync={lastSync}
+          action={
+            canSync || syncing ? (
+              <Button
+                label={syncing ? 'Syncing' : 'Sync now'}
+                variant="inverse"
+                icon="sync"
+                disabled={!canSync}
+                loading={syncing}
+                onPress={() => void sync()}
               />
-            ))}
-            <Button label="Refresh list" loading={bonded.loading} onPress={() => void bonded.reload()} />
-          </>
+            ) : linkState === 'disconnected' ? (
+              <Button label="Connect watch" variant="inverse" icon="bluetooth" onPress={() => router.push('/watch')} />
+            ) : null
+          }
+        />
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {loadError ? <Notice tone="danger">Could not read stored data: {loadError}</Notice> : null}
+      </View>
+
+      {loading ? (
+        <View style={styles.tiles}>
+          <Skeleton width="48%" height={112} radius={18} />
+          <Skeleton width="48%" height={112} radius={18} />
+        </View>
+      ) : (
+        <View style={styles.stack}>
+          <View style={styles.tiles}>
+            <StatTile icon="flame" tint="workouts" label="Calories" value={formatCount(view?.totals.calories ?? 0)} unit="kcal" />
+            <StatTile icon="trail-sign" tint="steps" label="Distance" value={distance.value} unit={distance.unit} />
+          </View>
+          <AppText variant="caption" muted style={styles.note}>
+            {view?.totalsFromWatch
+              ? 'Totals as reported by the watch at the last sync.'
+              : view?.hasSamples
+                ? 'Totals added up from stored one-minute samples.'
+                : 'Nothing stored for today yet. Sync to pull today from the watch.'}
+          </AppText>
+        </View>
+      )}
+
+      <Section title="Heart rate today" icon="heart" tint="heart">
+        {view?.heart ? (
+          <View style={styles.heartRow}>
+            <View style={styles.heartMain}>
+              <Metric value={String(view.heart.latest.bpm)} unit="bpm" size="lg" color={colors.heartText} unitColor={colors.mutedForeground} />
+              <AppText variant="caption" muted>
+                Latest, {formatClock(view.heart.latest.timestamp)}
+              </AppText>
+            </View>
+            <View style={styles.heartRange}>
+              <View>
+                <Metric value={String(view.heart.min)} unit="bpm" size="sm" />
+                <AppText variant="caption" muted>
+                  Lowest
+                </AppText>
+              </View>
+              <View>
+                <Metric value={String(view.heart.max)} unit="bpm" size="sm" />
+                <AppText variant="caption" muted>
+                  Highest
+                </AppText>
+              </View>
+            </View>
+          </View>
+        ) : loading ? (
+          <Skeleton width="60%" height={38} />
+        ) : (
+          <AppText variant="caption" muted>
+            No heart-rate readings stored for today.
+          </AppText>
         )}
       </Section>
 
-      {device ? (
-        <Section title="Watch">
-          <KeyValue label="Name" value={device.name} />
-          <KeyValue label="Model" value={device.productModel} />
-          <KeyValue label="Software" value={device.softwareVersion} />
-          <KeyValue label="Hardware" value={device.hardwareVersion} />
-          <KeyValue label="Serial" value={device.serialNumber} />
-          <KeyValue label="Auth mode" value={device.authMode} />
-          <KeyValue label="Battery" value={watch.battery === null ? null : `${watch.battery}%`} />
-          <Button
-            label="Refresh battery"
-            disabled={watch.linkState !== 'connected'}
-            onPress={() => void watch.refreshBattery()}
-          />
-        </Section>
-      ) : null}
+      <Section title="Steps per hour today" icon="footsteps" tint="steps">
+        <HourlyBars steps={view?.hourly ?? new Array<number>(24).fill(0)} />
+      </Section>
 
-      {device ? <FindWatchSection /> : null}
-      {device ? <WatchfacesSection /> : null}
+      <Section title="Last night's sleep" icon="moon" tint="sleep">
+        {loading ? <Skeleton width="50%" height={38} /> : <SleepSummaryView summary={view?.sleep ?? null} />}
+      </Section>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  stack: { gap: spacing.md },
+  tiles: { flexDirection: 'row', gap: spacing.md },
+  note: { paddingHorizontal: spacing.xs },
+  heartRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.lg },
+  heartMain: { gap: 2 },
+  heartRange: { flexDirection: 'row', gap: spacing.lg },
+});

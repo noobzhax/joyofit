@@ -1,0 +1,221 @@
+# @joyofit/hwt
+
+Lossless TypeScript codec for Huawei `.hwt` watch-face packages, written for JoyoFit Studio (Huawei Watch Fit 4 Pro,
+screen code `HWHD13`, 408 x 480). Pure `Uint8Array`/`DataView` plus [fflate](https://github.com/101arrowz/fflate):
+runs in browsers, Workers and React Native/Hermes. The CLI and the tests need Bun.
+
+```sh
+bun install
+bun test                                   # 134 tests, ~3 s
+bun src/cli.ts info fixtures/fit4pro/SpaceRed.hwt
+```
+
+## Evidence legend
+
+Everything below is marked with how it is known:
+
+- **[verified]** holds in every applicable sample (18 packages, 1,168 images; the test that proves it is named) or is
+  stated by Huawei's documentation.
+- **[inferred]** consistent with all samples, not directly confirmed (a preview picture, a second source).
+- **[unknown]** seen, meaning not established.
+
+Samples: 10 Fit 4 Pro faces (`HWHD13`), 2 GT6 and 1 Band 9 face (version 2 layout), 2 GT3 faces (nested zip), 3 older
+faces (version 1 layout). See `fixtures/SOURCES.md`. **No sample was exported by Huawei's Theme Studio Pro**; the Fit 4
+Pro ones were made with a third-party editor ("Facemaker"). Section "Open questions" lists what only a real export can settle.
+
+## Format
+
+### Package (zip)
+
+A `.hwt` is a zip. Entries in the samples, in this order: `com.huawei.watchface`, `description.xml`, `preview/`,
+`preview/aod.jpg`, `preview/cover.jpg`, `preview/icon_small.jpg` [verified, 10/10 Fit 4 Pro]. The GT3 samples add
+`ability.xml` and `hashCode` and have no directory ordering guarantee.
+
+- `com.huawei.watchface` is **either** the binary itself (*flat*; all Fit 4 Pro, GT6, Band 9, version 1 samples) **or** a
+  zip that holds `watchface.bin` next to the Theme Studio project: `watchface/res/A100_NNN.png`,
+  `watchface/watch_face_config.xml` (XML form of the layout), `watchface/watch_face_info.xml` (*nested*; the 2 GT3 samples).
+  Gadgetbridge (`HuaweiFwHelper.parseAsWatchFace`) and JoyoFit's `WatchfacePackage.kt` accept both and send only
+  `watchface.bin` for nested ones. [verified for the samples; which one Theme Studio Pro exports for HWHD13: unknown]
+- Honor packages use root element `HnTheme` and `com.honor.watchface` (from Gadgetbridge; no sample).
+- `hashCode` (GT3 samples): comma separated upper-case SHA-256 of `description.xml`, `com.huawei.watchface`,
+  `ability.xml`, then a fourth digest whose input was not found (it is not any single entry of the package or of the nested zip, nor the res PNGs concatenated, nor `watchface.bin` + config). [unknown algorithm for the 4th]
+- `preview/cover.jpg`, `preview/aod.jpg`: **816 x 960**, `preview/icon_small.jpg`: **331 x 390** in all 10 Fit 4 Pro
+  samples (= 408 x 480 scaled to 960 / 390 high) [verified]. Huawei's guide says 960 x 960 and 390 x 390 for round
+  faces, plus `res.png` 250 x 250 — the thumbnail is image slot 0 in the binary, not a zip entry (below).
+- Zip framing: deflate, no data descriptors in flat packages (GT3 ones use them), no zip64, no encryption.
+
+`readHwt`/`writeHwt` keep every entry's local record verbatim until its content changes (compressed bytes, extra
+fields, timestamps, attributes, central directory, archive comment), so **a package round-trips byte-identically**
+[verified: `test/roundtrip.test.ts`, 18/18; the byte-identical claim is for the zip as a whole, not just entry contents].
+A changed entry is re-deflated by fflate (level 9) with its original metadata. New entries get a fixed 1980-01-01 timestamp so output is deterministic.
+
+### `description.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<HwTheme>
+  <title>SpaceRed</title>  <title-cn>SpaceRe</title-cn>  <author>John Smith</author>  <designer>John Smith</designer>
+  <screen>HWHD13</screen>  <version>2.8.2</version>  <font>Default</font>  <font-cn>默认</font-cn>  <briefinfo>{}</briefinfo>
+</HwTheme>
+```
+
+`renderDescription` reproduces the vendor layout byte-for-byte for all Fit 4 Pro samples [verified]. `<screen>` is the
+theme-version code; Gadgetbridge refuses a known code whose size differs from the watch's `height*width`
+(`HWHD13` = `480*408`, the Fit 4 / Fit 4 Pro screen) [verified in GB source]. `<version>` is `x.y.z`: x = GUI generation
+(2 for all 2.* faces), y = capability level, z = package revision (1..9000). Huawei's table for HWHD13 lists
+`2.1.z` (basic, selected layer, full-screen sequence frames, colour/style customisation 2.0), `2.9.z` (emotion data), `2.11.z`
+(video), `2.18.z` (expressions); the third-party samples use 2.1.1, 2.7.1, 2.8.1, 2.8.2, so the watch evidently loads
+non-table values (installed on a Fit 4 Pro per the source repo README; not re-verified here).
+`createHwt` defaults to `2.1.1`.
+
+### `com.huawei.watchface` / `watchface.bin`
+
+```
+off size
+0   u16le version    1 or 2                                   [verified 18/18; 2 = "v2 layout", 1 = older]
+2   u16le layoutLen  bytes of protobuf layout ("xmllen")      [verified]
+4   u32le tableLen   8 x image count ("maplen")               [verified]
+8   u32le binLen     bytes from end of table to EOF           [verified 18/18: file = 16 + layoutLen + tableLen + binLen]
+12  u32le reserved   0                                        [verified 18/18]
+16  layout[layoutLen]   protobuf
+    table[tableLen]     { u32le offset, u32le size } per image
+    bin[binLen]         8 byte signature, then the images back to back
+```
+
+- **Header rules** [verified]: `binLen = 8 + Σ image sizes` (the "+8" of the research doc is the signature, which belongs to the bin area); table
+  offsets are measured from the start of the bin area, so the first image is at offset 8 and image *k* starts where *k-1* ended
+  (18/18 samples tile exactly, no gaps, no overlap). `writeWatchface` recomputes `layoutLen`, `tableLen`, `binLen` and every offset from the
+  model, so builders cannot desynchronise them; `verifyWatchface(bytes)` re-checks all of it from bytes.
+- **Signature** (first 8 bytes of the bin area): `55 55 55 55 01 00 00 01` in 18 samples, `2e 2e 2e 2e 01 00 00 01` in SimpleItalic. The research doc's "8 × 0x55" is
+  wrong; `55`/`2e` ×4 followed by `01 00 00 01` is what exists. Purpose unknown (checksum? tool id?); the codec keeps it verbatim and `createHwt` writes `55 55 55 55 01 00 00 01`. [unknown meaning]
+- **Empty slot**: a table entry with size 0 (Carrera slot 0, offset 8). Kept as an empty blob so references keep their numbering. [verified, 1 sample]
+- Files that do not match the tiling (none of the samples) are *irregular*: header, table and bin area are kept verbatim; only the layout
+  can change. Image edits throw.
+- Image reference: layout strings are **1-based, zero padded to 3 digits**: `"004"` = table index 3. Slot 0 (`"001"`) is the **thumbnail the watch shows in its
+  face picker**; no layout of any sample references it [verified: `test/layout.test.ts`]. Its size is 228 x 269 in all Fit 4 Pro samples, 250 x 250 on round
+  faces, 126 x 238 on the Band 9 [verified]. Huawei lists it as `res.png` ("displayed during watch face switch on a watch").
+
+### Image blob
+
+```
+45 23 88 88   magic (u32le 0x88882345)
+u16le width, u16le height
+pixels in 4 byte units B,G,R,A. Unit == 89 67 45 23 is an escape: escape + B,G,R,A + u32le count => count copies of that pixel.
+```
+
+Verified on all 1,168 non-empty images of the samples: every image decodes to exactly `width*height` pixels and ends at the last byte
+(no padding, no trailing bytes); runs reach 206,116 pixels (no 16-bit cap); **re-encoding reproduces the original bytes for all 1,168** with the encoder rule
+"emit a run iff it has ≥ 4 pixels, never split a run" (`minRun: 4`, 1,162 images: every Fit 4 Pro/GT6/Band 9/GT3 sample and SimpleItalic) or "≥ 2 pixels"
+(`minRun: 2`, the 6 images of Carrera and Unnamed). A pixel equal to the escape colour must be written as a run of 1 (the encoder does; no sample contains one, so the
+watch's reading of that is [inferred] from symmetry). Other magics exist in other families (RGB565 `45 23 65 f5`, RGB555 `45 23 55 f5`, RGB888 `45 23 88 f8`,
+per the wzsx150 unpacker; Huawei says the 286 x 482 band uses 565 BMP) — none occurs in the samples, `decodeImage` rejects them and the blobs stay opaque. [unknown for HWHD13]
+
+### Layout, version 2 (all Fit 4 Pro samples)
+
+A protobuf whose schema is Huawei's own Theme Studio v11 model (nanopb), recovered from the compiled descriptors shipped with wzsx150's unpacker
+(`src/schema-v2.ts`: 52 messages, 434 fields, 8 enums). **Every field of every one of the 15 version 2 samples decodes through it with no unknown field
+number and no wire-type mismatch** [verified: `test/protobuf.test.ts`], and the schema-named JSON (`describeLayout`) composes back to the **identical layout bytes** for all 15
+(`buildMessage`) [verified]. Observed root: `element*` (field 1), then `title_en` (2), `title_cn` (3) once; no `screen_size`/`styles`/`colors` in any sample.
+
+```
+Watchface  { element*, title_en, title_cn, screen_size?, styles?, colors? }
+Element    { label (BACKGROUND|TIME|DATE|WIDGET|COMPLICATION), is_support_option, selected_option?, res_preview?, layer*, container*, ... }
+Container  { index, is_support_option, rect?, layer*, data_type?, ... }
+Layer      { index, draw_type, <one body message matching draw_type> }
+```
+
+Bodies seen in Fit 4 Pro samples (draw type → message): `SINGLE_RES` → `Single_Res`; `SELECTED_RES` → `Selected_Res`; `COMBINED_RES` → `Combined_Res`;
+`HAND_RES` → `Hand_Res`; `ARC_RES` → `Arc_Res`; `TEXT`/`TEXT2_RES`/`ARC_TEXT` (seen in GT/NikeCombo samples). Field names are the vendor's, including the misspelling
+`rotate_start_angel`.
+
+Encoding quirks [verified]:
+
+- `Point.x/y`, `Rect.x/y` are `uint32` on the wire, **negative values stored as two's complement uint32** (-6 = `4294967290`, 5-byte varint). `rotate_*_angel`, `x_offset`, `y_offset` are
+  genuine protobuf `int32` (negative = 10-byte varint). The codec's `int32w` kind vs `int32` kind handles both and writes each the way Huawei does.
+- Fields are written in ascending field-number order, repeated fields grouped.
+- Layers inside an element are numbered 0.. but numbering has gaps in samples (0,1,3...); the index is not required to be dense.
+- Normal vs always-on: every Fit 4 Pro sample expresses AOD with **duplicate layers whose `ambient_mode` is `AMBIENT_ONLY`** next to the `NORMAL_ONLY` ones
+  (10/10); `AMBIENT_NORMAL` (shown in both) is never used. [verified as convention; whether the watch renders `AMBIENT_NORMAL`: unknown]
+
+### Layout, version 1 (older faces: Carrera, SimpleItalic, Unnamed)
+
+Root = repeating `element (1), title_en (2), title_cn (3)` triples (titles are repeated after every element; only the elements matter). No vendor schema exists; `src/schema-v1.ts` names
+what the three samples support. Elements by `type` (field 1):
+
+| type | body | fields (confidence) |
+|---|---|---|
+| 0 | field 2 | `image` (ref), `x`, `y` — static image. [verified; the research doc's "static image at (x,y)"; SimpleItalic cover shows the backgrounds at 0,0] |
+| 1 | field 3 | `image`, rect `x y width height` (2-5), pivot `x y` (6,7), `start_angle`/`end_angle` float32 degrees (8,9), `value_type` (10) — rotating hand. [verified: SimpleItalic's seconds dot 0 → 360 with value 154 = the v2 id; Carrera gauges -150 → 150] |
+| 3 | field 5 | rect (1-4), RGB (5-7), `font` (8), `align` (9), `value_type` (11), `alpha` (12) — a **text label**, not the "meter/arc" of the research doc. [inferred: 33x18 white boxes at the date/sub-dial positions of an analogue face; field 10 = 1 unexplained] |
+| 6 | field 8 | `x`, `y`, `value_type` (3), glyph table (10): 15 strings, entry *v* = image shown when the value is *v* — "digit sequence". [verified: SimpleItalic cover "10 / 08 / 16 NOV MON" is exactly these 8 tables; field 4 = 5 unexplained] |
+
+`readV1Elements` gives the typed view; unexplained fields stay in the tree and appear as `$unknown`.
+
+### value_type ids
+
+`src/valuetypes.ts` (`VALUE_TYPES`, `VALUE_TYPE`) lists every id seen with name, category and evidence. Ids are shared between layout versions (SimpleItalic v1 and FocusWGTru v2 use the same 59-62). Verified by a preview picture
+plus structure: hour 12, minute 13, date 17, week 52, steps 0, heart rate 2, altitude 8, temperature 4, power 9, weather type 248, hour/minute high/low 59-62, month 51, date high/low 70/71, second ratio 154.
+Inferred: second high/low 63/64, hour/minute ratio 150/153, ratio arcs 161 (steps), 157 (heart rate), 170 (altitude), 163 (power), 167 (temperature), power enum 54. Unknown but seen: 53, 72, 73, 158-160 (three activity rings), 231, 232.
+Huawei documents ~150 data type *names* (Data Types page) without ids; only the ids above are known. Container `data_type`: 10 steps, 11 heart rate, 17 power, 21 weather, 22 altitude [verified from previews].
+Which control accepts which category follows Huawei's table: raw → text/arc text/connection text/combination image; enum → selected image/selected layer; ratio → hand/straight line/arc/line image/arc image (`CATEGORY_DRAW_TYPES`).
+Enum images are indexed by value (`images[v]`); weekday and month tables have an unused slot 0 (8 and 13 entries).
+
+### Limits (Huawei, Theme Studio Pro "Verifications", 408 x 480 version 2.y.z) [documented; whether the watch/GB enforce them: unknown]
+
+`watchface.bin` ≤ 9.5 MB; `.hwt` ≤ 10 MB; one image ≤ 750 KB *after compression* (the encoded blob; GT2e experiments in the research doc crash at ~850 KB, safe at ~690 KB, consistent); Σ w·h·4 of the images used ≤ 4 MiB ("PSRAM");
+"total layer size" ≤ 25,600 bytes by a per-control cost model (`estimateLayerBytes`). Several third-party Fit 4 Pro samples exceed that model's estimate (SpaceRed: 28,236) although they are reported to run, so the model is reported as a warning only.
+`checkFit4Limits` implements all of it.
+
+## API
+
+```ts
+import { readHwt, writeHwt, createHwt, FaceBuilder, VALUE_TYPE, verifyWatchface, checkFit4Limits } from "@joyofit/hwt";
+```
+
+| Area | Functions |
+|---|---|
+| Package | `readHwt(bytes) → HwtPackage`, `writeHwt(pkg) → Uint8Array`, `createHwt(options)`, `getEntry`/`setEntry`, `pkg.description` (edit fields), `pkg.watchface` (mutable `WatchfaceBinary`), `pkg.container` (`flat`\|`nested`) |
+| Zip | `readZip`, `writeZip` (framing-preserving) |
+| Binary | `parseWatchface`, `writeWatchface`, `imageRef(i)` / `imageIndex(ref)`, `verifyWatchface(bytes)` |
+| Images | `decodeImage(blob) → {width,height,data RGBA}`, `encodeImage(rgba, {minRun?, maxRun?})`, `readImageHeader`, `encodePng`/`decodePng` |
+| Protobuf | `decodePb(bytes, schema?, root?)`, `encodePb`, `inferMessage`, `toInt32`/`fromInt32`, `buildMessage(schema, name, named)` |
+| Layout | `getLayout(wf)`/`setLayout`, `describeLayout` (named JSON, `$unknown` for unexplained fields), `readV1Elements`, `collectImageRefs`, `usedImageIndices`, `remapImageRefs` |
+| Low-level edits | `addImage(wf, rgba\|blob) → index`, `replaceImage(wf, index, ...) → {resized,...}`, `addStaticImage(wf, {x, y, image, position})` (v1 and v2) |
+| From scratch (v2) | `new FaceBuilder(wf)`: `.image()`, `.element(label, build, {preview, position})`, `.commit()`; layer builders `singleImage`, `hand`, `arc`, `digits`, `selected`, `container` with `ambient: "normal"\|"aod"\|"both"` |
+| Tables | `VALUE_TYPES`, `VALUE_TYPE`, `WIDGET_DATA_TYPE`, `RESOLUTIONS`, `FIT4_LIMITS`, `FIT4_PREVIEW` |
+
+```ts
+const pkg = createHwt({ title: "Mine", author: "me", cover: coverJpg, aod: aodJpg, iconSmall: iconJpg, thumbnail: rgba228x269 });
+const face = new FaceBuilder(pkg.watchface!);                   // identical images share one slot
+face.element("background", (e) => e.singleImage({ image: bg, x: 0, y: 0, ambient: "both" }), { preview: bg });
+face.element("time", (e) => {
+  e.digits({ digits: ten58x96, x: 20, y: 120, align: "right", valueType: VALUE_TYPE.hour, ambient: "both" });
+  e.digits({ digits: ten58x96, x: 220, y: 120, align: "left", valueType: VALUE_TYPE.minute, ambient: "both" });
+});
+face.commit();
+const bytes = writeHwt(pkg);
+```
+
+### What a valid face needs
+
+Verified from the samples: image slot 0 = thumbnail (not referenced); layout elements in draw order (first = bottom), every sample starts with a `BACKGROUND` element, and has TIME elements; `title_en`/`title_cn` strings at the end of the layout; AOD layers as `AMBIENT_ONLY` duplicates; descriptor fields as above.
+Huawei's guide: background and time are mandatory for the store, date/widgets optional; AOD faces may light at most 20 % of the pixels on HWHD13.
+**Not established:** whether the watch needs the `Element` label to match what the layers show (labels drive the on-watch customisation UI as far as the names suggest), whether widget layers must sit in a `Container` with the right `data_type` (all sample widgets do; TIME/DATE layers sit directly in the element), whether a face without AOD layers shows a blank AOD, and whether `is_support_option: false` and the absent `ambient_mode` default are always safe. The builders mimic the sample conventions (containers for widgets, layers directly for time/date; normal layers 0..n-1 then AOD layers from n+1; AOD copies of widget layers in a separate container with the same data_type, no rect, index = normal containers + 1; BACKGROUND/TIME/DATE carry `res_preview`, WIDGET does not) — rebuilding SpaceRed's TIME element with `FaceBuilder` yields the identical element (test).
+
+## Tests
+
+`bun test`: byte-identical round trip of all 18 packages (zip, package, binary), header rules, 1,168 image re-encode identities and 300 randomised image round trips, 500 randomised protobuf trees, schema coverage and named-JSON recomposition of every v2 layout, builder fix-ups (replace a background + add a static image on a Fit 4 Pro face, re-read, check `xmllen`/`maplen`/`binlen`/offsets), a face built from nothing, description rendering, limits.
+
+## Open questions for the Watch Fit 4 (HWHD13): what a real Theme Studio Pro export must settle
+
+Run on the export (`F.hwt`), in this order; each line says what the answer decides.
+
+1. `bun src/cli.ts info F.hwt` — **container**: flat or nested? If nested, does JoyoFit's `WatchfacePackage.kt` (sends `watchface.bin` only) and Gadgetbridge's install path still produce a face the Fit 4 Pro accepts? Huawei's own docs call `watchface.bin` the "resource package" for 2.y.z faces, so a nested export is plausible. Also: which extra entries (`ability.xml`, `hashCode`) exist.
+2. Same output — **header**: `version` 2, `reserved` 0, **signature** bytes (does `55 55 55 55 01 00 00 01` still hold?), "consistency ok", table tiling (no "IRREGULAR").
+3. `bun src/cli.ts roundtrip F.hwt` — must print `package byte-identical` and `re-encode reproduces the original bytes with minRun 4 for N, only with minRun 2 for 0`. A different encoder policy or a non-8888 magic (the `info` image list shows `?` opacity) means the image codec needs another mode for this device.
+4. `bun src/cli.ts dump-layout F.hwt | grep -c '\$unknown'` — must be 0. Any `$unknown`, or root fields `screen_size`/`styles`/`colors` (colour/style customisation 2.0 is listed for HWHD13), is new schema territory: send the dump.
+5. `info` — **previews/thumbnail**: slot 0 size (228 x 269?), `preview/*.jpg` sizes (816 x 960 / 331 x 390?), `res.png` presence, `description.xml` `<version>` (2.1.z?) and `<font>`.
+6. `info` — **limits** line: confirm the exported face is inside `FIT4_LIMITS`; compare the estimated layer size (`est. layer`) with the number Theme Studio Pro shows for the face to validate the model (then promote it from warning to error, or fix the costs).
+7. **value ids**: export faces that use one data type each (steps, heart rate, calories, battery, distance, weather 28 types, AM/PM, seconds, dual time, ...) and diff `describeLayout` output; add the ids to `VALUE_TYPES` and mark `verified`. Especially: 158/159/160, 53, 72, 73, 150/153 vs Hour 24 ratio, 248 (11 vs 28 weather types), and the text-data ids (231, 232).
+8. **Hardware matrix** (install with the JoyoFit app / Gadgetbridge on a Fit 4 Pro): (a) the export untouched, re-serialised by `writeHwt`; (b) the export with one background replaced via `replaceImage` (same size, then different size); (c) the export plus `addStaticImage`; (d) a minimal `FaceBuilder` face (background + hour/minute `digits`) with and without AOD layers; (e) the same with `ambient: "both"` replaced by AMBIENT_NORMAL; (f) a face with widgets without containers. Each answers one "not established" item above.
+9. `hashCode`: if the export has one, decide the 4th digest's input (try `watchface.bin`, the PNG list, `watch_face_config.xml`); it is only required if the watch verifies it, and the Fit 4 Pro samples have none.

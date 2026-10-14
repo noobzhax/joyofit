@@ -1,15 +1,16 @@
 import { useCallback, useState } from 'react';
-import { PermissionsAndroid, Platform, StyleSheet, TextInput } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
 import { KeyValue } from '@/components/KeyValue';
 import { Section } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
+import { Notice } from '@/components/States';
 import { SwitchRow } from '@/components/SwitchRow';
 import { useNativeRefresh } from '@/features/settings/useNativeRefresh';
 import { errorMessage, formatClock } from '@/format';
-import { radius, usePalette } from '@/theme';
 import {
   HuaweiWear,
   type TemperatureUnit,
@@ -49,7 +50,6 @@ function conditionLabel(icon: string): string {
 }
 
 export function WeatherSection() {
-  const palette = usePalette();
   const [status, setStatus] = useState<WeatherStatus>(() => HuaweiWear.getWeatherStatus());
   const [city, setCity] = useState('');
   const [busy, setBusy] = useState(false);
@@ -107,21 +107,18 @@ export function WeatherSection() {
   const connected = status.watchSupported !== null;
 
   return (
-    <Section title="Weather">
-      <AppText variant="caption">
-        Sends the current weather and a forecast to the watch, and answers when the watch asks for
-        it. Data comes from Open-Meteo over the internet; only the coordinates of the place go out,
-        rounded to about 1 km.
-      </AppText>
+    <Section title="Weather" icon="partly-sunny">
       <SwitchRow
+        icon="partly-sunny"
         label="Send weather to the watch"
+        hint="Sends current weather and a forecast. Data comes from Open-Meteo; only coordinates rounded to about 1 km go out."
         value={status.enabled}
         onValueChange={toggle}
         disabled={busy}
       />
 
-      <AppText variant="caption" muted>
-        Temperature unit on the watch
+      <AppText variant="label" muted>
+        Temperature unit
       </AppText>
       <Segmented
         options={UNITS}
@@ -130,19 +127,22 @@ export function WeatherSection() {
         disabled={busy}
       />
 
-      <AppText variant="caption" muted>
+      <AppText variant="label" muted>
         Weather for
       </AppText>
       <Segmented options={MODES} value={status.locationMode} onChange={chooseMode} disabled={busy} />
       {status.locationMode === 'current' ? (
         <>
           <KeyValue
+            icon="location"
             label="Location permission"
             value={status.locationPermission ? 'Granted' : 'Not granted'}
           />
           {!status.locationPermission ? (
             <Button
               label="Allow location"
+              variant="secondary"
+              icon="location-outline"
               onPress={() =>
                 run(async () => {
                   await askLocation();
@@ -152,13 +152,14 @@ export function WeatherSection() {
             />
           ) : null}
           <AppText variant="caption" muted>
-            Uses the phone&apos;s last known coarse location. In the background Android may not
-            give a fresh one, so the last position is reused.
+            Uses the last known coarse location. In the background Android may not give a fresh one,
+            so the last position is reused.
           </AppText>
         </>
       ) : (
         <>
           <KeyValue
+            icon="business"
             label="City"
             value={
               status.city
@@ -166,23 +167,22 @@ export function WeatherSection() {
                 : null
             }
           />
-          <TextInput
+          <Input
+            icon="search"
             accessibilityLabel="City name"
             placeholder="City, or City, Country"
-            placeholderTextColor={palette.textMuted}
             value={city}
             onChangeText={setCity}
             onSubmitEditing={search}
             autoCapitalize="words"
             autoCorrect={false}
             returnKeyType="search"
-            style={[styles.input, { borderColor: palette.border, color: palette.text }]}
           />
-          <Button label="Search city" onPress={search} disabled={busy || !city.trim()} />
+          <Button label="Search city" variant="secondary" onPress={search} disabled={busy || !city.trim()} />
         </>
       )}
 
-      <AppText variant="caption" muted>
+      <AppText variant="label" muted>
         Update interval
       </AppText>
       <Segmented
@@ -192,32 +192,29 @@ export function WeatherSection() {
         disabled={busy}
       />
 
-      {message ? (
-        <AppText variant="caption" danger={message.danger} muted={!message.danger} selectable>
-          {message.text}
-        </AppText>
-      ) : null}
+      {message ? <Notice tone={message.danger ? 'danger' : 'info'}>{message.text}</Notice> : null}
       <Button
         label="Update now"
         variant="primary"
+        icon="refresh"
         loading={busy}
         disabled={!status.enabled || !connected}
         onPress={() => run(async () => void (await HuaweiWear.refreshWeather()), 'Sent to the watch.')}
       />
       {!connected ? (
         <AppText variant="caption" muted>
-          Connect the watch to send weather. It is sent on every connect.
+          Connect your watch to send weather. It is sent on every connect.
         </AppText>
       ) : status.watchSupported === false ? (
-        <AppText variant="caption" danger>
-          This watch does not list the weather service.
-        </AppText>
+        <Notice tone="danger">This watch does not list the weather service.</Notice>
       ) : null}
       <KeyValue
+        icon="time"
         label="Last sent"
         value={status.lastPushAt ? formatClock(status.lastPushAt) : null}
       />
       <KeyValue
+        icon="thermometer"
         label="Last weather"
         value={
           status.lastTemperatureC !== null && status.lastCondition
@@ -227,21 +224,7 @@ export function WeatherSection() {
             : null
         }
       />
-      {status.lastError ? (
-        <AppText variant="caption" danger selectable>
-          {status.lastError}
-        </AppText>
-      ) : null}
+      {status.lastError ? <Notice tone="danger">{status.lastError}</Notice> : null}
     </Section>
   );
 }
-
-const styles = StyleSheet.create({
-  input: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    fontSize: 15,
-  },
-});

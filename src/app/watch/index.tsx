@@ -1,0 +1,162 @@
+import { useRouter } from 'expo-router';
+import { Linking, StyleSheet, View } from 'react-native';
+
+import { AppText } from '@/components/AppText';
+import { Button } from '@/components/Button';
+import { KeyValue } from '@/components/KeyValue';
+import { NavRow } from '@/components/NavRow';
+import { Divider, Screen, Section } from '@/components/Screen';
+import { EmptyState, LoadingState, Notice } from '@/components/States';
+import { BondedRow } from '@/features/device/BondedRow';
+import { FindWatchSection } from '@/features/device/FindWatchSection';
+import { WatchStatusCard } from '@/features/device/WatchStatusCard';
+import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
+import { useBondedDevices } from '@/features/device/useBondedDevices';
+import { useWatch } from '@/state/WatchProvider';
+import { fonts, spacing, useColors } from '@/theme';
+
+const CONNECT_STEPS = [
+  'Pair the watch in Android Bluetooth settings. It has to appear in the list below.',
+  'Unbind it from Huawei Health first, or the watch will refuse this app.',
+  'On the first connect, keep the watch awake and accept the prompt on its screen.',
+];
+
+/** The three things that have to be true before the first connect, in the order they happen. */
+function ConnectSteps() {
+  const colors = useColors();
+  return (
+    <Section title="Before you connect" icon="list">
+      {CONNECT_STEPS.map((step, index) => (
+        <View key={step} style={styles.step}>
+          <View style={[styles.stepNumber, { backgroundColor: colors.muted }]}>
+            <AppText variant="label" style={styles.stepDigit}>
+              {index + 1}
+            </AppText>
+          </View>
+          <AppText variant="caption" style={styles.stepText}>
+            {step}
+          </AppText>
+        </View>
+      ))}
+    </Section>
+  );
+}
+
+export default function WatchScreen() {
+  const router = useRouter();
+  const watch = useWatch();
+  const permission = useBluetoothPermission();
+  const granted = permission.status === 'granted';
+  const bonded = useBondedDevices(granted);
+  const { device } = watch;
+
+  const showEmpty = bonded.devices.length === 0 && !bonded.loading && !bonded.error;
+
+  return (
+    <Screen
+      title="Watch"
+      refresh={{ refreshing: bonded.loading, onRefresh: () => void bonded.reload(), enabled: granted }}>
+      <WatchStatusCard />
+
+      {device ? null : <ConnectSteps />}
+
+      <Section title="Paired watches" icon="bluetooth">
+        {permission.status === 'checking' ? (
+          <LoadingState label="Checking Bluetooth permission" />
+        ) : !granted ? (
+          <>
+            <Notice tone="danger">Bluetooth permission is needed to list paired watches and open the connection.</Notice>
+            {permission.status === 'blocked' ? (
+              <Button label="Open app settings" icon="settings" onPress={() => void Linking.openSettings()} />
+            ) : (
+              <Button label="Allow Bluetooth" variant="primary" icon="bluetooth" onPress={() => void permission.request()} />
+            )}
+          </>
+        ) : (
+          <>
+            {bonded.error ? <Notice tone="danger">Could not read paired devices: {bonded.error}</Notice> : null}
+            {showEmpty ? (
+              <EmptyState
+                icon="bluetooth"
+                title="No paired devices"
+                description="Pair the watch in Android Bluetooth settings, then refresh."
+                action={{ label: 'Refresh list', icon: 'refresh', onPress: () => void bonded.reload() }}
+              />
+            ) : (
+              <>
+                {bonded.devices.map((d, index) => (
+                  <View key={d.address} style={styles.bonded}>
+                    {index > 0 ? <Divider /> : null}
+                    <BondedRow
+                      device={d}
+                      linkState={watch.linkState}
+                      activeAddress={watch.activeAddress}
+                      onConnect={(address) => void watch.connect(address)}
+                      onDisconnect={() => void watch.disconnect()}
+                      onForget={(address) => void watch.forget(address)}
+                    />
+                  </View>
+                ))}
+                <Button label="Refresh list" icon="refresh" loading={bonded.loading} onPress={() => void bonded.reload()} />
+              </>
+            )}
+          </>
+        )}
+      </Section>
+
+      {device ? (
+        <Section title="Watch details" icon="watch">
+          <KeyValue icon="pricetag" label="Name" value={device.name} />
+          <KeyValue icon="watch" label="Model" value={device.productModel} />
+          <KeyValue icon="code-slash" label="Software" value={device.softwareVersion} />
+          <KeyValue icon="hardware-chip" label="Hardware" value={device.hardwareVersion} />
+          <KeyValue icon="barcode" label="Serial" value={device.serialNumber} />
+          <KeyValue icon="key" label="Auth mode" value={device.authMode} />
+          <KeyValue icon="battery-half" label="Battery" value={watch.battery === null ? null : `${watch.battery}%`} />
+          {watch.linkState !== 'connected' ? (
+            <AppText variant="caption" muted>
+              {watch.linkState === 'syncing' ? 'Available when the sync finishes.' : 'Connect your watch first.'}
+            </AppText>
+          ) : null}
+          <Button
+            label="Refresh battery"
+            icon="refresh"
+            disabled={watch.linkState !== 'connected'}
+            onPress={() => void watch.refreshBattery()}
+          />
+        </Section>
+      ) : null}
+
+      {device ? <FindWatchSection /> : null}
+
+      <Section title="On the watch" icon="watch">
+        <NavRow
+          icon="color-palette"
+          title="Watch faces"
+          subtitle="List, switch, delete and install faces"
+          style={styles.navRow}
+          onPress={() => router.push('/watch/faces')}
+        />
+        <Divider />
+        <NavRow
+          icon="alarm"
+          title="Alarms"
+          subtitle="Read and change the watch alarms"
+          style={styles.navRow}
+          onPress={() => router.push('/watch/alarms')}
+        />
+      </Section>
+
+      {device ? <ConnectSteps /> : null}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  bonded: { gap: spacing.md },
+  navRow: { paddingHorizontal: 0 },
+  step: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  stepNumber: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  stepDigit: { fontFamily: fonts.bold, fontVariant: ['tabular-nums'] },
+  stepText: { flex: 1, paddingTop: 6 },
+});

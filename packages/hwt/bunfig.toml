@@ -1,0 +1,3 @@
+[test]
+# Reading the larger samples inflates ~1 MB with fflate (about 0.4 s each), and several tests sweep every fixture.
+timeout = 120000

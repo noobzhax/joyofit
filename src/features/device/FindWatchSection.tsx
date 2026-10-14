@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Section } from '@/components/Screen';
+import { Notice } from '@/components/States';
 import { errorMessage } from '@/format';
 import { useWatch } from '@/state/WatchProvider';
 import { HuaweiWear } from '@/wear';
@@ -29,25 +30,31 @@ export function FindWatchSection() {
   };
 
   return (
-    <Section title="Find my watch">
-      <AppText variant="caption">Makes the watch ring and vibrate.</AppText>
-      {connected && !supported ? (
-        <AppText variant="caption" muted>
-          This watch did not report find-device support.
-        </AppText>
-      ) : null}
+    <Section title="Find my watch" icon="locate">
+      <AppText variant="caption" muted>
+        Makes the watch ring and vibrate.
+      </AppText>
+      {!connected ? <Notice>Connect your watch first.</Notice> : null}
+      {connected && !supported ? <Notice>This watch did not report find-device support.</Notice> : null}
       <Button
         label="Ring the watch"
         variant="primary"
+        icon="volume-high"
         disabled={!supported}
         loading={busy === 'start'}
         onPress={() => void send(true)}
       />
-      <Button label="Stop ringing" disabled={!supported} loading={busy === 'stop'} onPress={() => void send(false)} />
+      <Button
+        label="Stop ringing"
+        icon="volume-mute"
+        disabled={!supported}
+        loading={busy === 'stop'}
+        onPress={() => void send(false)}
+      />
       {message ? (
-        <AppText variant="caption" danger={message.danger} muted={!message.danger} selectable>
+        <Notice tone={message.danger ? 'danger' : 'info'} icon={message.danger ? undefined : 'checkmark-circle'}>
           {message.text}
-        </AppText>
+        </Notice>
       ) : null}
     </Section>
   );

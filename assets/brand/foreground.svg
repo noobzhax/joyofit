@@ -1,0 +1,5 @@
+<!-- Adaptive foreground, 432 canvas (108dp x 4). Mark stays inside the 264px (66dp) centered safe circle: outer radius 128. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432">
+  <path d="M216.00 116.00A100 100 0 1 1 129.40 266.00" fill="none" stroke="#0A6580" stroke-width="46" stroke-linecap="round"/>
+  <circle cx="118.19" cy="195.21" r="28" fill="#2BA3C4"/>
+</svg>

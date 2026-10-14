@@ -1,10 +1,15 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { IconChip } from '@/components/IconChip';
 import { KeyValue } from '@/components/KeyValue';
-import { Screen, Section } from '@/components/Screen';
+import { Metric } from '@/components/Metric';
+import { Card, Screen, Section } from '@/components/Screen';
+import { StatTile } from '@/components/StatTile';
+import { Notice, Skeleton } from '@/components/States';
 import {
   getWorkout,
   listWorkoutPoints,
@@ -13,6 +18,7 @@ import {
 } from '@/db/queries';
 import { HeartRateChart } from '@/features/workouts/HeartRateChart';
 import { RouteView } from '@/features/workouts/RouteView';
+import { sportIcon } from '@/features/workouts/sportIcon';
 import {
   formatElapsed,
   formatPace,
@@ -24,6 +30,7 @@ import {
   type WorkoutSummary,
 } from '@/features/workouts/summary';
 import { errorMessage, formatClock, formatCount, formatDateTime } from '@/format';
+import { radius, spacing } from '@/theme';
 
 interface Loaded {
   workout: WorkoutRow;
@@ -94,9 +101,15 @@ export default function WorkoutDetailScreen() {
     return (
       <Screen>
         <Stack.Screen options={{ title: 'Workout' }} />
-        <AppText variant="caption" muted danger={error !== null}>
-          {error ?? 'Loading'}
-        </AppText>
+        {error !== null ? (
+          <Notice tone="danger">{error}</Notice>
+        ) : (
+          <>
+            <Skeleton width="100%" height={216} radius={radius.card} />
+            <Skeleton width="100%" height={280} radius={radius.card} />
+            <Skeleton width="100%" height={200} radius={radius.card} />
+          </>
+        )}
       </Screen>
     );
   }
@@ -104,6 +117,8 @@ export default function WorkoutDetailScreen() {
   const { workout, summary } = loaded;
   const jumpRope = summary.kind === 'JUMP_ROPING';
   const swim = summary.swim;
+  // `formatWorkoutDistance` returns "2.34 km"; the summary shows the number big and the unit small.
+  const [distance, distanceUnit] = formatWorkoutDistance(workout.distance).split(' ');
   const swimRows: { label: string; value: string | null }[] = swim
     ? [
         { label: 'Style', value: swim.style ?? null },
@@ -118,67 +133,113 @@ export default function WorkoutDetailScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: workout.sportName }} />
-      <Section title={`${workout.sportName}, ${formatDateTime(workout.start)}`}>
-        <KeyValue label="Duration" value={formatElapsed(workout.duration)} />
-        <KeyValue label="Time of day" value={`${formatClock(workout.start)} to ${formatClock(workout.end)}`} />
-        {workout.distance > 0 ? <KeyValue label="Distance" value={formatWorkoutDistance(workout.distance)} /> : null}
-        {paceRows(summary).map((row) => (
-          <KeyValue key={row.label} label={row.label} value={row.value} />
-        ))}
-        {workout.calories > 0 ? <KeyValue label="Calories" value={`${formatCount(workout.calories)} kcal`} /> : null}
-        {workout.steps > 0 ? (
-          <KeyValue label={jumpRope ? 'Jumps' : 'Steps'} value={formatCount(workout.steps)} />
+      <Card>
+        <View style={styles.summaryHead}>
+          <IconChip icon={sportIcon(workout.sportName)} tint="workouts" size="lg" />
+          <View style={styles.summaryTitle}>
+            <AppText variant="heading" numberOfLines={2}>
+              {workout.sportName}
+            </AppText>
+            <AppText variant="caption" muted>
+              {formatDateTime(workout.start)}
+            </AppText>
+          </View>
+        </View>
+        <View style={styles.figures}>
+          <Figure label="Duration">
+            <Metric value={formatElapsed(workout.duration)} size="lg" />
+          </Figure>
+          {workout.distance > 0 ? (
+            <Figure label="Distance">
+              <Metric value={distance} unit={distanceUnit} size="lg" />
+            </Figure>
+          ) : null}
+          {workout.calories > 0 ? (
+            <Figure label="Calories">
+              <Metric value={formatCount(workout.calories)} unit="kcal" size="lg" />
+            </Figure>
+          ) : null}
+          {workout.steps > 0 ? (
+            <Figure label={jumpRope ? 'Jumps' : 'Steps'}>
+              <Metric value={formatCount(workout.steps)} size="lg" />
+            </Figure>
+          ) : null}
+        </View>
+        {workout.avgHr !== null || workout.maxHr !== null ? (
+          <View style={styles.tiles}>
+            {workout.avgHr !== null ? (
+              <StatTile icon="heart" tint="heart" label="Avg heart rate" value={String(workout.avgHr)} unit="bpm" />
+            ) : null}
+            {workout.maxHr !== null ? (
+              <StatTile icon="heart" tint="heart" label="Max heart rate" value={String(workout.maxHr)} unit="bpm" />
+            ) : null}
+          </View>
         ) : null}
-        {workout.avgHr !== null ? <KeyValue label="Average heart rate" value={`${workout.avgHr} bpm`} /> : null}
-        {workout.maxHr !== null ? <KeyValue label="Highest heart rate" value={`${workout.maxHr} bpm`} /> : null}
-        {summary.minHr !== undefined ? <KeyValue label="Lowest heart rate" value={`${summary.minHr} bpm`} /> : null}
+      </Card>
+
+      <Section title="Details" icon="list">
+        <KeyValue
+          icon="time-outline"
+          label="Time of day"
+          value={`${formatClock(workout.start)} to ${formatClock(workout.end)}`}
+        />
+        {paceRows(summary).map((row) => (
+          <KeyValue key={row.label} icon="speedometer-outline" label={row.label} value={row.value} />
+        ))}
+        {summary.minHr !== undefined ? (
+          <KeyValue icon="heart-outline" label="Lowest heart rate" value={`${summary.minHr} bpm`} />
+        ) : null}
         {summary.elevationGain !== undefined ? (
-          <KeyValue label="Elevation gain" value={metres(summary.elevationGain)} />
+          <KeyValue icon="trending-up-outline" label="Elevation gain" value={metres(summary.elevationGain)} />
         ) : null}
         {summary.elevationLoss !== undefined ? (
-          <KeyValue label="Elevation loss" value={metres(summary.elevationLoss)} />
+          <KeyValue icon="trending-down-outline" label="Elevation loss" value={metres(summary.elevationLoss)} />
         ) : null}
-        {summary.maxAltitude !== undefined ? <KeyValue label="Highest point" value={metres(summary.maxAltitude)} /> : null}
-        {summary.minAltitude !== undefined ? <KeyValue label="Lowest point" value={metres(summary.minAltitude)} /> : null}
-        {summary.maxDepth !== undefined ? <KeyValue label="Maximum depth" value={metres(summary.maxDepth)} /> : null}
+        {summary.maxAltitude !== undefined ? (
+          <KeyValue icon="chevron-up-circle-outline" label="Highest point" value={metres(summary.maxAltitude)} />
+        ) : null}
+        {summary.minAltitude !== undefined ? (
+          <KeyValue icon="chevron-down-circle-outline" label="Lowest point" value={metres(summary.minAltitude)} />
+        ) : null}
+        {summary.maxDepth !== undefined ? (
+          <KeyValue icon="water-outline" label="Maximum depth" value={metres(summary.maxDepth)} />
+        ) : null}
         {summary.aerobicEffect !== undefined ? (
-          <KeyValue label="Aerobic training effect" value={summary.aerobicEffect.toFixed(1)} />
+          <KeyValue icon="fitness-outline" label="Aerobic training effect" value={summary.aerobicEffect.toFixed(1)} />
         ) : null}
         {summary.anaerobicEffect !== undefined ? (
-          <KeyValue label="Anaerobic training effect" value={summary.anaerobicEffect.toFixed(1)} />
+          <KeyValue icon="fitness-outline" label="Anaerobic training effect" value={summary.anaerobicEffect.toFixed(1)} />
         ) : null}
-        {summary.workoutLoad !== undefined ? <KeyValue label="Workout load" value={String(summary.workoutLoad)} /> : null}
+        {summary.workoutLoad !== undefined ? (
+          <KeyValue icon="barbell-outline" label="Workout load" value={String(summary.workoutLoad)} />
+        ) : null}
         {summary.recoveryHours !== undefined ? (
-          <KeyValue label="Recovery time" value={`${summary.recoveryHours.toFixed(0)} h`} />
+          <KeyValue icon="bed-outline" label="Recovery time" value={`${summary.recoveryHours.toFixed(0)} h`} />
         ) : null}
-        {summary.vo2max !== undefined ? <KeyValue label="VO2 max" value={`${summary.vo2max} ml/kg/min`} /> : null}
+        {summary.vo2max !== undefined ? (
+          <KeyValue icon="pulse-outline" label="VO2 max" value={`${summary.vo2max} ml/kg/min`} />
+        ) : null}
         {!workout.complete ? (
-          <AppText variant="caption" muted>
-            Partly downloaded; the next sync fetches the rest.
-          </AppText>
+          <Notice icon="cloud-download-outline">Partly downloaded; the next sync fetches the rest.</Notice>
         ) : null}
         {summary.missingData ? (
-          <AppText variant="caption" muted>
-            The watch refused to return some data for this workout, so parts may be missing.
-          </AppText>
+          <Notice>The watch refused to return some data for this workout, so parts may be missing.</Notice>
         ) : null}
       </Section>
 
-      <Section title="Route">
+      <Section title="Route" icon="map" tint="workouts">
         <RouteView route={route} />
         {summary.gps === 'failed' ? (
-          <AppText variant="caption" muted>
-            The watch did not provide a GPS file for this workout.
-          </AppText>
+          <Notice icon="location-outline">The watch did not provide a GPS file for this workout.</Notice>
         ) : null}
       </Section>
 
-      <Section title="Heart rate">
+      <Section title="Heart rate" icon="heart" tint="heart">
         <HeartRateChart points={loaded.points} start={workout.start} end={workout.end} />
       </Section>
 
       {splits.length > 0 ? (
-        <Section title="Splits">
+        <Section title="Splits" icon="flag">
           {splits.map((split, i) => (
             <KeyValue
               key={i}
@@ -190,7 +251,7 @@ export default function WorkoutDetailScreen() {
       ) : null}
 
       {swimRows.length > 0 ? (
-        <Section title="Swimming">
+        <Section title="Swimming" icon="water" tint="workouts">
           {swimRows.map((row) => (
             <KeyValue key={row.label} label={row.label} value={row.value} />
           ))}
@@ -199,3 +260,23 @@ export default function WorkoutDetailScreen() {
     </Screen>
   );
 }
+
+/** A small label over one summary number. */
+function Figure({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={styles.figure}>
+      <AppText variant="label" muted>
+        {label}
+      </AppText>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  summaryHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  summaryTitle: { flex: 1, gap: 2 },
+  figures: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.xl, rowGap: spacing.md },
+  figure: { gap: 2 },
+  tiles: { flexDirection: 'row', gap: spacing.md },
+});

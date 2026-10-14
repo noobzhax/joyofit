@@ -6,6 +6,7 @@ import { KeyValue } from '@/components/KeyValue';
 import { Section } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
 import { SwitchRow } from '@/components/SwitchRow';
+import { Notice } from '@/components/States';
 import { ensureBluetoothConnect } from '@/features/device/useBluetoothPermission';
 import { useBackgroundStatus } from '@/features/settings/useBackgroundStatus';
 import { errorMessage } from '@/format';
@@ -63,41 +64,33 @@ export function BackgroundSection() {
     });
 
   return (
-    <Section title="Background">
+    <Section title="Background" icon="sync">
       <SwitchRow
+        icon="sync"
         label="Keep connected in the background"
+        hint={
+          !status.address
+            ? 'Connect your watch first.'
+            : 'Keeps the link to the watch up while the app is closed.'
+        }
         value={status.enabled}
         onValueChange={toggle}
         disabled={busy || (!status.enabled && !status.address)}
       />
-      {!status.address ? (
-        <AppText variant="caption" muted>
-          Connect a watch on the Device tab first.
-        </AppText>
-      ) : null}
       {notificationHidden ? (
-        <AppText variant="caption" muted>
-          Notification permission was denied, so the service notification will be hidden.
-        </AppText>
+        <Notice>Notification permission was denied, so the service notification is hidden.</Notice>
       ) : null}
-      {error ? (
-        <AppText variant="caption" danger selectable>
-          {error}
-        </AppText>
-      ) : null}
-      <KeyValue label="Watch" value={status.name ?? status.address} />
-      <KeyValue label="Service" value={status.running ? 'Running' : 'Stopped'} />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <KeyValue icon="watch" label="Watch" value={status.name ?? status.address} />
+      <KeyValue icon="pulse" label="Service" value={status.running ? 'Running' : 'Stopped'} />
       {status.enabled ? (
         <KeyValue
+          icon="refresh"
           label="Auto-reconnect"
-          value={
-            status.paused
-              ? 'Paused: you disconnected in the app. Connect again to resume.'
-              : 'Active'
-          }
+          value={status.paused ? 'Paused. Connect again to resume.' : 'Active'}
         />
       ) : null}
-      <AppText variant="caption" muted>
+      <AppText variant="label" muted>
         Sync interval
       </AppText>
       <Segmented

@@ -1,5 +1,6 @@
-import { AlarmsScreen } from '@/features/alarms/AlarmsScreen';
+import { Redirect } from 'expo-router';
 
-export default function AlarmsRoute() {
-  return <AlarmsScreen />;
+/** Alarms live under the Watch tab; `joyofit:///alarms` keeps working. */
+export default function AlarmsRedirect() {
+  return <Redirect href="/watch/alarms" />;
 }

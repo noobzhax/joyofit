@@ -6,6 +6,8 @@ import type {
   DeviceInfo,
   HealthConnectExportResult,
   HealthConnectStatus,
+  HealthSensorsStatus,
+  HealthSensorsUpdate,
   HuaweiWearModuleEvents,
   LinkState,
   NotificationAccessStatus,
@@ -68,6 +70,23 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
    * they reached the watch, false when stored only (not connected or unsupported).
    */
   setUserProfile(profile: UserProfile): Promise<boolean>;
+
+  /** The sensor switches as stored, plus what the connected watch supports (`supported` is null when none is connected). */
+  getHealthSensors(): HealthSensorsStatus;
+  /**
+   * Stores the sensor switches and, if the watch is connected, sends what changed. Resolves true
+   * when everything reached the watch, false when stored only or the watch did not answer. On every
+   * connect the stored switches (not alerts that are off) are sent too. Rejects with
+   * ERR_INVALID_ARGUMENT for an alert threshold the watch does not offer.
+   */
+  setHealthSensors(sensors: HealthSensorsUpdate): Promise<boolean>;
+  /**
+   * Asks the watch for live heart rate (`true`) and emits `onHeartRate` for every reading it pushes, or
+   * stops that (`false`) and restores the continuous heart-rate setting. It costs watch battery: call it
+   * only while the live number is on screen. The module also stops it when the app goes to the background.
+   * Does nothing when no watch is connected or it does not list the realtime command.
+   */
+  setLiveHeartRate(active: boolean): Promise<void>;
 
   /**
    * Makes the watch ring and vibrate (`start` true) or stops it. Needs a connected watch that

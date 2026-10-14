@@ -37,6 +37,8 @@ internal class HuaweiInitializer(
   private val profile: UserProfileData?,
   /** The notification switch GB sends from `PREF_NOTIFICATION_ENABLE`. */
   private val notificationsEnabled: Boolean,
+  /** The sensor switches the user saved (continuous heart rate, SpO2, TruSleep, alerts). */
+  private val healthSensors: HealthSensorConfig,
 ) {
   private val params get() = session.params
 
@@ -191,6 +193,26 @@ internal class HuaweiInitializer(
     // SendFitnessUserInfoRequest + SendFitnessGoalRequest, once the user has saved a profile.
     profile?.let { saved ->
       soft("FitnessProfile") { ProfileSender.sendProfile(session, events, saved) }
+    }
+
+    // The heart-rate capability notifications and the sensor switches. GB sends none of these at init
+    // (only when a setting changes, all off by default), so a wiped watch never records heart rate.
+    soft("HealthSensors") {
+      val gates = HealthSensorSupport.of(DeviceCaps::supports)
+      events.log(
+        LogDirection.INFO,
+        null,
+        null,
+        null,
+        "HealthSensors gates: heartRate(07/17)=${gates.heartRate} realtime(07/1c)=${gates.realtimeHeartRate} " +
+          "spo2(07/24)=${gates.spo2} truSleep(07/16)=${gates.truSleep} highAlert(07/1d)=${gates.highHeartRateAlert} " +
+          "lowAlert(07/22)=${gates.lowHeartRateAlert} restHeartRateNotify(07/23)=${supports(0x07, 0x23)} " +
+          "workoutHeartRateNotify(17/17)=${supports(0x17, 0x17)} zones(07/13)=${supports(0x07, 0x13)} " +
+          "zonesExtended(07/21)=${supports(0x07, 0x21)} lowSpo2Alert(07/25)=${supports(0x07, 0x25)}",
+      )
+      val plan = HealthSensors.plan(DeviceCaps::supports, healthSensors, null)
+      val acknowledged = HealthSensors.send(session, events, plan)
+      events.log(LogDirection.INFO, null, null, null, "HealthSensors: $acknowledged of ${plan.size} requests acknowledged")
     }
 
     // GetNotificationCapabilitiesRequest, GetNotificationConstraintsRequest, SetNotificationRequest.

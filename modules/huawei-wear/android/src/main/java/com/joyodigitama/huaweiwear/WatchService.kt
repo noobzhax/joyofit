@@ -83,7 +83,8 @@ class WatchService : Service() {
       PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
     return Notification.Builder(this, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+      .setSmallIcon(R.drawable.ic_stat_joyofit)
+      .setColor(getColor(R.color.joyofit_notification_accent))
       .setContentTitle(settings.watchName ?: "JoyoFit")
       .setContentText(statusText(status))
       .setCategory(Notification.CATEGORY_SERVICE)

@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { radius, usePalette } from '@/theme';
+import { AppText } from '@/components/AppText';
+import { PressableScale } from '@/components/PressableScale';
+import { HIT, useColors } from '@/theme';
 import { ALARM_DAYS } from '@/wear';
 
 interface DayChipsProps {
@@ -9,31 +11,27 @@ interface DayChipsProps {
   onChange: (value: number) => void;
 }
 
-/** Seven toggles for the weekdays of an alarm. */
+/** Seven round weekday toggles; each sits in a 48 dp tall hit row. */
 export function DayChips({ value, onChange }: DayChipsProps) {
-  const palette = usePalette();
+  const colors = useColors();
   return (
     <View style={styles.row}>
       {ALARM_DAYS.map((day) => {
         const selected = (value & day.bit) !== 0;
         return (
-          <Pressable
+          <PressableScale
             key={day.bit}
             accessibilityRole="checkbox"
             accessibilityLabel={day.label}
             accessibilityState={{ checked: selected }}
             onPress={() => onChange(selected ? value & ~day.bit : value | day.bit)}
-            style={[
-              styles.chip,
-              {
-                backgroundColor: selected ? palette.accent : 'transparent',
-                borderColor: selected ? palette.accent : palette.border,
-              },
-            ]}>
-            <Text style={[styles.label, { color: selected ? palette.onAccent : palette.text }]}>
-              {day.label.slice(0, 2)}
-            </Text>
-          </Pressable>
+            style={styles.hit}>
+            <View style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.muted }]}>
+              <AppText variant="label" color={selected ? colors.primaryForeground : colors.foreground}>
+                {day.label.slice(0, 2)}
+              </AppText>
+            </View>
+          </PressableScale>
         );
       })}
     </View>
@@ -41,14 +39,14 @@ export function DayChips({ value, onChange }: DayChipsProps) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 6 },
+  row: { flexDirection: 'row' },
+  hit: { flex: 1, minHeight: HIT, alignItems: 'center', justifyContent: 'center' },
   chip: {
-    flex: 1,
-    minHeight: 44,
-    borderWidth: 1,
-    borderRadius: radius.md,
+    width: '100%',
+    maxWidth: 40,
+    aspectRatio: 1,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontSize: 13, fontWeight: '600' },
 });

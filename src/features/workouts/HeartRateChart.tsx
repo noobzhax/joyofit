@@ -5,10 +5,11 @@ import { AppText } from '@/components/AppText';
 import type { WorkoutPointRow } from '@/db/queries';
 import { heartRateBuckets } from '@/features/workouts/summary';
 import { formatClock } from '@/format';
-import { radius, usePalette } from '@/theme';
+import { useColors } from '@/theme';
 
 const BAR_AREA_HEIGHT = 96;
 const BUCKETS = 60;
+const BAR_RADIUS = 3;
 
 /** Heart rate over the workout as 60 bars of averaged readings. Plain Views, no chart library. */
 export function HeartRateChart({
@@ -20,7 +21,7 @@ export function HeartRateChart({
   start: number;
   end: number;
 }) {
-  const palette = usePalette();
+  const colors = useColors();
   const buckets = useMemo(() => heartRateBuckets(points, start, end, BUCKETS), [points, start, end]);
 
   if (!buckets) {
@@ -46,9 +47,9 @@ export function HeartRateChart({
                 <View
                   style={{
                     height: Math.max(2, ((value - lo) / (hi - lo)) * BAR_AREA_HEIGHT),
-                    backgroundColor: palette.accent,
-                    borderTopLeftRadius: radius.sm / 2,
-                    borderTopRightRadius: radius.sm / 2,
+                    backgroundColor: colors.heart,
+                    borderTopLeftRadius: BAR_RADIUS,
+                    borderTopRightRadius: BAR_RADIUS,
                   }}
                 />
               ) : null}
@@ -64,7 +65,7 @@ export function HeartRateChart({
           </AppText>
         </View>
       </View>
-      <View style={[styles.axis, { borderTopColor: palette.border }]}>
+      <View style={[styles.axis, { borderTopColor: colors.hairline }]}>
         <AppText variant="caption" muted>
           {formatClock(start)}
         </AppText>

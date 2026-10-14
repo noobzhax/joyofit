@@ -16,6 +16,17 @@ class UserProfileRecord : Record {
   @Field var dailyStepGoal: Int = 0
 }
 
+/** `HealthSensorsUpdate` in `HuaweiWear.types.ts`. */
+class HealthSensorsRecord : Record {
+  @Field var automaticHeartRate: Boolean = true
+  @Field var automaticSpo2: Boolean = true
+  @Field var truSleep: Boolean = true
+  @Field var highHeartRateAlert: Int = 0
+  @Field var lowHeartRateAlert: Int = 0
+
+  internal fun toConfig() = HealthSensorConfig(automaticHeartRate, automaticSpo2, truSleep, highHeartRateAlert, lowHeartRateAlert)
+}
+
 /**
  * Expo module implementing `HuaweiWearModule.ts`. All protocol work lives in [WearLink], reached
  * through the process-wide [WearRuntime] that the background service shares; this class wires the
@@ -62,6 +73,10 @@ class HuaweiWearModule : Module() {
       emit("onUploadResult", mapOf("ok" to ok, "fileName" to fileName, "code" to code, "message" to message))
     }
 
+    override fun heartRate(bpm: Int, tsMs: Long) {
+      emit("onHeartRate", mapOf("bpm" to bpm, "ts" to tsMs))
+    }
+
     private fun emit(name: String, payload: Map<String, Any?>) {
       if (destroyed) return
       try {
@@ -91,7 +106,7 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate")
 
     OnCreate {
       val runtime = runtime()
@@ -173,6 +188,24 @@ class HuaweiWearModule : Module() {
 
     AsyncFunction("setUserProfile") Coroutine { profile: UserProfileRecord ->
       runtime().setUserProfile(profileOf(profile))
+    }
+
+    // The watch's own heart rate, SpO2 and sleep sensors, and the live heart rate on Today (HealthSensors.kt, LiveHeartRate.kt).
+    Function("getHealthSensors") {
+      runtime().healthSensorsStatus()
+    }
+
+    AsyncFunction("setHealthSensors") Coroutine { sensors: HealthSensorsRecord ->
+      runtime().setHealthSensors(sensors.toConfig())
+    }
+
+    AsyncFunction("setLiveHeartRate") { active: Boolean ->
+      runtime().liveHeartRate.setActive(active)
+    }
+
+    // Realtime heart rate drains the watch: it never outlives the app being on screen.
+    OnActivityEntersBackground {
+      runtimeRef?.liveHeartRate?.setActive(false)
     }
 
     // Find my watch / find my phone, calls and alarms (PhoneFeaturesModuleApi.kt).

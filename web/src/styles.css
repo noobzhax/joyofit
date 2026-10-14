@@ -1,0 +1,256 @@
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * JoyoFit Studio tokens. Structure from JoyoRogo's design v2 (apps/web + packages/ui globals.css):
+ * warm paper canvas, borderless white cards, big radii, Plus Jakarta Sans. Palette from JoyoFit mobile
+ * (src/theme.ts): ink teal primary, and per-metric data colors that only tell the data sources apart
+ * (steps teal, heart rose, calories amber, battery green). `stage` is the dark "watch glass" the face
+ * is previewed on, in both themes.
+ */
+:root {
+  --background: #f9f6f1;
+  --foreground: #1d1a15;
+  --card: #ffffff;
+  --card-foreground: #1d1a15;
+  --popover: #ffffff;
+  --popover-foreground: #1d1a15;
+  --primary: #0a6580;
+  --primary-foreground: #ffffff;
+  --secondary: #f0ece5;
+  --secondary-foreground: #1d1a15;
+  --muted: #f0ece5;
+  --muted-foreground: #66635c;
+  --accent: #f0ece5;
+  --accent-foreground: #1d1a15;
+  --destructive: #b42318;
+  --border: rgba(29, 26, 21, 0.1);
+  --input: rgba(29, 26, 21, 0.1);
+  --ring: #0a6580;
+
+  --steps: #0a6580;
+  --steps-soft: #dcf0f6;
+  --steps-ink: #07506a;
+  --heart: #d12f4d;
+  --heart-soft: #ffe4e9;
+  --heart-ink: #a31e39;
+  --calories: #c2700a;
+  --calories-soft: #ffefd6;
+  --calories-ink: #8a4e00;
+  --battery: #177a45;
+  --battery-soft: #dff5e6;
+  --battery-ink: #0f6236;
+  --warning: #b45309;
+  --warning-soft: #ffefd6;
+
+  --stage: #0b1417;
+  --stage-foreground: #f2f7f8;
+  --stage-muted: #a9c2c9;
+  --radius: 0.875rem;
+}
+
+.dark {
+  --background: #0d1112;
+  --foreground: #eef1f0;
+  --card: #171d1f;
+  --card-foreground: #eef1f0;
+  --popover: #1d2527;
+  --popover-foreground: #eef1f0;
+  --primary: #58c4de;
+  --primary-foreground: #04222b;
+  --secondary: #242c2f;
+  --secondary-foreground: #eef1f0;
+  --muted: #242c2f;
+  --muted-foreground: #9ba6a8;
+  --accent: #242c2f;
+  --accent-foreground: #eef1f0;
+  --destructive: #ff8a80;
+  --border: rgba(238, 241, 240, 0.1);
+  --input: rgba(238, 241, 240, 0.14);
+  --ring: #58c4de;
+
+  --steps: #58c4de;
+  --steps-soft: #12323c;
+  --steps-ink: #58c4de;
+  --heart: #ff7b93;
+  --heart-soft: #42202b;
+  --heart-ink: #ff8fa4;
+  --calories: #f0a23c;
+  --calories-soft: #41300f;
+  --calories-ink: #f0a23c;
+  --battery: #5fd08d;
+  --battery-soft: #123324;
+  --battery-ink: #5fd08d;
+  --warning: #f0a23c;
+  --warning-soft: #41300f;
+  --stage: #070d0f;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-steps: var(--steps);
+  --color-steps-soft: var(--steps-soft);
+  --color-steps-ink: var(--steps-ink);
+  --color-heart: var(--heart);
+  --color-heart-soft: var(--heart-soft);
+  --color-heart-ink: var(--heart-ink);
+  --color-calories: var(--calories);
+  --color-calories-soft: var(--calories-soft);
+  --color-calories-ink: var(--calories-ink);
+  --color-battery: var(--battery);
+  --color-battery-soft: var(--battery-soft);
+  --color-battery-ink: var(--battery-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-stage: var(--stage);
+  --color-stage-foreground: var(--stage-foreground);
+  --color-stage-muted: var(--stage-muted);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: calc(var(--radius) - 2px);
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) + 4px);
+  --radius-3xl: calc(var(--radius) + 10px);
+  --radius-4xl: calc(var(--radius) + 18px);
+  --shadow-float: 0 1px 2px rgb(29 26 21 / 6%), 0 8px 24px -6px rgb(29 26 21 / 14%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply font-sans bg-background text-foreground antialiased;
+    overflow: hidden;
+    /* Plus Jakarta's bold word space reads tight at small sizes. */
+    word-spacing: 0.06em;
+  }
+}
+
+/* Hide scrollbars on rails that still scroll by touch or trackpad. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbars for the side panels. */
+.panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 20%, transparent) transparent;
+}
+
+/* Range inputs: track and thumb in the app's colors, 44px hit area via padding. */
+input[type="range"].slider {
+  appearance: none;
+  height: 28px;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"].slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--slider-fill, var(--primary));
+  background: linear-gradient(to right, var(--slider-color, var(--primary)) var(--pct, 0%), var(--muted) var(--pct, 0%));
+}
+input[type="range"].slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+input[type="range"].slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--slider-color, var(--primary));
+}
+input[type="range"].slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 2px solid var(--slider-color, var(--primary));
+  box-shadow: 0 1px 3px rgb(29 26 21 / 25%);
+  transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+input[type="range"].slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+input[type="range"].slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 2px solid var(--slider-color, var(--primary));
+}
+input[type="range"].slider:focus-visible {
+  outline: none;
+}
+input[type="range"].slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--slider-color, var(--primary)) 30%, transparent);
+}
+
+/* Press feedback for tappable surfaces: quick, small, only on press. */
+.pressable {
+  transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Native dialog: backdrop and a short enter. Opens rarely, so a small fade and rise is fine. */
+dialog.sheet {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+dialog.sheet::backdrop {
+  background: rgb(15 20 22 / 46%);
+  transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog.sheet[open] > .sheet-body {
+    animation: sheet-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}

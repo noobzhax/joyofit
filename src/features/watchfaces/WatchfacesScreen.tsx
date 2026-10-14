@@ -1,20 +1,61 @@
 import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { KeyValue } from '@/components/KeyValue';
-import { Screen, Section } from '@/components/Screen';
+import { IconChip } from '@/components/IconChip';
+import { Card, Section, useContentPadding, useRefreshControl } from '@/components/Screen';
+import { EmptyState, Notice, Skeleton } from '@/components/States';
 import { useWatchfaces } from '@/features/watchfaces/useWatchfaces';
 import { formatDateTime } from '@/format';
-import { radius, usePalette } from '@/theme';
+import { radius, spacing, tintColors, useColors } from '@/theme';
 import { FIT4_SCREEN, type WatchfaceInfo } from '@/wear';
+
+const SKELETON_ROWS = [0, 1, 2];
+
+/** "Active" badge on the face that is on the watch's screen now. */
+function ActivePill() {
+  const colors = useColors();
+  const link = tintColors(colors, 'link');
+  return (
+    <View style={[styles.pill, { backgroundColor: link.soft }]}>
+      <AppText variant="label" color={link.text}>
+        Active
+      </AppText>
+    </View>
+  );
+}
+
+/** Stand-in for a face card while the list is being read. */
+function FaceSkeleton() {
+  return (
+    <Card>
+      <View style={styles.faceHeader}>
+        <Skeleton width={40} height={40} radius={20} />
+        <View style={styles.faceText}>
+          <Skeleton width="55%" height={16} />
+          <Skeleton width="35%" height={12} />
+        </View>
+      </View>
+      <View style={styles.actions}>
+        <Skeleton width={120} height={48} radius={radius.pill} />
+        <Skeleton width={96} height={48} radius={radius.pill} />
+      </View>
+    </Card>
+  );
+}
 
 /** Lists, activates, deletes and installs watch faces on the connected watch. */
 export function WatchfacesScreen() {
   const router = useRouter();
-  const palette = usePalette();
+  const colors = useColors();
+  const padding = useContentPadding(false);
   const { connected, list, busy, error, notice, progress, refresh, setActive, remove, install } = useWatchfaces();
+  const refreshControl = useRefreshControl({
+    refreshing: busy === 'list',
+    onRefresh: () => void refresh(),
+    enabled: connected,
+  });
   const idle = busy === null;
   const installing = busy === 'install';
   const percent =
@@ -26,30 +67,48 @@ export function WatchfacesScreen() {
       { text: 'Delete', style: 'destructive', onPress: () => void remove(face.id) },
     ]);
 
-  return (
-    <Screen>
-      <Button label="Back" onPress={() => router.back()} />
+  const listMeta = list
+    ? [
+        list.width && list.height ? `Screen ${list.width} x ${list.height} px` : null,
+        list.maxVersion ? `Newest face format ${list.maxVersion}` : null,
+        `Read ${formatDateTime(list.updatedAt / 1000)}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
 
-      <Section title="Install a watch face">
+  const header = (
+    <View style={styles.header}>
+      <Section title="Install a watch face" icon="cloud-upload">
         <AppText variant="caption">
-          Create faces with Huawei Theme Studio Pro and export them as a .hwt file. The Watch Fit 4 and
-          Fit 4 Pro screen is {FIT4_SCREEN.width} x {FIT4_SCREEN.height} px (Theme Studio Pro calls it 408 x 480).
-          A face made for another screen is refused before it is sent.
+          Make faces in Huawei Theme Studio Pro and export them as .hwt files. The Watch Fit 4 and Fit 4 Pro screen
+          is {FIT4_SCREEN.width} x {FIT4_SCREEN.height} px. A face made for another screen is refused before it is
+          sent.
         </AppText>
         <AppText variant="caption" muted>
-          Whether the watch accepts a face that Huawei did not sign is not known. If it refuses, the exact
-          status code it returned is shown here and in the Log tab.
+          Whether the watch accepts a face that Huawei did not sign is not known. If it refuses, the exact status
+          code it returned is shown here and in the log.
         </AppText>
         {!connected ? (
-          <AppText variant="caption" muted>
-            Connect the watch on the Device tab first.
-          </AppText>
+          <Notice icon="bluetooth" action={{ label: 'Open Watch', onPress: () => router.navigate('/watch') }}>
+            Connect your watch to manage its faces.
+          </Notice>
         ) : null}
-        <Button label="Install from file" variant="primary" disabled={!connected || !idle} loading={installing} onPress={() => void install()} />
+        <Button
+          label="Install from file"
+          variant="primary"
+          icon="document"
+          disabled={!connected || !idle}
+          loading={installing}
+          onPress={() => void install()}
+        />
         {installing && progress ? (
           <View style={styles.progress}>
-            <View style={[styles.track, { backgroundColor: palette.border }]}>
-              <View style={[styles.bar, { backgroundColor: palette.accent, width: `${percent}%` }]} />
+            <View
+              accessibilityRole="progressbar"
+              accessibilityValue={{ min: 0, max: 100, now: percent }}
+              style={[styles.track, { backgroundColor: colors.muted }]}>
+              <View style={[styles.bar, { backgroundColor: colors.primary, width: `${percent}%` }]} />
             </View>
             <AppText variant="caption" muted>
               {progress.total > 0
@@ -59,79 +118,140 @@ export function WatchfacesScreen() {
           </View>
         ) : null}
         {notice ? (
-          <AppText variant="caption" selectable>
-            {notice}
-          </AppText>
+          <Notice icon="checkmark-circle">{notice}</Notice>
         ) : null}
-        {error ? (
-          <AppText variant="caption" danger selectable>
-            {error}
-          </AppText>
-        ) : null}
+        {error ? <Notice tone="danger">{error}</Notice> : null}
       </Section>
 
-      <Section title="On the watch">
-        {list ? (
-          <>
-            <KeyValue label="Screen reported by the watch" value={list.width && list.height ? `${list.width} x ${list.height} px` : null} />
-            <KeyValue label="Newest face format" value={list.maxVersion} />
-            <AppText variant="caption" muted>
-              Read {formatDateTime(list.updatedAt / 1000)}.
-            </AppText>
-          </>
-        ) : (
+      <View style={styles.listTitle}>
+        <View style={styles.listTitleRow} accessibilityRole="header">
+          <IconChip icon="watch" size="sm" />
+          <AppText variant="heading">On the watch</AppText>
+        </View>
+        {listMeta ? (
           <AppText variant="caption" muted>
-            {connected ? 'Reading the watch faces...' : 'Not read yet.'}
-          </AppText>
-        )}
-        {list && list.faces.length === 0 ? (
-          <AppText variant="caption" muted>
-            The watch lists no watch faces.
+            {listMeta}
           </AppText>
         ) : null}
-        {list?.faces.map((face) => {
-          const working = typeof busy === 'object' && busy !== null && busy.id === face.id;
-          return (
-            <View key={face.id} style={[styles.face, { borderColor: palette.border }]}>
-              <AppText variant="title">
-                {face.name}
-                {face.active ? '  (active)' : ''}
-              </AppText>
-              <AppText variant="caption" muted>
-                {face.id} v{face.version}
-                {face.factory ? ' · preinstalled' : ''}
-                {face.tryout ? ' · trial' : ''}
-                {face.video ? ' · video' : ''}
-                {face.photo ? ' · photo' : ''}
-              </AppText>
-              <View style={styles.actions}>
-                <Button
-                  label="Set active"
-                  disabled={!connected || !idle || face.active}
-                  loading={working && typeof busy === 'object' && busy?.action === 'activate'}
-                  onPress={() => void setActive(face.id)}
-                />
-                <Button
-                  label="Delete"
-                  variant="danger"
-                  disabled={!connected || !idle || face.factory}
-                  loading={working && typeof busy === 'object' && busy?.action === 'delete'}
-                  onPress={() => confirmDelete(face)}
-                />
+      </View>
+    </View>
+  );
+
+  const empty = (() => {
+    if (list === null && !connected) {
+      return (
+        <Card>
+          <EmptyState
+            icon="watch"
+            title="Watch not connected"
+            description="The faces on your watch appear here once it is connected."
+          />
+        </Card>
+      );
+    }
+    if (busy === 'list' && list === null) {
+      return (
+        <View style={styles.skeletons}>
+          {SKELETON_ROWS.map((row) => (
+            <FaceSkeleton key={row} />
+          ))}
+        </View>
+      );
+    }
+    return (
+      <Card>
+        {list === null ? (
+          <EmptyState
+            icon="watch"
+            title="Faces not read yet"
+            description="Read the list from your watch to see its faces."
+            action={{ label: 'Read from the watch', icon: 'refresh', onPress: () => void refresh() }}
+          />
+        ) : (
+          <EmptyState
+            icon="watch"
+            title="No watch faces"
+            description="The watch lists no faces. Install one from a file above."
+          />
+        )}
+      </Card>
+    );
+  })();
+
+  return (
+    <FlatList
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={padding}
+      data={list?.faces ?? []}
+      keyExtractor={(face) => face.id}
+      ListHeaderComponent={header}
+      ListEmptyComponent={empty}
+      ItemSeparatorComponent={Separator}
+      refreshControl={refreshControl}
+      initialNumToRender={8}
+      windowSize={7}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      renderItem={({ item: face }) => {
+        const working = typeof busy === 'object' && busy !== null && busy.id === face.id;
+        const action = typeof busy === 'object' && busy !== null ? busy.action : null;
+        return (
+          <Card>
+            <View style={styles.faceHeader}>
+              <IconChip icon="watch" tint={face.active ? 'link' : 'neutral'} />
+              <View style={styles.faceText}>
+                <AppText variant="bodyStrong" numberOfLines={2}>
+                  {face.name}
+                </AppText>
+                <AppText variant="caption" muted>
+                  {face.id} v{face.version}
+                  {face.factory ? ' · preinstalled' : ''}
+                  {face.tryout ? ' · trial' : ''}
+                  {face.video ? ' · video' : ''}
+                  {face.photo ? ' · photo' : ''}
+                </AppText>
               </View>
+              {face.active ? <ActivePill /> : null}
             </View>
-          );
-        })}
-        <Button label="Read from the watch" disabled={!connected || !idle} loading={busy === 'list'} onPress={() => void refresh()} />
-      </Section>
-    </Screen>
+            <View style={styles.actions}>
+              <Button
+                label="Set active"
+                icon="checkmark-circle"
+                disabled={!connected || !idle || face.active}
+                loading={working && action === 'activate'}
+                onPress={() => void setActive(face.id)}
+              />
+              <Button
+                label="Delete"
+                icon="trash"
+                variant="destructive"
+                disabled={!connected || !idle || face.factory}
+                loading={working && action === 'delete'}
+                onPress={() => confirmDelete(face)}
+              />
+            </View>
+          </Card>
+        );
+      }}
+    />
   );
 }
 
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
 const styles = StyleSheet.create({
-  face: { gap: 6, borderTopWidth: 1, paddingTop: 12 },
-  actions: { flexDirection: 'row', gap: 8 },
-  progress: { gap: 6 },
-  track: { height: 8, borderRadius: radius.sm, overflow: 'hidden' },
-  bar: { height: 8 },
+  header: { gap: spacing.xl, marginBottom: spacing.md },
+  listTitle: { gap: spacing.xs },
+  listTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 32 },
+  separator: { height: spacing.md },
+  skeletons: { gap: spacing.md },
+  faceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  faceText: { flex: 1, gap: 2 },
+  pill: { borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  progress: { gap: spacing.sm },
+  track: { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
+  bar: { height: 8, borderRadius: radius.pill },
 });

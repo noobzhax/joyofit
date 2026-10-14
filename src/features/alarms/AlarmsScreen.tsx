@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { Screen, Section } from '@/components/Screen';
+import { Divider, Screen, Section } from '@/components/Screen';
+import { Notice } from '@/components/States';
 import { SwitchRow } from '@/components/SwitchRow';
 import { AlarmEditor, type AlarmFormValues } from '@/features/alarms/AlarmEditor';
 import {
@@ -15,13 +16,18 @@ import {
 } from '@/features/alarms/alarmUtils';
 import { useAlarms } from '@/features/alarms/useAlarms';
 import { formatDateTime } from '@/format';
+import { spacing, useColors } from '@/theme';
 import { ALARM_SLOTS, type WatchAlarm, type WatchSmartAlarm } from '@/wear';
 
 type Editing = { kind: 'event'; slot: number; isNew: boolean } | { kind: 'smart' } | null;
 
-/** Reads, edits, adds, deletes and enables the watch's five alarms and its smart alarm. */
+/**
+ * Reads, edits, adds, deletes and enables the watch's alarms and its smart alarm. The watch has
+ * five slots, so the list is bounded and stays in a plain scroll view.
+ */
 export function AlarmsScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { alarms, connected, busy, error, refresh, save } = useAlarms();
   const [editing, setEditing] = useState<Editing>(null);
 
@@ -101,67 +107,74 @@ export function AlarmsScreen() {
   })();
 
   return (
-    <Screen>
-      <Button label="Back to settings" onPress={() => router.back()} />
+    <Screen refresh={{ refreshing: busy && editing === null, onRefresh: () => void refresh(), enabled: connected }}>
+      {!connected ? (
+        <Notice icon="bluetooth" action={{ label: 'Open Watch', onPress: () => router.navigate('/watch') }}>
+          Connect your watch to read and change its alarms.
+        </Notice>
+      ) : null}
+      {connected && !alarms.supported ? <Notice>This watch did not report alarm support.</Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      <Section title="Watch alarms">
-        {!connected ? (
+      <Section
+        title="Alarms"
+        icon="alarm"
+        trailing={
           <AppText variant="caption" muted>
-            Connect the watch on the Device tab to read and change its alarms. This is the last copy
-            read from it.
+            {alarms.event.length} of {ALARM_SLOTS}
           </AppText>
-        ) : null}
-        {connected && !alarms.supported ? (
-          <AppText variant="caption" muted>
-            This watch did not report alarm support.
-          </AppText>
-        ) : null}
-        <AppText variant="caption" muted>
-          {alarms.updatedAt === null
-            ? 'Not read from the watch yet.'
-            : `Last read from the watch ${formatDateTime(alarms.updatedAt / 1000)}.`}
-        </AppText>
-        {error ? (
-          <AppText variant="caption" danger selectable>
-            {error}
-          </AppText>
-        ) : null}
-        <Button label="Read from the watch" disabled={!connected || busy} loading={busy && !editing} onPress={() => void refresh()} />
-      </Section>
-
-      <Section title={`Alarms (${alarms.event.length} of ${ALARM_SLOTS})`}>
-        {alarms.event.length === 0 ? (
+        }>
+        {alarms.event.length === 0 && editing === null ? (
           <AppText variant="caption" muted>
             No alarms on the watch.
           </AppText>
         ) : null}
-        {alarms.event.map((alarm) =>
-          editing?.kind === 'event' && editing.slot === alarm.slot ? (
-            <View key={alarm.slot}>{editor}</View>
-          ) : (
-            <View key={alarm.slot} style={styles.row}>
-              <View style={styles.info}>
-                <AppText variant="title">{formatAlarmTime(alarm.hour, alarm.minute)}</AppText>
-                <AppText variant="caption" muted>
-                  {alarm.name} · {describeRepeat(alarm.repeat)}
-                </AppText>
-                <Button label="Edit" disabled={!writable} onPress={() => setEditing({ kind: 'event', slot: alarm.slot, isNew: false })} />
+        {alarms.event.map((alarm, index) => (
+          <View key={alarm.slot} style={styles.item}>
+            {index > 0 ? <Divider /> : null}
+            {editing?.kind === 'event' && editing.slot === alarm.slot ? (
+              editor
+            ) : (
+              <View style={styles.row}>
+                <View style={styles.top}>
+                  <View style={styles.info}>
+                    <AppText variant="figure">{formatAlarmTime(alarm.hour, alarm.minute)}</AppText>
+                    <AppText variant="caption" muted numberOfLines={1}>
+                      {alarm.name} · {describeRepeat(alarm.repeat)}
+                    </AppText>
+                  </View>
+                  <Switch
+                    accessibilityLabel={`Alarm ${formatAlarmTime(alarm.hour, alarm.minute)} on`}
+                    value={alarm.enabled}
+                    disabled={!writable}
+                    onValueChange={(enabled) =>
+                      void pushEvents(alarms.event.map((a) => (a.slot === alarm.slot ? { ...a, enabled } : a)))
+                    }
+                    trackColor={{ false: colors.switchOff, true: colors.primary }}
+                    thumbColor={alarm.enabled ? colors.primaryForeground : colors.card}
+                  />
+                </View>
+                <Button
+                  label="Edit"
+                  icon="create"
+                  disabled={!writable}
+                  style={styles.edit}
+                  onPress={() => setEditing({ kind: 'event', slot: alarm.slot, isNew: false })}
+                />
               </View>
-              <SwitchRow
-                label={`Alarm ${formatAlarmTime(alarm.hour, alarm.minute)} on`}
-                value={alarm.enabled}
-                disabled={!writable}
-                onValueChange={(enabled) =>
-                  void pushEvents(alarms.event.map((a) => (a.slot === alarm.slot ? { ...a, enabled } : a)))
-                }
-              />
-            </View>
-          ),
-        )}
-        {editing?.kind === 'event' && editing.isNew ? editor : null}
+            )}
+          </View>
+        ))}
+        {editing?.kind === 'event' && editing.isNew ? (
+          <View style={styles.item}>
+            {alarms.event.length > 0 ? <Divider /> : null}
+            {editor}
+          </View>
+        ) : null}
         <Button
           label="Add alarm"
           variant="primary"
+          icon="add"
           disabled={!writable || free === null || editing !== null}
           onPress={() => free !== null && setEditing({ kind: 'event', slot: free, isNew: true })}
         />
@@ -170,10 +183,22 @@ export function AlarmsScreen() {
             All {ALARM_SLOTS} slots are used. Delete one to add another.
           </AppText>
         ) : null}
+        <AppText variant="caption" muted>
+          {alarms.updatedAt === null
+            ? 'Not read from the watch yet.'
+            : `Last read from the watch ${formatDateTime(alarms.updatedAt / 1000)}.`}
+        </AppText>
+        <Button
+          label="Read from the watch"
+          icon="refresh"
+          disabled={!connected || busy}
+          loading={busy && !editing}
+          onPress={() => void refresh()}
+        />
       </Section>
 
       {alarms.smartSupported ? (
-        <Section title="Smart alarm">
+        <Section title="Smart alarm" icon="moon" tint="sleep">
           <AppText variant="caption" muted>
             Wakes you at a light moment of sleep within the chosen window before the time. The watch
             keeps one smart alarm and cannot delete it, only switch it off.
@@ -182,14 +207,14 @@ export function AlarmsScreen() {
             editor
           ) : (
             <>
-              <AppText variant="title">
-                {smart ? formatAlarmTime(smart.hour, smart.minute) : 'Not set'}
-              </AppText>
-              {smart ? (
-                <AppText variant="caption" muted>
-                  Up to {smart.aheadMinutes} min early · {describeRepeat(smart.repeat)}
-                </AppText>
-              ) : null}
+              <View style={styles.stack}>
+                <AppText variant="figure">{smart ? formatAlarmTime(smart.hour, smart.minute) : 'Not set'}</AppText>
+                {smart ? (
+                  <AppText variant="caption" muted>
+                    Up to {smart.aheadMinutes} min early · {describeRepeat(smart.repeat)}
+                  </AppText>
+                ) : null}
+              </View>
               {smart ? (
                 <SwitchRow
                   label="Smart alarm on"
@@ -200,6 +225,7 @@ export function AlarmsScreen() {
               ) : null}
               <Button
                 label={smart ? 'Edit smart alarm' : 'Set smart alarm'}
+                icon="create"
                 disabled={!writable || editing !== null}
                 onPress={() => setEditing({ kind: 'smart' })}
               />
@@ -212,6 +238,10 @@ export function AlarmsScreen() {
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 8 },
-  info: { gap: 4 },
+  item: { gap: spacing.md },
+  row: { gap: spacing.sm },
+  top: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  info: { flex: 1, gap: 2 },
+  stack: { gap: 2 },
+  edit: { alignSelf: 'flex-start' },
 });

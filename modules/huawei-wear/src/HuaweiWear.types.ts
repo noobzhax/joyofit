@@ -229,6 +229,42 @@ export interface WeatherStatus {
   lastLocationName: string | null;
 }
 
+/** A live heart-rate reading the watch pushed (`onHeartRate`); only while `setLiveHeartRate(true)` is in effect. */
+export interface HeartRateEvent {
+  bpm: number;
+  /** Unix milliseconds, the phone's receive time. */
+  ts: number;
+}
+
+/** Which sensor commands the connected watch lists (Gadgetbridge's `HuaweiState.supports*`). */
+export interface HealthSensorSupport {
+  heartRate: boolean;
+  realtimeHeartRate: boolean;
+  spo2: boolean;
+  truSleep: boolean;
+  highHeartRateAlert: boolean;
+  lowHeartRateAlert: boolean;
+}
+
+/** What the watch's health sensors are set to. Everything but the alerts is on by default, as in Huawei Health. */
+export interface HealthSensorsUpdate {
+  /** Continuous heart rate: the watch records a reading about every minute. Without it, no heart rate reaches the app. */
+  automaticHeartRate: boolean;
+  /** Automatic SpO2 readings. */
+  automaticSpo2: boolean;
+  /** TruSleep, the sleep tracking the sleep files come from. */
+  truSleep: boolean;
+  /** bpm that triggers an alert on the watch; 0 = off, else 100 to 150. */
+  highHeartRateAlert: number;
+  /** bpm that triggers an alert on the watch; 0 = off, else 40 to 50. */
+  lowHeartRateAlert: number;
+}
+
+export interface HealthSensorsStatus extends HealthSensorsUpdate {
+  /** What the connected watch supports; null when no watch is connected (nothing is known then). */
+  supported: HealthSensorSupport | null;
+}
+
 export type HuaweiWearModuleEvents = {
   onStateChange: (event: StateEvent) => void;
   onBattery: (event: BatteryEvent) => void;
@@ -236,4 +272,5 @@ export type HuaweiWearModuleEvents = {
   onUploadProgress: (event: UploadProgressEvent) => void;
   onUploadResult: (event: UploadResultEvent) => void;
   onSyncComplete: (event: SyncCompleteEvent) => void;
+  onHeartRate: (event: HeartRateEvent) => void;
 };

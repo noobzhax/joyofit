@@ -1,0 +1,17 @@
+{
+  "name": "@joyofit/faces",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JoyoFit watch faces built with @joyofit/hwt. Each face is a folder with a build.ts that renders its sprites and writes dist/<Face>.hwt.",
+  "scripts": {
+    "build:pulse": "bun pulse/build.ts",
+    "sim:pulse": "bun pulse/simulate.ts"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/bun": "latest",
+    "jpeg-js": "^0.4.4",
+    "typescript": "^5.6.0"
+  }
+}

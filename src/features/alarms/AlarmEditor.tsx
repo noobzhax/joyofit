@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { Field } from '@/components/Input';
+import { Notice } from '@/components/States';
 import { DayChips } from '@/features/alarms/DayChips';
 import { parseBounded } from '@/features/alarms/alarmUtils';
-import { radius, usePalette } from '@/theme';
+import { spacing } from '@/theme';
 
 export interface AlarmFormValues {
   hour: number;
@@ -24,32 +26,6 @@ interface AlarmEditorProps {
   onSave: (values: AlarmFormValues) => void;
   onCancel: () => void;
   onDelete?: () => void;
-}
-
-interface FieldProps {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  numeric?: boolean;
-}
-
-function Field({ label, value, onChangeText, numeric }: FieldProps) {
-  const palette = usePalette();
-  return (
-    <View style={styles.field}>
-      <AppText variant="caption" muted>
-        {label}
-      </AppText>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={numeric ? 'number-pad' : 'default'}
-        maxLength={numeric ? 3 : 64}
-        style={[styles.input, { borderColor: palette.border, color: palette.text }]}
-      />
-    </View>
-  );
 }
 
 /** Time, days and (per kind) name or wake-up window of one alarm. Validation messages stay inside the form. */
@@ -82,42 +58,42 @@ export function AlarmEditor({ initial, kind, saving, onSave, onCancel, onDelete 
     <View style={styles.form}>
       <View style={styles.timeRow}>
         <View style={styles.time}>
-          <Field label="Hour (0-23)" value={hour} onChangeText={setHour} numeric />
+          <Field label="Hour (0-23)" value={hour} onChangeText={setHour} keyboardType="number-pad" maxLength={3} />
         </View>
         <View style={styles.time}>
-          <Field label="Minute (0-59)" value={minute} onChangeText={setMinute} numeric />
+          <Field label="Minute (0-59)" value={minute} onChangeText={setMinute} keyboardType="number-pad" maxLength={3} />
         </View>
       </View>
-      {kind === 'event' ? <Field label="Name" value={name} onChangeText={setName} /> : null}
+      {kind === 'event' ? <Field label="Name" value={name} onChangeText={setName} maxLength={64} icon="pricetag" /> : null}
       {kind === 'smart' ? (
-        <Field label="Wake me up to this many minutes early" value={ahead} onChangeText={setAhead} numeric />
+        <Field
+          label="Wake me up to this many minutes early"
+          value={ahead}
+          onChangeText={setAhead}
+          keyboardType="number-pad"
+          maxLength={3}
+        />
       ) : null}
-      <AppText variant="caption" muted>
-        Repeat (none selected means once)
-      </AppText>
-      <DayChips value={repeat} onChange={setRepeat} />
-      {problem ? (
-        <AppText variant="caption" danger>
-          {problem}
+      <View style={styles.repeat}>
+        <AppText variant="label" muted>
+          Repeat
         </AppText>
-      ) : null}
-      <Button label="Save to the watch" variant="primary" loading={saving} onPress={save} />
+        <DayChips value={repeat} onChange={setRepeat} />
+        <AppText variant="caption" muted>
+          No day selected means once.
+        </AppText>
+      </View>
+      {problem ? <Notice tone="danger">{problem}</Notice> : null}
+      <Button label="Save to the watch" variant="primary" icon="checkmark" loading={saving} onPress={save} />
       <Button label="Cancel" disabled={saving} onPress={onCancel} />
-      {onDelete ? <Button label="Delete alarm" variant="danger" disabled={saving} onPress={onDelete} /> : null}
+      {onDelete ? <Button label="Delete alarm" variant="destructive" icon="trash" disabled={saving} onPress={onDelete} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  form: { gap: 12 },
-  timeRow: { flexDirection: 'row', gap: 12 },
+  form: { gap: spacing.md },
+  timeRow: { flexDirection: 'row', gap: spacing.md },
   time: { flex: 1 },
-  field: { gap: 4 },
-  input: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    fontSize: 15,
-  },
+  repeat: { gap: 2 },
 });

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 
 /** What the service notification shows. */
 internal data class ServiceStatus(
@@ -66,6 +67,7 @@ internal class WearRuntime private constructor(context: Context) {
       if (state == LinkState.DISCONNECTED || state == LinkState.CONNECTED) controller?.onLinkChanged()
       features.onLinkState(state)
       weather.onLinkState(state)
+      liveHeartRate.onLinkState(state)
     }
 
     override fun battery(level: Int) {
@@ -94,6 +96,10 @@ internal class WearRuntime private constructor(context: Context) {
     override fun uploadResult(ok: Boolean, fileName: String, code: Int?, message: String) {
       listeners.forEach { it.uploadResult(ok, fileName, code, message) }
     }
+
+    override fun heartRate(bpm: Int, tsMs: Long) {
+      listeners.forEach { it.heartRate(bpm, tsMs) }
+    }
   }
 
   /** Same fan-out the link reports through; background code logs here so the Log tab shows it. */
@@ -106,6 +112,7 @@ internal class WearRuntime private constructor(context: Context) {
   val weatherSettings = WeatherSettings(appContext)
   val weather = WeatherController(appContext, weatherSettings, link, events, scope)
   val watchfaces = WatchfaceController(appContext, link, events)
+  val liveHeartRate = LiveHeartRate(link, settings, events, scope)
 
   fun addListener(listener: WearEvents) {
     listeners.add(listener)
@@ -158,6 +165,7 @@ internal class WearRuntime private constructor(context: Context) {
 
   /** JS reload with background off: nothing keeps the link, so it is closed as before. */
   fun onModuleDestroyed() {
+    liveHeartRate.setActive(false)
     if (!settings.backgroundEnabled) link.shutdown()
   }
 
@@ -273,6 +281,42 @@ internal class WearRuntime private constructor(context: Context) {
   suspend fun notificationApps(): List<Map<String, Any?>> =
     withContext(Dispatchers.IO) { NotificationApps.list(appContext, settings) }
 
+  // Health sensors (continuous heart rate, SpO2, TruSleep, alerts) and live heart rate
+
+  /** The stored switches and, while connected, which of them the watch supports (null when not connected). */
+  fun healthSensorsStatus(): Map<String, Any?> {
+    val config = settings.healthSensors
+    return mapOf(
+      "automaticHeartRate" to config.automaticHeartRate,
+      "automaticSpo2" to config.automaticSpo2,
+      "truSleep" to config.truSleep,
+      "highHeartRateAlert" to config.highHeartRateAlert,
+      "lowHeartRateAlert" to config.lowHeartRateAlert,
+      "supported" to if (link.handle() != null) HealthSensorSupport.of(DeviceCaps::supports).toJs() else null,
+    )
+  }
+
+  fun validate(config: HealthSensorConfig) {
+    fun bad(what: String): Nothing = throw WearException(ErrorCodes.INVALID_ARGUMENT, what)
+    if (config.highHeartRateAlert != 0 && config.highHeartRateAlert !in HIGH_ALERT_RANGE) {
+      bad("High heart-rate alert must be 0 (off) or ${HIGH_ALERT_RANGE.first} to ${HIGH_ALERT_RANGE.last} bpm")
+    }
+    if (config.lowHeartRateAlert != 0 && config.lowHeartRateAlert !in LOW_ALERT_RANGE) {
+      bad("Low heart-rate alert must be 0 (off) or ${LOW_ALERT_RANGE.first} to ${LOW_ALERT_RANGE.last} bpm")
+    }
+  }
+
+  /** Stores the switches and, when the watch is connected, sends what changed; true when it was all acknowledged. */
+  suspend fun setHealthSensors(config: HealthSensorConfig): Boolean {
+    validate(config)
+    val previous = settings.healthSensors
+    settings.healthSensors = config
+    val handle = link.handle() ?: return false
+    val plan = HealthSensors.plan(DeviceCaps::supports, config, previous)
+    if (plan.isEmpty()) return true
+    return handle.operationLock.withLock { HealthSensors.send(handle.session, events, plan) } == plan.size
+  }
+
   // Profile
 
   fun validate(profile: UserProfileData) {
@@ -300,6 +344,10 @@ internal class WearRuntime private constructor(context: Context) {
   }
 
   companion object {
+    /** The thresholds GB offers for the watch's heart-rate alerts (arrays prefs_huawei_heart_rate_{high,low}_alert_values). */
+    val HIGH_ALERT_RANGE = 100..150
+    val LOW_ALERT_RANGE = 40..50
+
     @Volatile
     private var instance: WearRuntime? = null
 

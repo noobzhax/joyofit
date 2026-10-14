@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "joyofit-studio",
+  "account_id": "b7e6f8457bd39fa37a7eea5249799754",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": true,
+  // Static site only, built by Vite (@cloudflare/vite-plugin writes dist/wrangler.json and points wrangler at it).
+  "assets": {
+    "not_found_handling": "single-page-application"
+  },
+  "observability": { "enabled": true }
+}

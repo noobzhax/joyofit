@@ -72,6 +72,23 @@ internal class WearSettings(context: Context) {
     prefs.edit().putStringSet(KEY_APPS_ON, on).putStringSet(KEY_APPS_OFF, off).apply()
   }
 
+  /** The watch-side health sensor switches (see [HealthSensorConfig]); defaults match Huawei Health. */
+  var healthSensors: HealthSensorConfig
+    get() = HealthSensorConfig(
+      automaticHeartRate = prefs.getBoolean(KEY_AUTO_HEART_RATE, true),
+      automaticSpo2 = prefs.getBoolean(KEY_AUTO_SPO2, true),
+      truSleep = prefs.getBoolean(KEY_TRUSLEEP, true),
+      highHeartRateAlert = prefs.getInt(KEY_HIGH_HR_ALERT, 0),
+      lowHeartRateAlert = prefs.getInt(KEY_LOW_HR_ALERT, 0),
+    )
+    set(value) = prefs.edit()
+      .putBoolean(KEY_AUTO_HEART_RATE, value.automaticHeartRate)
+      .putBoolean(KEY_AUTO_SPO2, value.automaticSpo2)
+      .putBoolean(KEY_TRUSLEEP, value.truSleep)
+      .putInt(KEY_HIGH_HR_ALERT, value.highHeartRateAlert)
+      .putInt(KEY_LOW_HR_ALERT, value.lowHeartRateAlert)
+      .apply()
+
   var profile: UserProfileData?
     get() {
       if (!prefs.contains(KEY_PROFILE_HEIGHT)) return null
@@ -116,5 +133,10 @@ internal class WearSettings(context: Context) {
     private const val KEY_PROFILE_BIRTH_YEAR = "profile_birth_year"
     private const val KEY_PROFILE_SEX = "profile_sex"
     private const val KEY_PROFILE_GOAL = "profile_step_goal"
+    private const val KEY_AUTO_HEART_RATE = "sensor_auto_heart_rate"
+    private const val KEY_AUTO_SPO2 = "sensor_auto_spo2"
+    private const val KEY_TRUSLEEP = "sensor_trusleep"
+    private const val KEY_HIGH_HR_ALERT = "sensor_high_hr_alert"
+    private const val KEY_LOW_HR_ALERT = "sensor_low_hr_alert"
   }
 }

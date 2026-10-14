@@ -4,6 +4,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { KeyValue } from '@/components/KeyValue';
 import { Section } from '@/components/Screen';
+import { Notice } from '@/components/States';
 import { SwitchRow } from '@/components/SwitchRow';
 import { useNativeRefresh } from '@/features/settings/useNativeRefresh';
 import { errorMessage, formatDateTime } from '@/format';
@@ -70,35 +71,29 @@ export function HealthConnectSection() {
   const grantedCount = status?.granted.length ?? 0;
 
   return (
-    <Section title="Health Connect">
+    <Section title="Health Connect" icon="heart" tint="heart">
       <SwitchRow
+        icon="heart"
         label="Write to Health Connect"
+        hint={
+          status && unavailable
+            ? AVAILABILITY_TEXT[status.availability]
+            : 'Sends steps, distance, calories, heart rate, blood oxygen, sleep and workouts after every sync, so other apps such as JoyoRogo can read them. Turning it on also writes what is already stored.'
+        }
         value={status?.enabled ?? false}
         onValueChange={toggle}
         disabled={busy != null || status == null || unavailable}
       />
-      <AppText variant="caption" muted>
-        Steps, distance, calories, heart rate, blood oxygen, sleep and workouts go to Health Connect after
-        every sync, so other apps such as JoyoRogo can read them. Turning it on also writes what is already
-        stored.
-      </AppText>
       {busy ? (
         <AppText variant="caption" muted>
           {busy}...
         </AppText>
       ) : null}
-      {error ? (
-        <AppText variant="caption" danger selectable>
-          {error}
-        </AppText>
-      ) : null}
-      {status?.lastError ? (
-        <AppText variant="caption" danger selectable>
-          Last export failed: {status.lastError}
-        </AppText>
-      ) : null}
-      <KeyValue label="Health Connect" value={status ? AVAILABILITY_TEXT[status.availability] : null} />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {status?.lastError ? <Notice tone="danger">Last export failed: {status.lastError}</Notice> : null}
+      <KeyValue icon="fitness" label="Health Connect" value={status ? AVAILABILITY_TEXT[status.availability] : null} />
       <KeyValue
+        icon="key"
         label="Write permission"
         value={status && !unavailable ? `${grantedCount} of ${RECORD_TYPE_COUNT} types` : null}
       />
@@ -108,6 +103,7 @@ export function HealthConnectSection() {
         </AppText>
       ) : null}
       <KeyValue
+        icon="time"
         label="Last export"
         value={status?.lastExportSec ? formatDateTime(status.lastExportSec) : null}
       />
@@ -119,6 +115,8 @@ export function HealthConnectSection() {
       {status && !unavailable && grantedCount < RECORD_TYPE_COUNT ? (
         <Button
           label="Allow more types"
+          variant="secondary"
+          icon="add-circle-outline"
           onPress={() =>
             run('Asking for permission', async () => {
               setStatus(await HuaweiWear.requestHealthConnectPermissions());
@@ -130,6 +128,8 @@ export function HealthConnectSection() {
       {status?.enabled && !unavailable ? (
         <Button
           label="Write everything again"
+          variant="secondary"
+          icon="refresh"
           onPress={() =>
             run('Writing stored data', async () => {
               await HuaweiWear.backfillHealthConnect();
@@ -142,6 +142,8 @@ export function HealthConnectSection() {
       {status ? (
         <Button
           label="Open Health Connect"
+          variant="ghost"
+          icon="open-outline"
           onPress={() => run('Opening', () => HuaweiWear.openHealthConnectSettings())}
           disabled={busy != null}
         />

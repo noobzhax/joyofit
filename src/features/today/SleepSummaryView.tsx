@@ -1,9 +1,12 @@
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { KeyValue } from '@/components/KeyValue';
+import { Metric } from '@/components/Metric';
+import { EmptyState } from '@/components/States';
 import { formatClock, formatDuration } from '@/format';
 import type { SleepStageSummary, SleepSummary } from '@/features/today/stats';
+import { radius, spacing, useColors, type Colors } from '@/theme';
 
 const STAGE_LABELS: Record<SleepStageSummary['stage'], string> = {
   light: 'Light',
@@ -12,33 +15,60 @@ const STAGE_LABELS: Record<SleepStageSummary['stage'], string> = {
   awake: 'Awake',
 };
 
+function stageColor(stage: SleepStageSummary['stage'], colors: Colors): string {
+  return { light: colors.stageLight, deep: colors.stageDeep, rem: colors.stageRem, awake: colors.stageAwake }[stage];
+}
+
 export function SleepSummaryView({ summary }: { summary: SleepSummary | null }) {
+  const colors = useColors();
   if (!summary) {
     return (
-      <AppText variant="caption" muted>
-        No sleep segments stored from the last 36 hours. Sync after waking up to see last night.
-      </AppText>
+      <EmptyState
+        icon="moon"
+        title="No sleep stored"
+        description="Nothing from the last 36 hours. Sync after waking up to see last night."
+      />
     );
   }
 
   const hasStages = summary.byStage.length > 0;
   const awakeSeconds = summary.byStage.find((entry) => entry.stage === 'awake')?.seconds ?? 0;
   const headlineSeconds = hasStages ? summary.totalSeconds - awakeSeconds : summary.totalSeconds;
+  const minutes = Math.round(headlineSeconds / 60);
 
   return (
-    <View style={{ gap: 8 }}>
-      <AppText variant="figure">{formatDuration(headlineSeconds)}</AppText>
+    <View style={styles.wrap}>
+      <View accessible accessibilityLabel={`Slept ${formatDuration(headlineSeconds)}`} style={styles.headline}>
+        {minutes >= 60 ? <Metric value={String(Math.floor(minutes / 60))} unit="h" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} /> : null}
+        <Metric value={String(minutes % 60).padStart(minutes >= 60 ? 2 : 1, '0')} unit="min" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} />
+      </View>
       <AppText variant="caption" muted>
         {formatClock(summary.start)} to {formatClock(summary.end)}
         {hasStages ? ', time awake excluded' : ', segment durations added up'}
       </AppText>
       {hasStages ? (
         <>
+          <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.stageBar}>
+            {summary.byStage.map((entry) => (
+              <View key={entry.stage} style={{ flex: entry.seconds, backgroundColor: stageColor(entry.stage, colors) }} />
+            ))}
+          </View>
           {summary.byStage.map((entry) => (
-            <KeyValue key={entry.stage} label={STAGE_LABELS[entry.stage]} value={formatDuration(entry.seconds)} />
+            <View key={entry.stage} style={styles.legendRow}>
+              <View style={[styles.swatch, { backgroundColor: stageColor(entry.stage, colors) }]} />
+              <AppText variant="caption" style={styles.legendLabel}>
+                {STAGE_LABELS[entry.stage]}
+              </AppText>
+              <AppText variant="caption" muted style={styles.tabular}>
+                {Math.round((entry.seconds / summary.totalSeconds) * 100)}%
+              </AppText>
+              <AppText variant="label" style={[styles.legendValue, styles.tabular]}>
+                {formatDuration(entry.seconds)}
+              </AppText>
+            </View>
           ))}
           <AppText variant="caption" muted>
-            Stages come from the sleep data on the watch; spans without a stage are only in the total.
+            Stages come from the watch&apos;s sleep data. Spans without a stage count only in the total.
           </AppText>
         </>
       ) : (
@@ -51,10 +81,21 @@ export function SleepSummaryView({ summary }: { summary: SleepSummary | null }) 
             />
           ))}
           <AppText variant="caption" muted>
-            Types are the raw state bytes from the watch; their meanings are not decoded.
+            Types are the raw state bytes from the watch. Their meanings are not decoded.
           </AppText>
         </>
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { gap: spacing.sm },
+  headline: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  stageBar: { flexDirection: 'row', height: 14, gap: 2, borderRadius: radius.pill, overflow: 'hidden', marginVertical: spacing.xs },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 28 },
+  swatch: { width: 12, height: 12, borderRadius: 6 },
+  legendLabel: { flex: 1 },
+  legendValue: { minWidth: 72, textAlign: 'right' },
+  tabular: { fontVariant: ['tabular-nums'] },
+});

@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
-import { listSleepSince, listStepSamplesSince } from '@/db/queries';
+import { getLatestHeartRate, listSleepSince, listStepSamplesSince } from '@/db/queries';
 import { errorMessage } from '@/format';
 import { startOfLocalDay } from '@/features/today/stats';
 import type { SleepSegment, StepSample } from '@/wear';
@@ -16,6 +16,8 @@ export interface TodayData {
   /** Samples from `dayStart` onwards, oldest first. */
   samples: StepSample[];
   sleep: SleepSegment[];
+  /** Newest stored heart-rate reading of any day; the hero falls back to it when today has none. */
+  latestHeart: { bpm: number; timestamp: number } | null;
 }
 
 interface TodayState {
@@ -36,9 +38,10 @@ export function useTodayData(dataVersion: number): TodayState {
       Promise.all([
         listStepSamplesSince(db, dayStart),
         listSleepSince(db, nowSec - SLEEP_LOOKBACK_SEC),
+        getLatestHeartRate(db),
       ]).then(
-        ([samples, sleep]) => {
-          if (!cancelled) setState({ data: { dayStart, samples, sleep }, error: null });
+        ([samples, sleep, latestHeart]) => {
+          if (!cancelled) setState({ data: { dayStart, samples, sleep, latestHeart }, error: null });
         },
         (e: unknown) => {
           if (!cancelled) setState({ data: null, error: errorMessage(e) });
