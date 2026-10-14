@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -18,18 +18,28 @@ export default function LogScreen() {
   const palette = usePalette();
   const buffer = useLogBuffer();
   const [filter, setFilter] = useState<Filter>('all');
-  const [copied, setCopied] = useState(false);
+  const [query, setQuery] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
 
   // Newest first.
-  const rows = useMemo(
-    () => buffer.filter((e) => filter === 'all' || e.event.direction === filter).reverse(),
-    [buffer, filter],
-  );
+  // Newest first. Search matches the formatted line (message, ids and hex), case-insensitive.
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return buffer
+      .filter((e) => filter === 'all' || e.event.direction === filter)
+      .filter((e) => needle === '' || formatLogLine(e.event).toLowerCase().includes(needle))
+      .reverse();
+  }, [buffer, filter, query]);
 
-  async function copyBuffer() {
-    await Clipboard.setStringAsync(buffer.map((e) => formatLogLine(e.event)).join('\n'));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  async function copy(text: string, what: string) {
+    await Clipboard.setStringAsync(text);
+    setCopied(what);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  // Copies what is shown, oldest first, so a search for "TruSleep" copies only those lines.
+  function copyShown() {
+    void copy(rows.slice().reverse().map((e) => formatLogLine(e.event)).join('\n'), 'shown');
   }
 
   return (
@@ -60,25 +70,42 @@ export default function LogScreen() {
             );
           })}
         </View>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search, e.g. TruSleep"
+          placeholderTextColor={palette.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search log"
+          style={[styles.search, { color: palette.text, borderColor: palette.border }]}
+        />
         <Button
-          label={copied ? 'Copied' : 'Copy all'}
-          disabled={buffer.length === 0}
-          onPress={() => void copyBuffer()}
+          label={copied === 'shown' ? 'Copied' : `Copy ${rows.length} shown`}
+          disabled={rows.length === 0}
+          onPress={copyShown}
         />
       </View>
       <AppText variant="caption" muted style={styles.count}>
-        {rows.length} shown, {buffer.length} of {LOG_CAPACITY} buffered
+        {rows.length} shown, {buffer.length} of {LOG_CAPACITY} buffered. Long-press a line to copy it.{copied === 'line' ? ' Line copied.' : ''}
       </AppText>
       <FlatList
         data={rows}
         keyExtractor={(e) => String(e.id)}
-        renderItem={({ item }) => <LogRow event={item.event} />}
+        renderItem={({ item }) => (
+          <Pressable onLongPress={() => void copy(formatLogLine(item.event), 'line')} accessibilityHint="Long-press to copy this line">
+            <LogRow event={item.event} />
+          </Pressable>
+        )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <AppText variant="caption" muted>
             {buffer.length === 0
               ? 'No events yet. Connect a watch on the Device tab and its traffic will appear here.'
-              : `No ${filter} events in the buffer.`}
+              : query.trim() !== ''
+                ? `No events match "${query.trim()}".`
+                : `No ${filter} events in the buffer.`}
           </AppText>
         }
       />
@@ -96,6 +123,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderRadius: radius.md,
+  },
+  search: {
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    fontSize: 15,
   },
   count: { paddingHorizontal: space.lg },
   list: { padding: space.lg, paddingTop: space.sm },
