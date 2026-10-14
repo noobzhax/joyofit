@@ -77,6 +77,10 @@ internal class WearRuntime private constructor(context: Context) {
     }
 
     override fun log(direction: LogDirection, serviceId: Int?, commandId: Int?, hex: String?, message: String) {
+      // Mirrored to logcat (tag WatchFit) so the log can be read over adb, even with the UI closed.
+      val ids = if (serviceId != null) " svc=%02x cmd=%02x".format(serviceId, commandId ?: 0) else ""
+      val line = "${direction.wire.uppercase()}$ids $message" + if (hex != null) " $hex" else ""
+      if (direction == LogDirection.ERROR) android.util.Log.e("WatchFit", line) else android.util.Log.i("WatchFit", line)
       listeners.forEach { it.log(direction, serviceId, commandId, hex, message) }
     }
   }
