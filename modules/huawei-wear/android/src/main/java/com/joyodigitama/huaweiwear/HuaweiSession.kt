@@ -91,11 +91,14 @@ internal class HuaweiSession(
    * Sends [packet] without waiting for an answer, for commands whose reply (if any) is picked up by
    * a [subscribe]r, e.g. GB's GetFileBlockRequest, which only starts the watch pushing 0x05 data.
    */
-  suspend fun send(packet: HuaweiPacket, label: String) {
+  suspend fun send(packet: HuaweiPacket, label: String, logFrames: Boolean = true) {
     val frames = serialize(packet, label)
     synchronized(lock) { closedBy?.let { throw it } }
-    transmit(packet, frames, label)
+    transmit(packet, frames, label, logFrames)
   }
+
+  /** Why the session was closed, or null while it is open. */
+  val closeCause: WearException? get() = synchronized(lock) { closedBy }
 
   /**
    * Routes complete packets that no pending [request] waits for to [handler] until the returned
@@ -119,19 +122,31 @@ internal class HuaweiSession(
     throw WearException(ErrorCodes.PROTOCOL, "$label: request could not be created: ${e.message}", e)
   }
 
-  private suspend fun transmit(packet: HuaweiPacket, frames: List<ByteArray>, label: String) {
+  private suspend fun transmit(packet: HuaweiPacket, frames: List<ByteArray>, label: String, logFrames: Boolean = true) {
     try {
       val mtu = params.mtu
       val wire = ArrayList<ByteArray>(frames.size)
       for ((index, f) in frames.withIndex()) {
+        // Bulk data (file upload chunks) is logged as one summary line, not as hex per frame.
+        if (logFrames) {
+          events.log(
+            LogDirection.TX,
+            packet.serviceId.toInt() and 0xFF,
+            packet.commandId.toInt() and 0xFF,
+            f.toHex(),
+            if (frames.size > 1) "$label (frame ${index + 1}/${frames.size})" else label,
+          )
+        }
+        splitToMtu(f, mtu, wire)
+      }
+      if (!logFrames) {
         events.log(
           LogDirection.TX,
           packet.serviceId.toInt() and 0xFF,
           packet.commandId.toInt() and 0xFF,
-          f.toHex(),
-          if (frames.size > 1) "$label (frame ${index + 1}/${frames.size})" else label,
+          null,
+          "$label (${frames.size} frames, ${frames.sumOf { it.size }} bytes, hex not logged)",
         )
-        splitToMtu(f, mtu, wire)
       }
       sink.write(wire)
     } catch (e: IOException) {

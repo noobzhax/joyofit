@@ -1,3 +1,5 @@
+import type { UploadProgressEvent, UploadResultEvent } from './HuaweiWearWatchface.types';
+
 export type LinkState =
   | 'disconnected'
   | 'connecting'
@@ -231,5 +233,7 @@ export type HuaweiWearModuleEvents = {
   onStateChange: (event: StateEvent) => void;
   onBattery: (event: BatteryEvent) => void;
   onLog: (event: LogEvent) => void;
+  onUploadProgress: (event: UploadProgressEvent) => void;
+  onUploadResult: (event: UploadResultEvent) => void;
   onSyncComplete: (event: SyncCompleteEvent) => void;
 };

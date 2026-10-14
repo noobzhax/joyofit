@@ -54,6 +54,14 @@ class HuaweiWearModule : Module() {
       )
     }
 
+    override fun uploadProgress(bytes: Int, total: Int) {
+      emit("onUploadProgress", mapOf("bytes" to bytes, "total" to total))
+    }
+
+    override fun uploadResult(ok: Boolean, fileName: String, code: Int?, message: String) {
+      emit("onUploadResult", mapOf("ok" to ok, "fileName" to fileName, "code" to code, "message" to message))
+    }
+
     private fun emit(name: String, payload: Map<String, Any?>) {
       if (destroyed) return
       try {
@@ -83,7 +91,7 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog", "onSyncComplete")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult")
 
     OnCreate {
       val runtime = runtime()
@@ -175,6 +183,9 @@ class HuaweiWearModule : Module() {
 
     // Weather: settings, status, refresh (WeatherModuleApi.kt).
     weatherApi { runtime() }
+
+    // Watch faces: list, install a .hwt, set active, delete (WatchfaceModuleApi.kt).
+    watchfaceApi { runtime() }
 
     OnDestroy {
       destroyed = true

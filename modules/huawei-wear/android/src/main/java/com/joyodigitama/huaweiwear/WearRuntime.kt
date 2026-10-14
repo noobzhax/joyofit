@@ -86,6 +86,14 @@ internal class WearRuntime private constructor(context: Context) {
       if (direction == LogDirection.ERROR) android.util.Log.e("JoyoFit", line) else android.util.Log.i("JoyoFit", line)
       listeners.forEach { it.log(direction, serviceId, commandId, hex, message) }
     }
+
+    override fun uploadProgress(bytes: Int, total: Int) {
+      listeners.forEach { it.uploadProgress(bytes, total) }
+    }
+
+    override fun uploadResult(ok: Boolean, fileName: String, code: Int?, message: String) {
+      listeners.forEach { it.uploadResult(ok, fileName, code, message) }
+    }
   }
 
   /** Same fan-out the link reports through; background code logs here so the Log tab shows it. */
@@ -97,6 +105,7 @@ internal class WearRuntime private constructor(context: Context) {
   val healthConnect = HealthConnectExporter(appContext, syncStore, events, scope)
   val weatherSettings = WeatherSettings(appContext)
   val weather = WeatherController(appContext, weatherSettings, link, events, scope)
+  val watchfaces = WatchfaceController(appContext, link, events)
 
   fun addListener(listener: WearEvents) {
     listeners.add(listener)

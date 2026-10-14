@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Suspense } from 'react';
 
 import { migrate } from '@/db/migrations';
+import { CloudProvider } from '@/state/CloudProvider';
 import { WatchProvider } from '@/state/WatchProvider';
 import { usePalette } from '@/theme';
 
@@ -15,6 +16,7 @@ export default function RootLayout() {
     <Suspense fallback={null}>
       <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
         <WatchProvider>
+          <CloudProvider>
           <StatusBar style="auto" />
           <Tabs
             screenOptions={{
@@ -36,7 +38,9 @@ export default function RootLayout() {
             <Tabs.Screen name="log" options={{ title: 'Log' }} />
             {/* Reached from Settings; not a tab. */}
             <Tabs.Screen name="alarms" options={{ title: 'Alarms', href: null }} />
+            <Tabs.Screen name="watchfaces" options={{ title: 'Watch faces', href: null }} />
           </Tabs>
+          </CloudProvider>
         </WatchProvider>
       </SQLiteProvider>
     </Suspense>

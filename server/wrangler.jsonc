@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "joyofit-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    // JoyoRogo's better-auth origin. Sessions are verified against `${JOYOROGO_AUTH_URL}/api/auth/get-session`.
+    "JOYOROGO_AUTH_URL": "https://api.joyorogo.com",
+    // Largest accepted POST /v1/imports body, in bytes (100 MiB).
+    "MAX_IMPORT_BYTES": "104857600"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "joyofit",
+      // PLACEHOLDER: replace with the id printed by `wrangler d1 create joyofit`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMPORTS",
+      // PLACEHOLDER: create it with `wrangler r2 bucket create joyofit-imports`, or rename it here.
+      "bucket_name": "joyofit-imports"
+    }
+  ]
+  // Optional, same-account only: call JoyoRogo through a service binding instead of HTTPS.
+  // Replace the service with JoyoRogo's deployed Worker name, then uncomment. See README.md.
+  // "services": [{ "binding": "AUTH_SERVICE", "service": "REPLACE_WITH_JOYOROGO_WORKER_NAME" }]
+}

@@ -30,7 +30,13 @@
             "minSdkVersion": 29
           }
         }
-      ]
-    ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "joyorogoUrl": "https://api.joyorogo.com",
+      "cloudUrl": ""
+    }
   }
 }

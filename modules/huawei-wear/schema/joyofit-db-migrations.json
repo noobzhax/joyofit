@@ -11,5 +11,25 @@
     "CREATE TABLE workouts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, workout_number INTEGER NOT NULL, start INTEGER NOT NULL UNIQUE, end INTEGER NOT NULL, sport_type INTEGER NOT NULL, sport_name TEXT NOT NULL, duration INTEGER NOT NULL, distance INTEGER NOT NULL, calories INTEGER NOT NULL, avg_hr INTEGER, max_hr INTEGER, steps INTEGER NOT NULL, summary_json TEXT NOT NULL, complete INTEGER NOT NULL DEFAULT 1)",
     "CREATE TABLE workout_points (workout_id INTEGER NOT NULL, ts INTEGER NOT NULL, lat REAL, lon REAL, alt REAL, hr INTEGER)",
     "CREATE INDEX workout_points_by_workout ON workout_points (workout_id, ts)"
+  ],
+  [
+    "ALTER TABLE step_samples ADD COLUMN rev INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sleep_segments ADD COLUMN rev INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE workouts ADD COLUMN rev INTEGER NOT NULL DEFAULT 0",
+    "UPDATE step_samples SET rev = rowid",
+    "UPDATE sleep_segments SET rev = rowid",
+    "UPDATE workouts SET rev = id",
+    "CREATE TABLE cloud_cursor (tbl TEXT PRIMARY KEY NOT NULL, seq INTEGER NOT NULL, uploaded INTEGER NOT NULL DEFAULT 0)",
+    "INSERT INTO cloud_cursor (tbl, seq) VALUES ('step_samples', (SELECT COALESCE(MAX(rev), 0) FROM step_samples)), ('sleep_segments', (SELECT COALESCE(MAX(rev), 0) FROM sleep_segments)), ('workouts', (SELECT COALESCE(MAX(rev), 0) FROM workouts))",
+    "CREATE TABLE cloud_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)",
+    "CREATE INDEX step_samples_by_rev ON step_samples (rev)",
+    "CREATE INDEX sleep_segments_by_rev ON sleep_segments (rev)",
+    "CREATE INDEX workouts_by_rev ON workouts (rev)",
+    "CREATE TRIGGER step_samples_rev_insert AFTER INSERT ON step_samples BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'step_samples'; UPDATE step_samples SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'step_samples') WHERE rowid = NEW.rowid; END",
+    "CREATE TRIGGER step_samples_rev_update AFTER UPDATE ON step_samples WHEN NEW.rev = OLD.rev BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'step_samples'; UPDATE step_samples SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'step_samples') WHERE rowid = NEW.rowid; END",
+    "CREATE TRIGGER sleep_segments_rev_insert AFTER INSERT ON sleep_segments BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'sleep_segments'; UPDATE sleep_segments SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'sleep_segments') WHERE rowid = NEW.rowid; END",
+    "CREATE TRIGGER sleep_segments_rev_update AFTER UPDATE ON sleep_segments WHEN NEW.rev = OLD.rev BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'sleep_segments'; UPDATE sleep_segments SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'sleep_segments') WHERE rowid = NEW.rowid; END",
+    "CREATE TRIGGER workouts_rev_insert AFTER INSERT ON workouts BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'workouts'; UPDATE workouts SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'workouts') WHERE rowid = NEW.rowid; END",
+    "CREATE TRIGGER workouts_rev_update AFTER UPDATE ON workouts WHEN NEW.rev = OLD.rev BEGIN UPDATE cloud_cursor SET seq = seq + 1 WHERE tbl = 'workouts'; UPDATE workouts SET rev = (SELECT seq FROM cloud_cursor WHERE tbl = 'workouts') WHERE rowid = NEW.rowid; END"
   ]
 ]

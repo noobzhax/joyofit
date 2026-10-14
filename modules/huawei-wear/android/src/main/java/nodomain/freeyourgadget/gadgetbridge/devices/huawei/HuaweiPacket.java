@@ -18,6 +18,7 @@
 // Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() also dispatch the Weather service (support, start, forecast).
 // Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the Workout service (0x17).
 // Modified for watch-fit (AGPL-3.0-or-later): parse()/parseOutgoing() dispatch limited to the ported packet classes (DeviceConfig, FitnessData, FileDownloadService0A/2C, Notifications constraints/capabilities); other packet classes not ported.
+// Modified for watch-fit (AGPL-3.0-or-later): parse() also dispatches the FileUpload (0x28) and Watchface (0x27) services; WatchfaceOperation (0x27/0x03) is parsed too (GB leaves it generic).
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei;
 
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.HUAWEI_MAGIC;
@@ -44,6 +45,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DataSync;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FindPhone;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Workout;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Weather;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FileUpload;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Watchface;
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 public class HuaweiPacket {
@@ -607,6 +610,40 @@ public class HuaweiPacket {
                         return new Workout.WorkoutCapability.Response(paramsProvider).fromPacket(this);
                     case Workout.WorkoutSections.id:
                         return new Workout.WorkoutSections.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case FileUpload.id:
+                switch (this.commandId) {
+                    case FileUpload.FileInfoSend.id:
+                        return new FileUpload.FileInfoSend.Response(paramsProvider).fromPacket(this);
+                    case FileUpload.FileHashSend.id:
+                        return new FileUpload.FileHashSend.Response(paramsProvider).fromPacket(this);
+                    case FileUpload.FileUploadConsultAck.id:
+                        return new FileUpload.FileUploadConsultAck.Response(paramsProvider).fromPacket(this);
+                    case FileUpload.FileNextChunkParams.id:
+                        return new FileUpload.FileNextChunkParams(paramsProvider).fromPacket(this);
+                    case FileUpload.FileUploadResult.id:
+                        return new FileUpload.FileUploadResult.Response(paramsProvider).fromPacket(this);
+                    case FileUpload.FileUploadDeviceResponse.id:
+                        return new FileUpload.FileUploadDeviceResponse.Response(paramsProvider).fromPacket(this);
+                    default:
+                        this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
+                        return this;
+                }
+            case Watchface.id:
+                switch (this.commandId) {
+                    case Watchface.WatchfaceParams.id:
+                        return new Watchface.WatchfaceParams.Response(paramsProvider).fromPacket(this);
+                    case Watchface.DeviceWatchInfo.id:
+                        return new Watchface.DeviceWatchInfo.Response(paramsProvider).fromPacket(this);
+                    case Watchface.WatchfaceOperation.id:
+                        return new Watchface.WatchfaceOperation.Response(paramsProvider).fromPacket(this);
+                    case Watchface.WatchfaceConfirm.id:
+                        return new Watchface.WatchfaceConfirm.Response(paramsProvider).fromPacket(this);
+                    case Watchface.WatchfaceNameInfo.id:
+                        return new Watchface.WatchfaceNameInfo.Response(paramsProvider).fromPacket(this);
                     default:
                         this.isEncrypted = this.attemptDecrypt(); // Helps with debugging
                         return this;

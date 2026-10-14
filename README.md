@@ -1,8 +1,9 @@
 # JoyoFit
 
 JoyoFit is an Android companion app for the **Huawei Watch Fit 4 / Fit 4 Pro**. It has no Huawei
-Health install, no account and no cloud: data goes from the watch to the phone into a local SQLite
-database and stays there.
+Health install and no account needed: data goes from the watch to the phone into a local SQLite
+database. Optionally, signing in with a JoyoRogo account uploads it to your own Cloudflare backend
+(see [Cloud sync](#cloud-sync)); nothing leaves the phone before you do.
 
 The app has two parts:
 
@@ -54,9 +55,10 @@ flowchart LR
 | Find my phone (watch → phone): loud ringtone on the alarm volume, vibration, notification with Stop; works from the background service | implemented, ported from GB; unverified on the Fit 4 |
 | Incoming calls on the watch (caller name or number), accept / reject from the watch | implemented, ported from GB; unverified on the Fit 4 |
 | Alarms: read the five event alarms and the smart alarm, add, edit, delete, enable, push | implemented, ported from GB; unverified on the Fit 4 |
+| Watch faces: list with the active one, set active, delete, install a `.hwt` from Huawei Theme Studio Pro with upload progress | implemented, ported from GB; unverified on the Fit 4 (whether it accepts unsigned faces is not known) |
 
 The protocol layer is covered by the Gadgetbridge packet, TLV and crypto tests plus our own
-session reassembly tests, 120 JVM tests in total. **It has not yet been run against a real Fit 4.**
+session reassembly tests and fake-watch tests for downloads and watch face upload, 222 JVM tests in total. **It has not yet been run against a real Fit 4.**
 The first connect is the real test. When you do it, save the Log tab (Copy) and add the
 link parameters to `protocol/README.md` → Observations.
 
@@ -131,6 +133,25 @@ when the watch connects, whenever the watch asks for it (opening its weather app
   keeps the last copy on the phone, and every change pushes the whole list and shows what the watch reports
   back. Five event alarms (name, time, weekdays) and, if the watch has one, the smart alarm.
 
+### Watch faces
+
+**Settings** (or the **Device** tab, once the watch is connected) → *Watch faces*. The screen reads the watch's face list when it
+opens: name, id and version, an *(active)* marker, and *preinstalled* for the factory faces. *Set active* switches the watch to
+that face, *Delete* removes it (not offered for preinstalled faces). After each of these the app reads the list again and
+reports an error if the watch did not do what it was asked.
+
+*Install from file* opens Android's file picker. Pick a `.hwt` exported from **Huawei Theme Studio Pro**. The Watch Fit 4 and
+Fit 4 Pro screen is 480 x 408 px (Theme Studio Pro calls it 408 x 480; GB's theme version `HWHD13`). The app checks the package's
+theme version against the screen size the watch reports and refuses a face made for another screen before sending anything.
+The upload shows a progress bar; the watch pulls the data in chunks of its own choosing.
+
+- **Unsigned faces.** Whether the Fit 4 accepts a face that Huawei did not sign is not known yet. If the watch refuses, the screen
+  and the Log tab show the exact status code it returned (`Upload: rejected by the watch at … status code N`). If it takes the
+  upload but the face never shows up in its list, the result says so ("the watch does not list the new face"). Please note either
+  outcome, with the Log lines, in `protocol/README.md` → Observations.
+- Only one operation runs on the link at a time: a sync that starts during an upload waits for it.
+- GB does not check for the `0x28` upload service in the watch's service list, and neither do we; the Fit 4 does not list it.
+
 ## Permissions
 
 | Permission | Why |
@@ -145,11 +166,11 @@ when the watch connects, whenever the watch asks for it (opening its weather app
 | `READ_PHONE_STATE`, `READ_CALL_LOG`, `READ_CONTACTS` | show incoming calls on the watch: call state, the caller's number, the contact name (runtime prompt from Settings; only the first is required) |
 | `ANSWER_PHONE_CALLS` | accept or reject a call from the watch (runtime prompt from Settings) |
 | `android.permission.health.WRITE_STEPS`, `WRITE_DISTANCE`, `WRITE_ACTIVE_CALORIES_BURNED`, `WRITE_HEART_RATE`, `WRITE_RESTING_HEART_RATE`, `WRITE_OXYGEN_SATURATION`, `WRITE_SLEEP`, `WRITE_EXERCISE` | write the watch data to Health Connect (asked from Settings through Health Connect's own dialog; write only, no read) |
-| `INTERNET` | fetch the weather and search cities from Open-Meteo (nothing else uses it) |
+| `INTERNET` | fetch the weather and search cities from Open-Meteo; sign in with JoyoRogo and upload to the JoyoFit cloud server (Settings → Cloud) |
 | `ACCESS_COARSE_LOCATION` | weather for the phone's position (runtime prompt from Settings → Weather; not needed in city mode) |
 
 There is no `QUERY_ALL_PACKAGES`: the app chooser lists launcher apps through a `<queries>` entry.
-The only internet use is weather (Open-Meteo forecast and city search), and only while weather is switched on.
+Internet use: weather (Open-Meteo forecast and city search, only while weather is switched on) and, after you sign in under Settings → Cloud, JoyoRogo's auth server and your JoyoFit cloud server.
 
 ## Health Connect / JoyoRogo
 
@@ -191,6 +212,48 @@ model the watch reported). Switching the export off keeps what was written; dele
 Connect. Types you do not allow are skipped, and the last error and counts are shown in Settings.
 The export needs Health Connect: built into Android 14+, a Play Store app on Android 10 to 13.
 
+## Cloud sync
+
+Settings → **Cloud** signs in with your **JoyoRogo account** and uploads the local database to a
+separate Cloudflare Worker you deploy yourself ([`server/`](server/README.md): Hono, D1, R2). Upload only: the
+app does not read from the cloud yet, and the Huawei-export importer is not written (the server already
+has `POST /v1/imports`, which stores a raw file in R2 and records an `imports` row for it).
+
+```mermaid
+flowchart LR
+  APP[JoyoFit app<br/>src/cloud · CloudProvider] -- "sign in (better-auth + expo)" --> JR[JoyoRogo api.joyorogo.com<br/>/api/auth]
+  APP -- "POST /v1/sync · Cookie: session" --> W[JoyoFit Worker<br/>server/]
+  W -- "GET /api/auth/get-session" --> JR
+  W --> D1[(D1: step_samples, sleep_segments,<br/>workouts, workout_points, device)]
+  W --> R2[(R2: raw imports)]
+```
+
+- **Sign-in.** `@better-auth/expo` against JoyoRogo's server (default `https://api.joyorogo.com`, the URL JoyoRogo's
+  own app uses; override with `EXPO_PUBLIC_JOYOROGO_URL` or `expo.extra.joyorogoUrl`). It opens JoyoRogo's Google
+  sign-in in the browser and returns to the `joyofit://` scheme. The session cookies live in `expo-secure-store`
+  (Android Keystore) and are read from JS only: **native code, including the background service, cannot use
+  them, so uploads run from the JS app, not the service.** JoyoRogo must trust the `joyofit://` scheme, see
+  [`server/JOYOROGO_PATCH.md`](server/JOYOROGO_PATCH.md).
+- **Server URL.** Deploy `server/` and build the app with `EXPO_PUBLIC_JOYOFIT_CLOUD_URL=https://…` (or
+  `expo.extra.cloudUrl` in `app.json`). Without it the Cloud section says so and nothing is uploaded.
+- **What is uploaded, and when.** Step samples, sleep segments, workouts with their points, and the device
+  row. An upload runs 2 s after every sync the app sees, when the app returns to the foreground, and on
+  **Sync now**; rows the background service stored while the app was closed go up at the next of those.
+  Settings shows the account, the last cloud sync and the rows still waiting.
+- **Incremental by cursor.** Migration 4 adds a `rev` column to `step_samples`, `sleep_segments` and `workouts`
+  and triggers that stamp every insert or update (from JS or native) with the table's next `cloud_cursor.seq`.
+  `cloud_cursor.uploaded` is the last `rev` the server accepted; an upload sends `rev > uploaded` in batches
+  (2 000 samples, 500 sleep segments, up to 5 workouts / 15 000 points) and moves the cursor only after each
+  batch succeeded. `cloud_state` keeps the account, the last sync time and the last error. Signing in as another
+  JoyoRogo account resets the cursors so that account gets everything.
+- **Retries.** Network errors, timeouts, 408/425/429 and 5xx are retried 3 times with backoff (1 s, 2 s, 4 s,
+  or the server's `Retry-After`); a failed run leaves the cursors where they were. A row the server rejects as
+  invalid (400) is isolated by halving the batch and skipped so it cannot block the rest.
+- **Idempotent.** The server upserts on `(user, key)` and ignores identical rows, so replays and the 1 h
+  overlap of each watch sync cost nothing. A workout is replaced as a whole with its points; a track over
+  30 000 points is thinned evenly before upload.
+- **Not synced:** deletions, the profile, alarms and settings.
+
 ## Where data lives
 
 `joyofit.db` in `<app files>/SQLite` is shared by the screens (expo-sqlite, read) and the native
@@ -226,10 +289,11 @@ Keep `JAVA_HOME` pointed at JDK 17 and `ANDROID_HOME` at the SDK.
 ## Layout
 
 ```
-src/app/                  expo-router tabs: index (Device), today, workouts (list + detail stack), settings, log
+src/app/                  expo-router tabs: index (Device), today, workouts (list + detail stack), settings, log; alarms and watchfaces reached from Settings
 src/state/                WatchProvider (link state, events), log ring buffer
-src/db/                   expo-sqlite migrations (from the shared JSON) + read queries
-src/features/             screen pieces (device, today, settings, log)
+src/db/                   expo-sqlite migrations (from the shared JSON) + read queries + cloud cursors (cloud.ts)
+src/cloud/                JoyoRogo sign-in (better-auth client), cloud API client with retries, incremental uploader
+src/features/             screen pieces (device, today, settings, log, alarms, watchfaces)
 modules/huawei-wear/
   src/                    TS contract (HuaweiWear.types.ts, HuaweiWearModule.ts)
   schema/                 joyofit-db-migrations.json, read by JS and by native
@@ -238,6 +302,7 @@ modules/huawei-wear/
     nodomain/freeyourgadget/gadgetbridge/   Gadgetbridge Java, upstream package names kept for diffing
   android/src/test/java/                    Gadgetbridge tests + HuaweiSessionTest
 protocol/README.md        protocol reference + observations
+server/                   JoyoFit cloud Worker (Hono, D1, R2): see server/README.md
 ```
 
 ## Updating from Gadgetbridge

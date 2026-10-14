@@ -17,6 +17,7 @@ import type {
   WeatherStatus,
 } from './HuaweiWear.types';
 import type { PhoneFeatures, WatchAlarms, WatchAlarmsUpdate } from './HuaweiWearPhone.types';
+import type { WatchfaceInstallResult, WatchfaceList } from './HuaweiWearWatchface.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   /** Bonded classic-Bluetooth devices. Requires BLUETOOTH_CONNECT on Android 12+. */
@@ -133,6 +134,26 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   setWeatherCity(query: string): Promise<WeatherPlace>;
   /** Fetches and pushes now. Rejects with what went wrong (no watch, no location, no network...). */
   refreshWeather(): Promise<WeatherStatus>;
+
+  /**
+   * The watch's watch faces (active marker, factory flag, name), with the screen size the watch
+   * reported. Needs a connected watch (ERR_NOT_CONNECTED), and one that lists the watch face
+   * service (ERR_UNSUPPORTED).
+   */
+  listWatchfaces(): Promise<WatchfaceList>;
+  /**
+   * Uploads a Huawei Theme Studio Pro `.hwt` package from a `file://` or `content://` URI (the
+   * document picker's), as file type 1 with a random `<nine digits>_1.0.0` name, and reads the watch's
+   * list afterwards. Emits `onUploadProgress` while the watch pulls the data and `onUploadResult` at
+   * the end. Rejects with ERR_INVALID_ARGUMENT for a file that is no watch face or is made for another
+   * screen, ERR_UPLOAD_REJECTED with the exact status code when the watch refuses, ERR_TIMEOUT when it
+   * goes silent. A resolved result with `listed: false` means the watch took the upload but dropped the face.
+   */
+  installWatchface(uri: string): Promise<WatchfaceInstallResult>;
+  /** Makes the face with this id active; resolves with the list read afterwards, rejects if the watch did not switch. */
+  setActiveWatchface(id: string): Promise<WatchfaceList>;
+  /** Deletes the face with this id; resolves with the list read afterwards, rejects if the face is still there. */
+  deleteWatchface(id: string): Promise<WatchfaceList>;
 }
 
 export default requireNativeModule<HuaweiWearModule>('HuaweiWear');

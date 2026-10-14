@@ -9,6 +9,7 @@ import { FindWatchSection } from '@/features/device/FindWatchSection';
 import { LinkStatus } from '@/features/device/LinkStatus';
 import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
 import { useBondedDevices } from '@/features/device/useBondedDevices';
+import { WatchfacesSection } from '@/features/settings/WatchfacesSection';
 import { useBackgroundStatus } from '@/features/settings/useBackgroundStatus';
 import { formatDateTime } from '@/format';
 import { useWatch } from '@/state/WatchProvider';
@@ -118,6 +119,7 @@ export default function DeviceScreen() {
       ) : null}
 
       {device ? <FindWatchSection /> : null}
+      {device ? <WatchfacesSection /> : null}
     </Screen>
   );
 }

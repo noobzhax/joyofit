@@ -69,6 +69,8 @@ never found a usable channel.
 | `2C` / `0A` | as above | GPS file | `<n>_gps.bin` for a workout (file type `0x11`; `0A`: init type `02`, FileParameters type `02`) |
 | `0F` Weather | `09` start, `05` unit, `02` support, `06` extended support, `0A` sun/moon support, `01` current, `08` forecast, `07` / `0C` error, `04` device request | weather push | see Weather |
 | `18` GpsAndTime | `07` | current position | sent after the current weather when `18/06` is listed; see Weather |
+| `27` Watchface | `01` params, `02` list, `06` names, `03` operation, `05` confirm (pushed) | watch faces | list, set active, delete, install confirmation; see Watch faces |
+| `28` FileUpload | `02` info, `03` hash, `04` ack, `05` chunk request (pushed), `06` chunk, `07` result, `08` error (pushed) | watch face upload | the watch drives, the phone answers; see Watch faces |
 
 ## Notifications and profile
 
@@ -185,6 +187,51 @@ thunderstorm. Icon byte values are in `Weather.java` (`iconToByte`, unknown = `0
 - **Alarms** (service `08`): event alarms use watch index 1 to 5 (the smart alarm is separate, index 1 of `08/02`). A
   slot missing from the list is not an alarm, and a set replaces the whole event list. The app sends the list, then
   reads it back, because a missing acknowledgment is otherwise invisible.
+
+## Watch faces
+
+Port of GB's `HuaweiWatchfaceManager`, `HuaweiUploadManager`, `HuaweiFwHelper.parseAsWatchFace`, the watch face branch of
+`HuaweiInstallHandler` and the `0x27` / `0x28` packet classes (`Watchface.java`, `FileUpload.java`). Everything on the
+watch face list is TLV-encrypted like the other services.
+
+| Service | Cmd | Name | Content |
+|---|---|---|---|
+| `27` Watchface | `01` | WatchfaceParams | request tags `01..05, 0e, 0f` empty; reply `01` max version, `02` width, `03` height, `04` supported file type, `05` sort, `06` other versions. Gated by SupportedCommands `27/01` (`supportsWatchfaceParams`); we log `width` and `height` |
+| `27` | `02` | DeviceWatchInfo | request `06 = 3`; reply `81{82{03 id, 04 version, 05 type bits, 07 expanded type}…}`. Type bits: 0 current, 1 factory, 3 editable, 4 video, 5 photo, 6 trial, 7 kaleidoscope |
+| `27` | `06` | WatchfaceNameInfo | request `01 = 1, 82{83{04 id}…}`; reply `82{83{04 id, 05 name}…}` |
+| `27` | `03` | WatchfaceOperation | `01` id, `02` version, `03` operation: 1 = make active, 2 = delete. GB does not parse the reply; we read an optional `7f` status and log it |
+| `27` | `05` | WatchfaceConfirm | watch → phone after an upload: `01` id, `02` version, `03` report type. We answer `01`, `02`, `7f = 0x186A0`; report type 2 makes GB send operation 1 (activate) for the new face |
+| `28` FileUpload | `02` | FileInfoSend | `01` name `<id>_<version>`, `02` size, `03` file type (1 watch face, 2 music, 3 background image, 6 app, 7 firmware), watch faces also `05` id and `06` version. Reply `7f`: `100000` = accepted |
+| `28` | `03` | FileHashSend | watch asks (`01` file id), phone answers `01` file id, `03` SHA-256 of the data |
+| `28` | `04` | FileUploadConsultAck | watch sends `01` file id, `02` protocol, `03` app wait time, `04` bitmap enable, `05` unit size, `06` max apply data size, `07` interval, `08` received size, optional `09` no-encrypt; phone answers `7f = 0x186A0`, `01` file id, and `09 = 1` when the watch said no-encrypt |
+| `28` | `05` | FileNextChunkParams | watch asks for data: `02` bytes uploaded, `03` next chunk size |
+| `28` | `06` | FileNextChunkSend | phone → watch, not TLV: per `unit size` packet `fileId, index, position (u32 BE), data`, the whole payload wrapped in the encryption TLV unless the watch said no-encrypt; sliced like any frame |
+| `28` | `07` | FileUploadResult | watch announces the end (`02` status, not interpreted by GB); phone answers `7f = 0x186A0`, `01` file id |
+| `28` | `08` | FileUploadDeviceResponse | watch → phone error report: `01` file id, `7f` code; GB ends the upload when the id is the current one |
+
+**Install flow** (`WatchfaceOps.install`, `FileUploader`): the phone sends `28/02`; then the watch drives, and every packet it
+sends reaches the uploader through `HuaweiSession.subscribe`: `28/02` result, `28/03` hash request, `28/04` parameters,
+`28/05` chunk requests (answered with `28/06` of exactly the bytes asked for, cut into `unit size` packets; a request past the
+end of the file is clamped), `28/07` result, then `27/05`. Each watch message has to follow within 60 s of the previous one.
+Chunk packets are logged as one summary line, not as hex per frame.
+
+**Package.** A `.hwt` is a zip with `description.xml` (root `HwTheme`, or `HnTheme` for Honor), `preview/cover.jpg` and
+`com.huawei.watchface` (`com.honor.watchface`), itself a zip with `watchface.bin` (older packages: the binary directly). Only the
+`watchface.bin` is uploaded, as file type 1, under the name `<nine random digits>_1.0.0` (GB `getRandomName`). The `screen` of
+`description.xml` is a theme version code; GB's table maps it to `height*width`, and the install is refused when it does not equal
+the watch's `WatchfaceParams` height and width. The table is ported unchanged; a code it does not know is let through and left
+to the watch.
+
+**Screen.** Huawei lists the Watch Fit 4 and Fit 4 Pro with a 1.82 inch AMOLED of 480 x 408 px. In GB's table that is
+`HWHD13` = `480*408` (height 480, width 408); Theme Studio Pro calls the same size "408 x 480". The `WatchfaceParams` width and
+height of the watch are written to the Log tab (`Watchface: WatchfaceParams: width=… height=…`), and the answer is the thing to
+compare this table against.
+
+**Errors.** `28/02` answers other than `100000` and `28/08` reports end the upload with the code the watch sent. GB names three:
+`140004` too many watch faces or music files, `140008` file already exists, `140009` not enough space. Every other code is shown
+and logged as it came. After the transfer the phone reads the watch face list: a face that is not in it afterwards is reported
+as "not listed" (`listed: false`), which is how a face dropped after verification would show. Whether the Fit 4 accepts faces that
+Huawei did not sign is **not known**; see Observations once someone has tried one.
 
 ## Auth decision
 

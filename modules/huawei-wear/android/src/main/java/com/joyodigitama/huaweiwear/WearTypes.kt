@@ -44,6 +44,9 @@ internal object ErrorCodes {
   const val STORAGE = "ERR_STORAGE"
   const val INVALID_ARGUMENT = "ERR_INVALID_ARGUMENT"
   const val UNSUPPORTED = "ERR_UNSUPPORTED"
+
+  /** The watch refused a file upload or a watch face operation; the message carries the exact code it returned. */
+  const val UPLOAD_REJECTED = "ERR_UPLOAD_REJECTED"
 }
 
 /** Every failure surfaced to JS is a [CodedException] with one of [ErrorCodes]. */
@@ -51,6 +54,8 @@ internal class WearException(
   val errorCode: String,
   message: String,
   cause: Throwable? = null,
+  /** The status code the watch returned, for [ErrorCodes.UPLOAD_REJECTED]. */
+  val statusCode: Int? = null,
 ) : CodedException(errorCode, message, cause)
 
 /** Sink for everything the native layer reports; fans out to JS (when running) and the service notification. */
@@ -61,4 +66,10 @@ internal interface WearEvents {
   /** A sync finished and its rows are committed to the database. */
   fun syncComplete(summary: SyncSummary)
   fun log(direction: LogDirection, serviceId: Int?, commandId: Int?, hex: String?, message: String)
+
+  /** File upload progress (`onUploadProgress`): [bytes] acknowledged by the watch of [total]. */
+  fun uploadProgress(bytes: Int, total: Int) = Unit
+
+  /** A watch face install finished (`onUploadResult`); [code] is the watch's status when it gave one. */
+  fun uploadResult(ok: Boolean, fileName: String, code: Int?, message: String) = Unit
 }

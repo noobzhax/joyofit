@@ -25,6 +25,8 @@ internal class LinkHandle(
   val address: String,
   val session: HuaweiSession,
   val notificationState: HuaweiNotificationState,
+  /** Held by syncs, battery reads and watch face operations, which must not interleave on the one session. */
+  val operationLock: Mutex,
 )
 
 /**
@@ -212,7 +214,7 @@ internal class WearLink(
           throw WearException(ErrorCodes.DISCONNECTED, "Disconnected while connecting")
         }
         connection.info = info
-        connection.handle = LinkHandle(address, connection.session, init.notificationState)
+        connection.handle = LinkHandle(address, connection.session, init.notificationState, connection.operationLock)
         state = LinkState.CONNECTED
       }
       rememberWatch(address, name, info)
