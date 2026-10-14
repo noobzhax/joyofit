@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.joyodigitama.huaweiwear.HuaweiSessionTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-14T06:58:48.696Z" hostname="dzul" time="0.132">
+<testsuite name="com.joyodigitama.huaweiwear.HuaweiSessionTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-14T07:09:57.649Z" hostname="dzul" time="0.215">
   <properties/>
-  <testcase name="concatenatedResponsesCompletePendingRequestsInOrder" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.121"/>
-  <testcase name="unsolicitedPacketIsLoggedNotDelivered" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.002"/>
+  <testcase name="concatenatedResponsesCompletePendingRequestsInOrder" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.2"/>
+  <testcase name="unsolicitedPacketIsLoggedNotDelivered" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <testcase name="responseSplitAcrossReadsIsReassembled" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <testcase name="corruptFrameIsDroppedAndNextFrameStillParses" classname="com.joyodigitama.huaweiwear.HuaweiSessionTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>

@@ -136,7 +136,7 @@ internal class WearLink(
       val authMode = HuaweiAuthenticator(connection.session, identity, events).authenticate()
 
       setState(connection, LinkState.INITIALIZING)
-      val init = HuaweiInitializer(connection.session, events).run()
+      val init = HuaweiInitializer(connection.session, events, bondedName(connection.device)).run()
 
       val name = bondedName(connection.device) ?: init.deviceName ?: address
       val info = mapOf(

@@ -5,6 +5,7 @@ package com.joyodigitama.huaweiwear
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiCoordinator.HuaweiDeviceType
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.AccountRelated
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.DeviceConfig
 
 internal class InitResult(
@@ -25,6 +26,8 @@ internal class InitResult(
 internal class HuaweiInitializer(
   private val session: HuaweiSession,
   private val events: WearEvents,
+  /** Android Bluetooth name of the watch; GB sends gbDevice.getName() in SetUpDeviceStatus. */
+  private val bondedName: String?,
 ) {
   private val params get() = session.params
 
@@ -101,6 +104,65 @@ internal class HuaweiInitializer(
       supportedCommands(activated)
     }
 
+    // GetSupportedCommandsRequest -> GetExpandCapabilityRequest, then the order of GB
+    // initializeDynamicServices up to ConnectStatus (account requests are not ported).
+    if (supports(0x01, DeviceConfig.ExpandCapability.id)) {
+      soft("ExpandCapability") {
+        expandCapabilities = session
+          .request(DeviceConfig.ExpandCapability.Request(params), Timeouts.INIT_MS, "ExpandCapability")
+          .expect<DeviceConfig.ExpandCapability.Response>("ExpandCapability")
+          .expandCapabilities
+        events.log(LogDirection.INFO, null, null, null, "ExpandCapability: ${expandCapabilities?.size ?: 0} bytes")
+      }
+    }
+    // SendExtendedAccountRequest (first in GB initializeDynamicServices): no Huawei account, so
+    // GB's default empty account is sent. Watches that judge accounts wait for this after a bind.
+    if (supports(AccountRelated.id.toInt(), 0x05) && supports(AccountRelated.id.toInt(), 0x06)) {
+      soft("ExtendedAccount") {
+        session.request(
+          AccountRelated.SendExtendedAccountToDevice.Request(params, expandCapability(0xac), ""),
+          Timeouts.INIT_MS,
+          "ExtendedAccount",
+        )
+        events.log(LogDirection.INFO, null, null, null, "ExtendedAccount: acknowledged")
+      }
+    }
+    if (supports(0x01, DeviceConfig.SettingRelated.id)) {
+      soft("SettingRelated") {
+        session.request(DeviceConfig.SettingRelated.Request(params), Timeouts.INIT_MS, "SettingRelated")
+      }
+    }
+    if (supports(0x01, DeviceConfig.AcceptAgreement.id)) {
+      soft("AcceptAgreement") {
+        session.request(DeviceConfig.AcceptAgreement.Request(params), Timeouts.INIT_MS, "AcceptAgreement")
+        events.log(LogDirection.INFO, null, null, null, "AcceptAgreement: acknowledged")
+      }
+    }
+    if (expandCapability(182)) {
+      soft("ReverseCapabilities") {
+        session.request(DeviceConfig.ReverseCapabilities.Request(params), Timeouts.INIT_MS, "ReverseCapabilities")
+      }
+    }
+    if (expandCapability(109)) {
+      // SendSetUpDeviceStatusRequest: relationship 1 = main device. GB: "The watch never answers
+      // to this command" (50 ms timeout), so a timeout here is the expected outcome.
+      val name = bondedName ?: deviceName ?: ""
+      try {
+        session.request(DeviceConfig.SetUpDeviceStatusRequest(params, 1, name), SETUP_STATUS_MS, "SetUpDeviceStatus")
+      } catch (e: WearException) {
+        if (e.errorCode != ErrorCodes.TIMEOUT) throw e
+      }
+      events.log(LogDirection.INFO, null, null, null, "SetUpDeviceStatus: sent as main device \"$name\"")
+      soft("WearStatus") {
+        session.request(DeviceConfig.WearStatus.Request(params), Timeouts.INIT_MS, "WearStatus")
+      }
+    }
+    if (supports(0x01, 0x35)) {
+      soft("ConnectStatus") {
+        session.request(DeviceConfig.ConnectStatusRequest(params), Timeouts.INIT_MS, "ConnectStatus")
+      }
+    }
+
     return InitResult(productModel, softwareVersion, hardwareVersion, serialNumber, deviceName, battery)
   }
 
@@ -137,8 +199,27 @@ internal class HuaweiInitializer(
         .request(request, Timeouts.QUERY_MS, "SupportedCommands #$requestNumber")
         .expect<DeviceConfig.SupportedCommands.Response>("SupportedCommands #$requestNumber")
       serviceCount += response.commandsLists.size
+      for (list in response.commandsLists) supportedCommands[list.service] = list.commands
     }
     events.log(LogDirection.INFO, null, null, null, "SupportedCommands: $serviceCount services in $requestNumber request(s)")
+  }
+
+  /** Commands per service from SupportedCommands (GB HuaweiState.commandsPerService). */
+  private val supportedCommands = HashMap<Int, ByteArray>()
+
+  /** GB HuaweiState.supportsCommandForService. */
+  private fun supports(service: Int, command: Int): Boolean =
+    supportedCommands[service]?.any { it == command.toByte() } == true
+
+  /** ExpandCapability bitmap (GB HuaweiState.expandCapabilities). */
+  private var expandCapabilities: ByteArray? = null
+
+  /** GB HuaweiState.supportsExpandCapability(int): bit `which % 8` of byte `which / 8`. */
+  private fun expandCapability(which: Int): Boolean {
+    val caps = expandCapabilities ?: return false
+    if (which >= caps.size * 8) return false
+    val bit = 1 shl (which % 8)
+    return (caps[which / 8].toInt() and bit) == bit
   }
 
   private suspend fun soft(label: String, block: suspend () -> Unit) {
@@ -154,6 +235,8 @@ internal class HuaweiInitializer(
     }
   }
 }
+
+private const val SETUP_STATUS_MS = 300L
 
 /** GetBatteryLevelRequest: the first battery level (watches report a single one). */
 internal suspend fun HuaweiSession.queryBattery(timeoutMs: Long): Int {
