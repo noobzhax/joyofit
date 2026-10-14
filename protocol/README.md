@@ -2,7 +2,7 @@
 
 These notes come from Gadgetbridge (upstream `bb7a1e83`, 2026-10-13). Nothing here has been
 captured from our own watch yet. Gadgetbridge lists the Watch Fit 4 and Fit 4 Pro as supported
-devices (`HuaweiWatchFit4ProCoordinator`). When a capture from a real watch confirms or contradicts
+devices (`HuaweiJoyoFit4ProCoordinator`). When a capture from a real watch confirms or contradicts
 something below, note it under **Observations**.
 
 ## Transport
@@ -12,7 +12,7 @@ something below, note it under **Observations**.
 | Link | Bluetooth Classic (BR/EDR) RFCOMM, **not BLE GATT** | `HuaweiBRCoordinator.getConnectionType() = BT_CLASSIC` |
 | SDP service UUID | `82FF3820-8411-400C-B85A-55BDB32CF060` | `HuaweiConstants.UUID_SERVICE_HUAWEI_SDP` |
 | Socket | `createRfcommSocketToServiceRecord` (secure, needs a bond) | `btbr/BtBRQueue.connect` |
-| Advertised name | `HUAWEI WATCH FIT 4-XXX` / `HUAWEI WATCH FIT 4 Pro-XXX` | `HuaweiConstants.HU_WATCHFIT4*_NAME` |
+| Advertised name | `HUAWEI WATCH FIT 4-XXX` / `HUAWEI WATCH FIT 4 Pro-XXX` | `HuaweiConstants.HU_JOYOFIT4*_NAME` |
 
 The BLE service `0xFE86` (`FE01` write / `FE02` notify) is how older BLE-only Huawei bands connect.
 The Fit 4 is a BR device, so that service doesn't apply to it. This is why the old GATT explorer

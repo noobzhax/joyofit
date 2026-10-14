@@ -46,7 +46,7 @@ internal object OpenMeteo {
       connection.connectTimeout = CONNECT_TIMEOUT_MS
       connection.readTimeout = READ_TIMEOUT_MS
       connection.setRequestProperty("Accept", "application/json")
-      connection.setRequestProperty("User-Agent", "WatchFit")
+      connection.setRequestProperty("User-Agent", "JoyoFit")
       val status = connection.responseCode
       if (status !in 200..299) {
         val reason = connection.errorStream?.use { String(it.readBytes(), Charsets.UTF_8) }?.take(200)

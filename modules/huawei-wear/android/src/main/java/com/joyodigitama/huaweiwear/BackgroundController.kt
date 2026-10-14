@@ -48,7 +48,7 @@ internal class BackgroundController(private val runtime: WearRuntime) {
   private val alarmManager = context.getSystemService(AlarmManager::class.java)
   private val wakeLock: PowerManager.WakeLock =
     context.getSystemService(PowerManager::class.java)
-      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "watchfit:background")
+      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "joyofit:background")
       .apply { setReferenceCounted(false) }
 
   private val tickIntent: PendingIntent = PendingIntent.getBroadcast(

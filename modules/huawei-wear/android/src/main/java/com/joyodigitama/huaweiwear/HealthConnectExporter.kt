@@ -64,7 +64,7 @@ internal class HealthConnectCounts {
 /** Health Connect switch and the last export's outcome; private preferences, readable without JS. */
 internal class HealthConnectSettings(context: Context) {
   private val prefs: SharedPreferences =
-    context.applicationContext.getSharedPreferences("watchfit_health_connect", Context.MODE_PRIVATE)
+    context.applicationContext.getSharedPreferences("joyofit_health_connect", Context.MODE_PRIVATE)
 
   var enabled: Boolean
     get() = prefs.getBoolean(KEY_ENABLED, false)
@@ -98,7 +98,7 @@ internal class HealthConnectSettings(context: Context) {
 }
 
 /**
- * Writes the watch data stored in `watchfit.db` into Health Connect, from native code only, so it
+ * Writes the watch data stored in `joyofit.db` into Health Connect, from native code only, so it
  * works from the background service with no JS running. Each sync exports its window; the backfill
  * walks the whole table. Both read the stored rows, plan records with [HealthConnectPlan] and
  * insert them with a client record id and a version equal to the export time, which makes the
@@ -493,7 +493,7 @@ internal class HealthConnectExporter(
       calories?.takeIf { it > 0 }?.let { parts.add("$it kcal") }
       avgHr?.takeIf { it > 0 }?.let { parts.add("avg HR $it") }
       maxHr?.takeIf { it > 0 }?.let { parts.add("max HR $it") }
-      return if (parts.isEmpty()) null else "WatchFit: " + parts.joinToString(", ")
+      return if (parts.isEmpty()) null else "JoyoFit: " + parts.joinToString(", ")
     }
   }
 

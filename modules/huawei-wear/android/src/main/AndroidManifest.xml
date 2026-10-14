@@ -7,7 +7,7 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.WAKE_LOCK" />
-  <!-- Health Connect: write-only; WatchFit never reads Health Connect. -->
+  <!-- Health Connect: write-only; JoyoFit never reads Health Connect. -->
   <uses-permission android:name="android.permission.health.WRITE_STEPS" />
   <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
   <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" />
@@ -48,7 +48,7 @@
     <service
       android:name="com.joyodigitama.huaweiwear.WatchNotificationListener"
       android:exported="true"
-      android:label="WatchFit"
+      android:label="JoyoFit"
       android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
       <intent-filter>
         <action android:name="android.service.notification.NotificationListenerService" />
@@ -82,7 +82,7 @@
     <activity
       android:name="com.joyodigitama.huaweiwear.HealthConnectRationaleActivity"
       android:exported="true"
-      android:label="WatchFit and Health Connect"
+      android:label="JoyoFit and Health Connect"
       android:theme="@android:style/Theme.DeviceDefault.DayNight">
       <intent-filter>
         <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />

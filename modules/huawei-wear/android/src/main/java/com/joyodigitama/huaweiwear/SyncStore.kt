@@ -46,10 +46,10 @@ internal class SyncSummary(
 }
 
 /**
- * Writes sync results into the database the JS side reads with expo-sqlite: `watchfit.db` in
+ * Writes sync results into the database the JS side reads with expo-sqlite: `joyofit.db` in
  * `<filesDir>/SQLite` (expo-sqlite's `defaultDatabaseDirectory` + the name `_layout.tsx` opens).
  * Schema and migrations come from the same JSON asset JS imports
- * (`modules/huawei-wear/schema/watchfit-db-migrations.json`); `PRAGMA user_version` counts applied
+ * (`modules/huawei-wear/schema/joyofit-db-migrations.json`); `PRAGMA user_version` counts applied
  * migrations in both. Upserts are the ones `src/db/queries.ts` used to run from JS.
  */
 internal class SyncStore(context: Context) {
@@ -192,8 +192,8 @@ internal class SyncStore(context: Context) {
 
   private companion object {
     /** Must match `DATABASE_NAME` in `src/app/_layout.tsx`. */
-    const val DATABASE_NAME = "watchfit.db"
-    const val MIGRATIONS_ASSET = "watchfit-db-migrations.json"
+    const val DATABASE_NAME = "joyofit.db"
+    const val MIGRATIONS_ASSET = "joyofit-db-migrations.json"
     const val BUSY_TIMEOUT_MS = 10_000
   }
 }

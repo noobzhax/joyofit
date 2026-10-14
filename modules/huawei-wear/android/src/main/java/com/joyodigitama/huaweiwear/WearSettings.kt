@@ -103,7 +103,7 @@ internal class WearSettings(context: Context) {
     const val MIN_SYNC_INTERVAL_MIN = 5
     const val MAX_SYNC_INTERVAL_MIN = 1440
 
-    private const val PREFS_NAME = "watchfit_settings"
+    private const val PREFS_NAME = "joyofit_settings"
     private const val KEY_ADDRESS = "watch_address"
     private const val KEY_NAME = "watch_name"
     private const val KEY_BACKGROUND = "background_enabled"

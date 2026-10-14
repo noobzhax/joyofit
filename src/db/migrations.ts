@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import migrationsJson from '../../modules/huawei-wear/schema/watchfit-db-migrations.json';
+import migrationsJson from '../../modules/huawei-wear/schema/joyofit-db-migrations.json';
 
 /**
  * Ordered schema migrations, shared with the native side (it reads the same JSON as an Android

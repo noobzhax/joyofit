@@ -72,7 +72,7 @@ class WatchService : Service() {
 
   private fun createChannel() {
     val channel = NotificationChannel(CHANNEL_ID, "Watch connection", NotificationManager.IMPORTANCE_LOW).apply {
-      description = "Shows that WatchFit keeps your watch connected"
+      description = "Shows that JoyoFit keeps your watch connected"
       setShowBadge(false)
     }
     getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -84,7 +84,7 @@ class WatchService : Service() {
     }
     return Notification.Builder(this, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-      .setContentTitle(settings.watchName ?: "WatchFit")
+      .setContentTitle(settings.watchName ?: "JoyoFit")
       .setContentText(statusText(status))
       .setCategory(Notification.CATEGORY_SERVICE)
       .setOngoing(true)

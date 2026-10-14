@@ -45,7 +45,7 @@ internal data class WeatherPlace(
 
 /**
  * The weather feature's user settings. They live in the same SharedPreferences file as
- * [WearSettings] (`watchfit_settings`; Android hands out one instance per file and process), under
+ * [WearSettings] (`joyofit_settings`; Android hands out one instance per file and process), under
  * `weather_` keys, so the service, the module and the watch-request handler all read the same values.
  */
 internal class WeatherSettings(context: Context) {
@@ -112,7 +112,7 @@ internal class WeatherSettings(context: Context) {
     const val MAX_INTERVAL_MIN = 1440
 
     /** Same file as [WearSettings]. */
-    private const val PREFS_NAME = "watchfit_settings"
+    private const val PREFS_NAME = "joyofit_settings"
     private const val KEY_ENABLED = "weather_enabled"
     private const val KEY_UNIT = "weather_unit"
     private const val KEY_MODE = "weather_location_mode"

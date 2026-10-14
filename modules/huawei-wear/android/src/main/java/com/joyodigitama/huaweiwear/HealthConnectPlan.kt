@@ -11,11 +11,11 @@ package com.joyodigitama.huaweiwear
  *  - `calories`: kilocalories in that minute (GB's TODO wonders whether it could be small calories;
  *    its own UI and workout summary treat the value as kcal, so it is written as kcal).
  *
- * Every record has a stable client id (`watchfit:<kind>:<key>`), so writing the same window again
+ * Every record has a stable client id (`joyofit:<kind>:<key>`), so writing the same window again
  * replaces the earlier record instead of adding a second one.
  */
 internal object HealthConnectPlan {
-  const val ID_PREFIX = "watchfit"
+  const val ID_PREFIX = "joyofit"
 
   /** A sample's timestamp is the start of its minute. */
   const val SAMPLE_SPAN_SEC = 60L

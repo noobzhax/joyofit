@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "WatchFit",
-    "slug": "watch-fit",
+    "name": "JoyoFit",
+    "slug": "joyofit",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "watchfit",
+    "scheme": "joyofit",
     "userInterfaceStyle": "automatic",
     "platforms": ["android"],
     "android": {
-      "package": "com.joyodigitama.watchfit",
+      "package": "com.joyodigitama.joyofit",
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

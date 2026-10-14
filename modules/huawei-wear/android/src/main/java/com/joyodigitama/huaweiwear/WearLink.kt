@@ -112,11 +112,11 @@ internal class WearLink(
     }
   }
 
-  /** HuaweiWatchFit4ProCoordinator.getSupportedDeviceName: Fit 4 and Fit 4 Pro, case-insensitive. */
+  /** HuaweiJoyoFit4ProCoordinator.getSupportedDeviceName: Fit 4 and Fit 4 Pro, case-insensitive. */
   private fun isSupportedName(name: String): Boolean {
     val lower = name.lowercase(Locale.ROOT)
-    return lower.startsWith(HuaweiConstants.HU_WATCHFIT4_NAME) ||
-      lower.startsWith(HuaweiConstants.HU_WATCHFIT4PRO_NAME)
+    return lower.startsWith(HuaweiConstants.HU_JOYOFIT4_NAME) ||
+      lower.startsWith(HuaweiConstants.HU_JOYOFIT4PRO_NAME)
   }
 
   private fun requireAdapter(): BluetoothAdapter {

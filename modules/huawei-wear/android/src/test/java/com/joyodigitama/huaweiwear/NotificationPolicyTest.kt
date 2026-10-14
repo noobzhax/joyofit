@@ -10,7 +10,7 @@ import org.junit.Test
 
 class NotificationPolicyTest {
   private fun reason(flags: Int = 0, category: String? = null, pkg: String = "com.chat", title: String? = "Ann", body: String? = "hi") =
-    NotificationPolicy.skipReason(flags, category, pkg, "com.joyodigitama.watchfit", title, body)
+    NotificationPolicy.skipReason(flags, category, pkg, "com.joyodigitama.joyofit", title, body)
 
   @Test
   fun plainMessagePasses() {
@@ -19,7 +19,7 @@ class NotificationPolicyTest {
 
   @Test
   fun ownAppOngoingAndGroupSummaryAreSkipped() {
-    assertEquals("own app", reason(pkg = "com.joyodigitama.watchfit"))
+    assertEquals("own app", reason(pkg = "com.joyodigitama.joyofit"))
     assertEquals("ongoing", reason(flags = Notification.FLAG_ONGOING_EVENT))
     assertEquals("ongoing", reason(flags = Notification.FLAG_FOREGROUND_SERVICE))
     assertEquals("group summary", reason(flags = Notification.FLAG_GROUP_SUMMARY))

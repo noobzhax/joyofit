@@ -1,6 +1,6 @@
-# WatchFit
+# JoyoFit
 
-WatchFit is an Android companion app for the **Huawei Watch Fit 4 / Fit 4 Pro**. It has no Huawei
+JoyoFit is an Android companion app for the **Huawei Watch Fit 4 / Fit 4 Pro**. It has no Huawei
 Health install, no account and no cloud: data goes from the watch to the phone into a local SQLite
 database and stays there.
 
@@ -26,11 +26,11 @@ flowchart LR
   LINK --> AUTH[HuaweiAuthenticator<br/>LinkParams → HiChain / Lite / Normal]
   LINK --> INIT[HuaweiInitializer<br/>ProductInfo · Time · Battery · Services]
   LINK --> SYNC[ActivitySync<br/>sleep · steps/HR · totals]
-  LINK --> STORE[SyncStore<br/>writes watchfit.db]
+  LINK --> STORE[SyncStore<br/>writes joyofit.db]
   AUTH & INIT & SYNC --> SES[HuaweiSession<br/>reassembly · request/response]
   SES --> GB[Gadgetbridge Java<br/>HuaweiPacket · TLV · Crypto · DeviceConfig · FitnessData]
   SES --> RF[RfcommTransport<br/>SDP 82FF3820-…]
-  STORE --> DB[(watchfit.db)]
+  STORE --> DB[(joyofit.db)]
   UI -- reads --> DB
 ```
 
@@ -65,7 +65,7 @@ link parameters to `protocol/README.md` → Observations.
 1. Unbind the watch from Huawei Health. The watch can only be bound to one app at a time; a
    factory reset of the watch also works.
 2. Pair the watch in **Android Settings → Bluetooth**. It shows up as `HUAWEI WATCH FIT 4-XXX`.
-3. Open WatchFit → **Device** → grant Nearby devices → tap the watch → **Connect**.
+3. Open JoyoFit → **Device** → grant Nearby devices → tap the watch → **Connect**.
    - On the first connect, confirm the pairing on the watch within 30 s.
 4. Go to **Today** and tap **Sync**. The first sync pulls the last 7 days. Each later sync starts
    from the previous one, with 1 h of overlap.
@@ -85,13 +85,13 @@ Sync results are written to the database by native code, so data accumulates whi
 - Tapping **Disconnect** in the app pauses auto-reconnect until you connect again.
 - Android 13+ asks for the notification permission when you enable it. Without it the service still
   runs but its notification is hidden.
-- Battery optimisation: if your phone kills the service, exempt WatchFit from battery restrictions.
+- Battery optimisation: if your phone kills the service, exempt JoyoFit from battery restrictions.
 
 ### Notifications
 
 In Settings, grant **notification access** (on Android 13+ a sideloaded app must first be allowed
 under App info → ⋮ → *Allow restricted settings*), then switch on forwarding. Ongoing notifications,
-group summaries, local-only ones, calls, media controls, progress bars and WatchFit's own are skipped.
+group summaries, local-only ones, calls, media controls, progress bars and JoyoFit's own are skipped.
 Apps you have not chosen are on, except system apps; **Choose apps** overrides either way.
 Notifications only reach the watch while it is connected, so use background mode to keep it connected.
 
@@ -153,7 +153,7 @@ The only internet use is weather (Open-Meteo forecast and city search), and only
 
 ## Health Connect / JoyoRogo
 
-WatchFit can copy what the watch records into [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect),
+JoyoFit can copy what the watch records into [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect),
 Android's on-device health store, so other apps can read it. It only **writes**: it never reads
 Health Connect. [JoyoRogo](../joyorogo) reads `ExerciseSession`, `SleepSession`, `Steps`, `Distance`
 and `ActiveCaloriesBurned` (`apps/native/src/lib/health-connect.ts`), and aggregates the cumulative
@@ -167,7 +167,7 @@ already in the local database once; **Write everything again** repeats that. Aft
 is exported by native code, so the background service feeds Health Connect with the app closed.
 Then, in JoyoRogo, grant it read access to the same types and sync.
 
-| Local data (`watchfit.db`) | Health Connect record | Shape |
+| Local data (`joyofit.db`) | Health Connect record | Shape |
 |---|---|---|
 | `step_samples.steps` | `StepsRecord` | one per minute with steps > 0 |
 | `step_samples.distance` | `DistanceRecord` | one per minute, metres |
@@ -184,7 +184,7 @@ comment there wonders whether they could be small calories, which is unconfirmed
 They are written as metres and kcal. A workout's own energy is not written a second time: the
 per-minute energy already covers it, and a second record would be counted twice by readers that sum it.
 
-Re-syncs are idempotent. Each record has the client record id `watchfit:<kind>:<time or day>` and a
+Re-syncs are idempotent. Each record has the client record id `joyofit:<kind>:<time or day>` and a
 client record version equal to the export time, so Health Connect replaces the earlier record
 instead of adding another. Records are written with the watch as the device (Huawei, the product
 model the watch reported). Switching the export off keeps what was written; delete it in Health
@@ -193,12 +193,12 @@ The export needs Health Connect: built into Android 14+, a Play Store app on And
 
 ## Where data lives
 
-`watchfit.db` in `<app files>/SQLite` is shared by the screens (expo-sqlite, read) and the native
+`joyofit.db` in `<app files>/SQLite` is shared by the screens (expo-sqlite, read) and the native
 module (`android.database.sqlite`, write, WAL with a 10 s busy timeout). The schema is one JSON file,
-`modules/huawei-wear/schema/watchfit-db-migrations.json`, imported by `src/db/migrations.ts` and shipped
+`modules/huawei-wear/schema/joyofit-db-migrations.json`, imported by `src/db/migrations.ts` and shipped
 as an Android asset that the native side migrates from, so JS and native cannot drift. Native
 upserts the same rows the JS queries used to, and advances `device.last_sync` in the same transaction.
-The profile, background and notification settings are in native SharedPreferences (`watchfit_settings`).
+The profile, background and notification settings are in native SharedPreferences (`joyofit_settings`).
 
 Workouts are two more tables from migration 3: `workouts` (one row per session: watch workout number,
 start/end, Huawei sport type and GB's name for it, duration, distance, calories, average/max heart
@@ -232,7 +232,7 @@ src/db/                   expo-sqlite migrations (from the shared JSON) + read q
 src/features/             screen pieces (device, today, settings, log)
 modules/huawei-wear/
   src/                    TS contract (HuaweiWear.types.ts, HuaweiWearModule.ts)
-  schema/                 watchfit-db-migrations.json, read by JS and by native
+  schema/                 joyofit-db-migrations.json, read by JS and by native
   android/src/main/java/
     com/joyodigitama/huaweiwear/            Kotlin: transport, session, auth, init, sync, runtime/service, notifications, Expo module
     nodomain/freeyourgadget/gadgetbridge/   Gadgetbridge Java, upstream package names kept for diffing

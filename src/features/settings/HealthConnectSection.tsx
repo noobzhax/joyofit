@@ -59,7 +59,7 @@ export function HealthConnectSection() {
       }
       const afterRequest = await HuaweiWear.requestHealthConnectPermissions();
       if (afterRequest.granted.length === 0) {
-        setError('No write permission was granted. Allow WatchFit in Health Connect to turn this on.');
+        setError('No write permission was granted. Allow JoyoFit in Health Connect to turn this on.');
         return;
       }
       setBusy('Writing stored data');

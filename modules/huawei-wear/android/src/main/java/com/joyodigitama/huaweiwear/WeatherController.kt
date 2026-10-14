@@ -79,7 +79,7 @@ internal class WeatherController(
   private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
   private val wakeLock: PowerManager.WakeLock =
     appContext.getSystemService(PowerManager::class.java)
-      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "watchfit:weather")
+      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "joyofit:weather")
       .apply { setReferenceCounted(false) }
 
   private val tickIntent: PendingIntent = PendingIntent.getBroadcast(

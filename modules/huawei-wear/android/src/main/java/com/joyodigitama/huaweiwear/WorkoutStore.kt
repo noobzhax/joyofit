@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Writes workouts into the shared database (`workouts`, `workout_points`; migration 3 in
- * `schema/watchfit-db-migrations.json`) through [SyncStore]'s connection. A workout is replaced as a whole in one
+ * `schema/joyofit-db-migrations.json`) through [SyncStore]'s connection. A workout is replaced as a whole in one
  * transaction: the row is upserted by `start` (the id stays), its old points are deleted and the new ones inserted.
  */
 internal class WorkoutStore(private val store: SyncStore) : WorkoutSink {

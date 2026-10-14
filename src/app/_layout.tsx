@@ -7,7 +7,7 @@ import { migrate } from '@/db/migrations';
 import { WatchProvider } from '@/state/WatchProvider';
 import { usePalette } from '@/theme';
 
-const DATABASE_NAME = 'watchfit.db';
+const DATABASE_NAME = 'joyofit.db';
 
 export default function RootLayout() {
   const palette = usePalette();

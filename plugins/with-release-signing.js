@@ -2,23 +2,23 @@
 // Without it, release builds keep Expo's default debug signing so CI and fresh clones still build.
 const { withAppBuildGradle } = require('expo/config-plugins');
 
-const MARKER = '// watchfit-release-signing';
+const MARKER = '// joyofit-release-signing';
 
 const LOAD_PROPERTIES = `${MARKER}
-def watchfitKeystoreProperties = new Properties()
-def watchfitKeystoreFile = rootProject.file("../keystore/keystore.properties")
-if (watchfitKeystoreFile.exists()) {
-    watchfitKeystoreFile.withInputStream { watchfitKeystoreProperties.load(it) }
+def joyofitKeystoreProperties = new Properties()
+def joyofitKeystoreFile = rootProject.file("../keystore/keystore.properties")
+if (joyofitKeystoreFile.exists()) {
+    joyofitKeystoreFile.withInputStream { joyofitKeystoreProperties.load(it) }
 }
 `;
 
 const RELEASE_CONFIG = `
         release {
-            if (watchfitKeystoreFile.exists()) {
-                storeFile file(watchfitKeystoreProperties['storeFile'])
-                storePassword watchfitKeystoreProperties['storePassword']
-                keyAlias watchfitKeystoreProperties['keyAlias']
-                keyPassword watchfitKeystoreProperties['keyPassword']
+            if (joyofitKeystoreFile.exists()) {
+                storeFile file(joyofitKeystoreProperties['storeFile'])
+                storePassword joyofitKeystoreProperties['storePassword']
+                keyAlias joyofitKeystoreProperties['keyAlias']
+                keyPassword joyofitKeystoreProperties['keyPassword']
             }
         }`;
 
@@ -33,7 +33,7 @@ function applySigning(gradle) {
   // Point the release build type at it when the keystore is present.
   out = out.replace(
     /(release \{[^}]*?)signingConfig signingConfigs\.debug/,
-    '$1signingConfig watchfitKeystoreFile.exists() ? signingConfigs.release : signingConfigs.debug',
+    '$1signingConfig joyofitKeystoreFile.exists() ? signingConfigs.release : signingConfigs.debug',
   );
 
   if (!out.includes('signingConfigs.release')) {

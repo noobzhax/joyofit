@@ -144,7 +144,7 @@ export interface UserProfile {
 
 export type HealthConnectAvailability = 'available' | 'update-required' | 'unavailable';
 
-/** Health Connect record types WatchFit writes; also the names in `granted` / `missing`. */
+/** Health Connect record types JoyoFit writes; also the names in `granted` / `missing`. */
 export type HealthConnectRecordType =
   | 'Steps'
   | 'HeartRate'
@@ -155,7 +155,7 @@ export type HealthConnectRecordType =
   | 'SleepSession'
   | 'ExerciseSession';
 
-/** State of the Health Connect export (write only; WatchFit never reads Health Connect). */
+/** State of the Health Connect export (write only; JoyoFit never reads Health Connect). */
 export interface HealthConnectStatus {
   /** `update-required`: the Health Connect app on the phone must be updated first. */
   availability: HealthConnectAvailability;

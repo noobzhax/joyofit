@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestCalls" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-14T09:45:47.411Z" hostname="dzul" time="0.004">
-  <properties/>
-  <testcase name="testAnswerCallResponseAccept" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestCalls" time="0.003"/>
-  <testcase name="testAnswerCallResponseReject" classname="nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.TestCalls" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

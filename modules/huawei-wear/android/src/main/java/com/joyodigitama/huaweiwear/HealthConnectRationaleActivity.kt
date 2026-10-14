@@ -24,11 +24,11 @@ internal class HealthConnectRationaleActivity : Activity() {
   }
 
   private companion object {
-    const val RATIONALE = "WatchFit copies the data your Huawei watch records (steps, distance, active " +
+    const val RATIONALE = "JoyoFit copies the data your Huawei watch records (steps, distance, active " +
       "energy, heart rate, resting heart rate, blood oxygen, sleep and workouts) into Health Connect, " +
       "so that other apps you allow can read it.\n\n" +
-      "WatchFit only writes to Health Connect. It never reads other apps' data, has no account and " +
+      "JoyoFit only writes to Health Connect. It never reads other apps' data, has no account and " +
       "no server, and sends nothing over the internet. The data stays on this phone. You can switch " +
-      "the export off in WatchFit's Settings, and delete what was written from Health Connect."
+      "the export off in JoyoFit's Settings, and delete what was written from Health Connect."
   }
 }

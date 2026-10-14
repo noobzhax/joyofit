@@ -24,7 +24,7 @@ class HealthConnectPlanTest {
       sample(1_120, steps = 7, distance = 4),
     )
     val steps = HealthConnectPlan.steps(samples, fromSec = 1_050)
-    assertEquals(listOf(HealthConnectPlan.Interval("watchfit:steps:1120", 1_120, 1_180, 7)), steps)
+    assertEquals(listOf(HealthConnectPlan.Interval("joyofit:steps:1120", 1_120, 1_180, 7)), steps)
     assertEquals(listOf(1_060L), HealthConnectPlan.calories(samples, 1_050).map { it.startSec })
     assertEquals(listOf(1_120L), HealthConnectPlan.distance(samples, 1_050).map { it.startSec })
   }
@@ -46,7 +46,7 @@ class HealthConnectPlanTest {
       sample(3_600 * 11 + 60, hr = 400),
     )
     val series = HealthConnectPlan.heartSeries(samples)
-    assertEquals(listOf("watchfit:hr:36000", "watchfit:hr:39600"), series.map { it.id })
+    assertEquals(listOf("joyofit:hr:36000", "joyofit:hr:39600"), series.map { it.id })
     assertEquals(listOf(60, 70), series[0].points.map { it.value })
     assertEquals(36_060L, series[0].startSec)
     assertEquals(36_181L, series[0].endSec)
@@ -71,7 +71,7 @@ class HealthConnectPlanTest {
       sample(86_400 + 20),
     )
     val result = HealthConnectPlan.restingHeartRate(samples, 0, dayOf)
-    assertEquals(listOf("watchfit:rhr:0", "watchfit:rhr:1"), result.map { it.first })
+    assertEquals(listOf("joyofit:rhr:0", "joyofit:rhr:1"), result.map { it.first })
     assertEquals(listOf(57, 52), result.map { it.second.value })
     assertEquals(200L, result[0].second.timeSec)
   }
@@ -89,7 +89,7 @@ class HealthConnectPlanTest {
     )
     val sessions = HealthConnectPlan.sleepSessions(segments, fromSec = 0)
     assertEquals(2, sessions.size)
-    assertEquals("watchfit:sleep:$night", sessions[0].id)
+    assertEquals("joyofit:sleep:$night", sessions[0].id)
     assertEquals(night + 1_560, sessions[0].endSec)
     assertEquals(
       listOf(SleepStageKind.LIGHT, SleepStageKind.DEEP, SleepStageKind.REM, SleepStageKind.AWAKE),
@@ -118,6 +118,6 @@ class HealthConnectPlanTest {
       SleepSegment(0, 3_600, 0x06, "light"),
       SleepSegment(200_000, 203_600, 0x06, "light"),
     )
-    assertEquals(listOf("watchfit:sleep:200000"), HealthConnectPlan.sleepSessions(segments, 100_000).map { it.id })
+    assertEquals(listOf("joyofit:sleep:200000"), HealthConnectPlan.sleepSessions(segments, 100_000).map { it.id })
   }
 }

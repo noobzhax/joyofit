@@ -32,7 +32,7 @@ export function NotificationsSection() {
   return (
     <Section title="Notifications">
       <AppText variant="caption">
-        WatchFit forwards the app name, title and text of posted notifications to the watch.
+        JoyoFit forwards the app name, title and text of posted notifications to the watch.
       </AppText>
       <KeyValue label="Notification access" value={access.granted ? 'Granted' : 'Not granted'} />
       <Button

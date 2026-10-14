@@ -33,7 +33,7 @@ internal class PhoneFeatureSettings(context: Context) {
     set(value) = prefs.edit().apply { if (value == null) remove(KEY_ALARMS) else putString(KEY_ALARMS, value) }.apply()
 
   private companion object {
-    const val PREFS_NAME = "watchfit_phone_features"
+    const val PREFS_NAME = "joyofit_phone_features"
     const val KEY_FIND_PHONE = "find_phone"
     const val KEY_CALLS = "calls"
     const val KEY_CALL_CONTROL = "call_control"
