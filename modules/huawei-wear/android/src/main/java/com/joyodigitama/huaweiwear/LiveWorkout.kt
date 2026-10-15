@@ -11,22 +11,36 @@ import android.os.SystemClock
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
- * A workout started on the watch, followed live on the phone (Huawei Health's reverse linkage, [LiveWorkoutWire]). The
- * watch announces the workout and pushes its numbers by itself; this class answers the watch's start / stop / resume
- * requests, keeps the latest numbers with JoyoFit's fat and carbohydrate estimate ([SubstrateEstimator]), shows them in an
- * ongoing notification that opens the live screen, and reports every change to JS (`onLiveWorkout`).
+ * A workout on the watch, followed live on the phone. Two sources:
+ *  - the watch's own numbers, when it sends them (Huawei Health's reverse linkage [LiveWorkoutWire], or the `17/11` report);
+ *  - otherwise JoyoFit's own session ([Source.GPS] / [Source.MANUAL]): the Fit 4 Pro (6.1.0.117) sends neither, but asks
+ *    for the phone's GPS about every 20 s while an outdoor workout runs, and pushes realtime heart rate when asked. The
+ *    session runs on that heart rate: time from the phone, calories from [HeartRateEnergy], ended when the GPS requests
+ *    stop for [GPS_SILENCE_MS] or the user taps Finish.
+ * Either way it keeps JoyoFit's fat and carbohydrate estimate ([SubstrateEstimator]), an ongoing notification that opens the
+ * live screen, and reports every change to JS (`onLiveWorkout`).
  */
 internal class LiveWorkout(
   context: Context,
   private val dataSync: DataSyncService,
   private val events: WearEvents,
   private val settings: WearSettings,
+  private val liveHeartRate: LiveHeartRate,
+  private val scope: CoroutineScope,
 ) : DataSyncFeature {
   override val name = "live workout"
 
   enum class Status(val wire: String) { PREPARING("preparing"), RUNNING("running"), PAUSED("paused"), ENDED("ended") }
+
+  /** Where the numbers come from: the watch, or JoyoFit's heart-rate session started by the GPS requests or by hand. */
+  enum class Source(val wire: String) { WATCH("watch"), GPS("gps"), MANUAL("manual") }
 
   private class Session(
     val id: Long,
@@ -36,8 +50,15 @@ internal class LiveWorkout(
     val estimator: SubstrateEstimator,
     val maxHeartRate: Int,
     var updatedAtMs: Long,
+    var source: Source,
     var endedAtMs: Long? = null,
+    /** Phone-side session: kcal so far, last heart-rate time, last GPS request. */
+    var estimatedKcal: Double = 0.0,
+    var lastHeartRateAtMs: Long? = null,
+    var lastGpsAtMs: Long = 0L,
   )
+
+  private var watchdog: Job? = null
 
   private val appContext = context.applicationContext
   private val lock = Any()
@@ -61,6 +82,58 @@ internal class LiveWorkout(
       if (session?.status == Status.ENDED) session = null
     }
     cancelNotification()
+  }
+
+  /** Live screen "Start": a phone-side session for a workout the watch does not announce (indoor). */
+  fun startManual() {
+    synchronized(lock) {
+      if (session?.status.let { it != null && it != Status.ENDED }) return
+      session = newSession(null, Status.RUNNING, Source.MANUAL)
+    }
+    log("Live workout: started on the phone")
+    liveHeartRate.setWorkoutActive(true)
+    publish(force = true)
+  }
+
+  /** Live screen "Finish". */
+  fun finish() = end("finished on the phone")
+
+  private fun end(why: String) {
+    synchronized(lock) {
+      val s = session ?: return
+      if (s.status == Status.ENDED) return
+      s.status = Status.ENDED
+      s.updatedAtMs = System.currentTimeMillis()
+      s.endedAtMs = s.updatedAtMs
+    }
+    log("Live workout: ended ($why)")
+    liveHeartRate.setWorkoutActive(false)
+    watchdog?.cancel()
+    watchdog = null
+    publish(force = true)
+  }
+
+  /** Realtime heart rate from the watch: drives a phone-side session; a watch-fed one has its own heart rate. */
+  fun onHeartRate(bpm: Int) {
+    synchronized(lock) {
+      val s = session ?: return
+      if (s.status != Status.RUNNING || s.source == Source.WATCH) return
+      val now = System.currentTimeMillis()
+      val last = s.lastHeartRateAtMs
+      s.lastHeartRateAtMs = now
+      if (last != null) {
+        // A reading covers the time since the previous one, at most 10 s (the link may have dropped in between).
+        val minutes = (now - last).coerceIn(0L, 10_000L) / 60_000.0
+        val profile = settings.profile
+        val age = profile?.birthYear?.takeIf { it > 0 }?.let { ProfileSender.age(it, LocalDate.now()) } ?: DEFAULT_AGE
+        val weight = profile?.weightKg?.takeIf { it > 0 } ?: DEFAULT_WEIGHT_KG
+        s.estimatedKcal += HeartRateEnergy.kcalPerMinute(bpm, weight, age, profile?.sex ?: "unknown") * minutes
+      }
+      s.metrics = s.metrics.copy(heartRate = bpm, calories = s.estimatedKcal, durationSec = ((now - s.id) / 1000).toInt())
+      s.updatedAtMs = now
+      s.estimator.update(s.estimatedKcal, bpm)
+    }
+    publish(force = false)
   }
 
   private suspend fun onEvent(event: SampleEvent) {
@@ -133,7 +206,7 @@ internal class LiveWorkout(
 
   private fun onPoint(point: SamplePointIn) {
     synchronized(lock) {
-      val current = session?.takeIf { it.status != Status.ENDED } ?: newSession(null, Status.RUNNING).also { session = it }
+      val current = watchSession()
       val metrics = current.metrics.applyPoint(point.values)
       current.metrics = metrics
       current.updatedAtMs = System.currentTimeMillis()
@@ -152,26 +225,39 @@ internal class LiveWorkout(
     publish(force = false)
   }
 
-  /** The watch shows a workout is running (it asked for the phone's GPS) before any number arrived. */
-  fun workoutSeen() {
+  /** The watch asked for the phone's GPS: an outdoor workout is running (the request repeats about every 20 s). */
+  fun gpsPing() {
     val created = synchronized(lock) {
-      if (session?.status.let { it == null || it == Status.ENDED }) {
-        session = newSession(null, Status.RUNNING)
-        true
-      } else {
+      val s = session
+      if (s != null && s.status != Status.ENDED) {
+        s.lastGpsAtMs = System.currentTimeMillis()
         false
+      } else {
+        session = newSession(null, Status.RUNNING, Source.GPS).also { it.lastGpsAtMs = it.id }
+        true
       }
     }
-    if (created) {
-      log("Live workout: running on the watch (phone GPS asked)")
-      publish(force = true)
+    if (!created) return
+    log("Live workout: running on the watch (it asked for the phone's GPS); following its heart rate")
+    liveHeartRate.setWorkoutActive(true)
+    watchdog?.cancel()
+    watchdog = scope.launch {
+      while (isActive) {
+        delay(15_000L)
+        val silent = synchronized(lock) {
+          val s = session
+          s != null && s.source == Source.GPS && s.status != Status.ENDED && System.currentTimeMillis() - s.lastGpsAtMs > GPS_SILENCE_MS
+        }
+        if (silent) end("the watch stopped asking for GPS")
+      }
     }
+    publish(force = true)
   }
 
   /** A `17/11` realtime report ([WorkoutReport]); operator type 1 running, 2 paused, 3 resumed, 4 stopped. */
   fun onReport(report: WorkoutReport.Parsed) {
     synchronized(lock) {
-      val current = session?.takeIf { it.status != Status.ENDED } ?: newSession(null, Status.RUNNING).also { session = it }
+      val current = watchSession()
       val metrics = report.apply(current.metrics)
       current.metrics = metrics
       current.updatedAtMs = System.currentTimeMillis()
@@ -188,12 +274,25 @@ internal class LiveWorkout(
     publish(force = false)
   }
 
-  private fun newSession(workoutType: Int?, status: Status): Session {
+  /**
+   * The session watch numbers go into. A phone-side session is replaced by a watch-fed one with the same id, because the
+   * watch's cumulative calories and its estimate would otherwise be mixed. Callers hold [lock].
+   */
+  private fun watchSession(): Session {
+    val current = session?.takeIf { it.status != Status.ENDED }
+    if (current != null && current.source == Source.WATCH) return current
+    val fresh = newSession(current?.sportType, Status.RUNNING, Source.WATCH, id = current?.id)
+    session = fresh
+    if (current != null) log("Live workout: the watch sends its own numbers; using them instead of the heart-rate estimate")
+    return fresh
+  }
+
+  private fun newSession(workoutType: Int?, status: Status, source: Source = Source.WATCH, id: Long? = null): Session {
     val birthYear = settings.profile?.birthYear?.takeIf { it > 0 }
     val age = birthYear?.let { ProfileSender.age(it, LocalDate.now()) } ?: DEFAULT_AGE
     val maxHr = SubstrateEstimator.maxHeartRate(age)
     val now = System.currentTimeMillis()
-    return Session(now, workoutType, status, LiveMetrics(), SubstrateEstimator(maxHr), maxHr, now)
+    return Session(id ?: now, workoutType, status, LiveMetrics(), SubstrateEstimator(maxHr), maxHr, now, source)
   }
 
   private fun toJs(s: Session): Map<String, Any?> {
@@ -201,6 +300,7 @@ internal class LiveWorkout(
     return mapOf(
       "id" to s.id.toDouble(),
       "status" to s.status.wire,
+      "source" to s.source.wire,
       "sportType" to s.sportType,
       "sportName" to s.sportType?.let { WorkoutSportTypes.name(it) },
       "updatedAt" to s.updatedAtMs.toDouble(),
@@ -235,7 +335,12 @@ internal class LiveWorkout(
     if (!force && s.status == notifiedStatus && now - notifiedAtMs < NOTIFY_EVERY_MS) return
     notifiedAtMs = now
     notifiedStatus = s.status
-    if (s.status == Status.ENDED) cancelNotification() else notify(s)
+    if (s.status == Status.ENDED) {
+      liveHeartRate.setWorkoutActive(false)
+      cancelNotification()
+    } else {
+      notify(s)
+    }
   }
 
   private fun notify(s: Session) {
@@ -303,5 +408,11 @@ internal class LiveWorkout(
 
     /** Age used for the maximum heart rate when no profile is saved (220 - 35 = 185 bpm). */
     const val DEFAULT_AGE = 35
+
+    /** Weight for the heart-rate energy estimate when no profile is saved. */
+    const val DEFAULT_WEIGHT_KG = 70.0
+
+    /** No GPS request for this long ends a GPS-started session (the watch asks about every 20 s). */
+    const val GPS_SILENCE_MS = 120_000L
   }
 }

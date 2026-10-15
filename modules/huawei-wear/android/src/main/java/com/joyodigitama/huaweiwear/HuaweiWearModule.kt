@@ -135,6 +135,15 @@ class HuaweiWearModule : Module() {
       runtime().liveWorkout.dismiss()
     }
 
+    // A phone-side live session on the watch's realtime heart rate, for workouts the watch does not announce (indoor).
+    Function("startLiveWorkout") {
+      runtime().liveWorkout.startManual()
+    }
+
+    Function("finishLiveWorkout") {
+      runtime().liveWorkout.finish()
+    }
+
     AsyncFunction("getBondedDevices") {
       runtime().link.bondedDevices()
     }

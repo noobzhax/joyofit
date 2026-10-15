@@ -105,6 +105,10 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   getLiveWorkout(): LiveWorkout | null;
   /** Forgets a finished live workout (status `ended`) and removes its notification. */
   dismissLiveWorkout(): void;
+  /** Starts a phone-side live session on the watch's realtime heart rate (for indoor workouts the watch does not announce). */
+  startLiveWorkout(): void;
+  /** Ends the live session now. */
+  finishLiveWorkout(): void;
 
   /**
    * Makes the watch ring and vibrate (`start` true) or stops it. Needs a connected watch that

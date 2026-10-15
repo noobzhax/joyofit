@@ -103,6 +103,7 @@ internal class WearRuntime private constructor(context: Context) {
     }
 
     override fun heartRate(bpm: Int, tsMs: Long) {
+      liveWorkout.onHeartRate(bpm)
       listeners.forEach { it.heartRate(bpm, tsMs) }
     }
 
@@ -136,7 +137,7 @@ internal class WearRuntime private constructor(context: Context) {
   val activityGoals = ActivityGoals(appContext, dataSync, events, settings)
   val bodyMetrics = BodyMetrics(appContext, syncStore, dataSync, events, settings)
   val diet = DietSync(appContext, syncStore, dataSync, events, settings, activityGoals, bodyMetrics)
-  val liveWorkout = LiveWorkout(appContext, dataSync, events, settings)
+  val liveWorkout = LiveWorkout(appContext, dataSync, events, settings, liveHeartRate, scope)
   val workoutLink = WorkoutLink(appContext, link, events, scope, liveWorkout)
   val extras = WatchExtras(appContext, syncStore, link, events, scope)
   val p2p = P2pController(appContext, P2pSettings(appContext), link, settings, syncStore, events, scope)

@@ -30,7 +30,13 @@ internal class LiveHeartRate(
   private var running: HuaweiSession? = null
 
   @Volatile
-  private var wanted = false
+  private var uiWanted = false
+
+  /** A live workout ([LiveWorkout]) needs the readings, whatever screen is open and also in the background. */
+  @Volatile
+  private var workoutWanted = false
+
+  private val wanted get() = uiWanted || workoutWanted
 
   private val stateMutex = Mutex()
   private val undecoded = AtomicInteger()
@@ -39,8 +45,14 @@ internal class LiveHeartRate(
 
   /** The UI asks for live heart rate (Today on screen) or stops asking (other screen, app in background). */
   fun setActive(active: Boolean) {
-    wanted = active
-    scope.launch { if (active) start() else stop() }
+    uiWanted = active
+    scope.launch { if (wanted) start() else stop() }
+  }
+
+  /** A live workout starts or ends. */
+  fun setWorkoutActive(active: Boolean) {
+    workoutWanted = active
+    scope.launch { if (wanted) start() else stop() }
   }
 
   /** Called with every link state change: subscribes on a new session, drops everything when the link is gone. */

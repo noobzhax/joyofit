@@ -113,7 +113,7 @@ internal class WorkoutLink(
       }
       if (enable) {
         // A workout is running on the watch: follow it.
-        live.workoutSeen()
+        live.gpsPing()
         openReport()
         startGps()
       } else {

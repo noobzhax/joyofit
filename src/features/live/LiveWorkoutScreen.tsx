@@ -41,8 +41,9 @@ export function LiveWorkoutScreen() {
         <HiddenTabHeader title="Live workout" />
         <EmptyState
           icon="walk"
-          title="No workout on the watch"
-          description="Start a walk, run or ride on the watch while it is connected. This screen opens by itself and follows it live."
+          title="No workout running"
+          description="An outdoor walk, run or ride started on the watch opens this screen by itself. For an indoor workout, start it on the watch and tap Start here."
+          action={{ label: 'Start', icon: 'play', onPress: () => HuaweiWear.startLiveWorkout() }}
         />
       </Screen>
     );
@@ -62,6 +63,8 @@ export function LiveWorkoutScreen() {
             router.replace('/workouts');
           }}
         />
+      ) : live.source !== 'watch' ? (
+        <Button label="Finish" icon="stop" onPress={() => HuaweiWear.finishLiveWorkout()} />
       ) : null}
     </Screen>
   );
@@ -129,6 +132,9 @@ function LiveBody({ live }: { live: LiveWorkout }) {
         <AppText variant="caption" muted>
           An estimate by JoyoFit, the watch does not measure it: each calorie is split by your heart rate at that moment, with a
           maximum of {live.maxHeartRate} bpm (220 minus your age from the profile). Easier effort burns a larger share of fat.
+          {live.source !== 'watch'
+            ? ' The watch sends no live calories to JoyoFit, so they too come from its live heart rate, your weight, age and sex (Keytel 2005); the watch screen may differ.'
+            : ''}
         </AppText>
       </Section>
 

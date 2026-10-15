@@ -200,3 +200,23 @@ internal class SubstrateEstimator(private val maxHeartRate: Int) {
     }
   }
 }
+
+/**
+ * Energy from heart rate, for when the watch sends no calories live: Keytel et al. (2005), kJ per minute from heart rate,
+ * weight, age and sex, divided by 4.184 for kcal. Sex unknown uses the mean of both equations. Below about 90 bpm the
+ * equation drifts towards zero, so it never goes under a resting 1.2 kcal per minute.
+ */
+internal object HeartRateEnergy {
+  fun kcalPerMinute(heartRate: Int, weightKg: Double, age: Int, sex: String): Double {
+    val male = (-55.0969 + 0.6309 * heartRate + 0.1988 * weightKg + 0.2017 * age) / 4.184
+    val female = (-20.4022 + 0.4472 * heartRate - 0.1263 * weightKg + 0.074 * age) / 4.184
+    val kcal = when (sex) {
+      "male" -> male
+      "female" -> female
+      else -> (male + female) / 2
+    }
+    return kcal.coerceAtLeast(REST_KCAL_PER_MIN)
+  }
+
+  const val REST_KCAL_PER_MIN = 1.2
+}
