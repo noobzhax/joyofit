@@ -1,5 +1,7 @@
 # JoyoFit
 
+Website: <https://fit.joyorogo.com> (source in [`site/`](site/)).
+
 JoyoFit is an Android companion app for the **Huawei Watch Fit 4 / Fit 4 Pro**. It has no Huawei
 Health install and no account needed: data goes from the watch to the phone into a local SQLite
 database. Optionally, signing in with a JoyoRogo account uploads it to your own Cloudflare backend

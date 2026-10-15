@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "joyofit-site",
+  "account_id": "b7e6f8457bd39fa37a7eea5249799754",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // Static site only: no script, the asset store answers every request.
+  "routes": [{ "pattern": "fit.joyorogo.com", "custom_domain": true }],
+  "assets": {
+    "directory": "dist",
+    "not_found_handling": "single-page-application",
+    "html_handling": "auto-trailing-slash"
+  }
+}
