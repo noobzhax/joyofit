@@ -7,7 +7,7 @@ import { Screen } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
 import { Notice, Skeleton } from '@/components/States';
 import { buildNights } from '@/features/sleep/nights';
-import { dailyStrain, STRAIN_MAX } from '@/features/today/strain';
+import { STRAIN_MAX } from '@/features/today/strain';
 import {
   hrvSeries,
   recoverySeries,
@@ -19,10 +19,8 @@ import {
 } from '@/features/trends/series';
 import { TrendCard } from '@/features/trends/TrendCard';
 import { useTrendsData } from '@/features/trends/useTrendsData';
-import { DEFAULT_AGE, maxHeartRate } from '@/features/workouts/substrate';
 import { useWatch } from '@/state/WatchProvider';
 import { spacing, radius } from '@/theme';
-import { HuaweiWear } from '@/wear';
 
 const RANGE_OPTIONS = TREND_RANGES.map((value) => ({ value, label: `${value} days` }));
 
@@ -40,9 +38,7 @@ export function TrendsScreen() {
 
   const trends = useMemo(() => {
     if (!data) return null;
-    const birthYear = HuaweiWear.getUserProfile()?.birthYear;
-    const maxHr = maxHeartRate(birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE);
-    const strain = dailyStrain(data.heart, maxHr);
+    const { maxHr, strain } = data;
     return {
       days: data.days,
       maxHr,

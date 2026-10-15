@@ -39,34 +39,64 @@ export interface DayStrain {
   coveredMinutes: number;
 }
 
+/** Per local day: seconds in Edwards zones 1..5 and seconds covered by any heart-rate reading (zone 0 included). */
+export interface DayHeartLoad {
+  /** Local midnight, unix seconds. */
+  day: number;
+  zoneSeconds: [number, number, number, number, number];
+  coveredSeconds: number;
+}
+
+/** Whole seconds are summed and divided by 60 once, so the SQL aggregate and the JS loop below give identical floats. */
+function dayStrainOf(load: DayHeartLoad): DayStrain {
+  const zoneMinutes = load.zoneSeconds.map((s) => s / 60) as DayStrain['zoneMinutes'];
+  const trimp = load.zoneSeconds.reduce((sum, s, i) => sum + ((i + 1) * s) / 60, 0);
+  return { day: load.day, trimp, strain: strainFromTrimp(trimp), zoneMinutes, coveredMinutes: load.coveredSeconds / 60 };
+}
+
+/** Strain per day from per-day aggregates (`listDayHeartLoad`), oldest first. */
+export function strainFromLoads(loads: readonly DayHeartLoad[]): DayStrain[] {
+  return loads.map(dayStrainOf).sort((a, b) => a.day - b.day);
+}
+
+/**
+ * The lowest whole heart rate in Edwards zones 1..5 at `maxHr`, found with `edwardsZone` itself so the SQL zone test
+ * (`bpm >= threshold`) cannot drift from it. A zone no plausible heart rate reaches gets Infinity-like 1e9.
+ */
+export function zoneThresholds(maxHr: number): [number, number, number, number, number] {
+  const out: number[] = [];
+  for (let zone = 1; zone <= 5; zone++) {
+    let hr = 1;
+    while (hr <= 400 && edwardsZone(hr, maxHr) < zone) hr++;
+    out.push(hr <= 400 ? hr : 1e9);
+  }
+  return out as [number, number, number, number, number];
+}
+
 /**
  * Strain per local day from per-minute samples (oldest first). Samples without heart rate are skipped; each reading
  * counts until the next reading or [MAX_READING_SEC], whichever is first, and never past its day's midnight.
+ * `listDayHeartLoad` does the same arithmetic in SQL for long ranges; keep the two in step.
  */
 export function dailyStrain(samples: readonly Pick<StepSample, 'timestamp' | 'heartRate'>[], maxHr: number): DayStrain[] {
   const withHr = samples.filter((s) => s.heartRate !== null && s.heartRate > 0);
-  const days = new Map<number, DayStrain>();
+  const days = new Map<number, DayHeartLoad>();
   for (let i = 0; i < withHr.length; i++) {
     const sample = withHr[i];
     const day = startOfLocalDay(sample.timestamp);
     const next = withHr[i + 1]?.timestamp ?? sample.timestamp + 60;
     const until = Math.min(next, sample.timestamp + MAX_READING_SEC, day + 24 * 3600);
-    const minutes = Math.max(1, until - sample.timestamp) / 60;
+    const seconds = Math.max(1, until - sample.timestamp);
     let entry = days.get(day);
     if (!entry) {
-      entry = { day, trimp: 0, strain: 0, zoneMinutes: [0, 0, 0, 0, 0], coveredMinutes: 0 };
+      entry = { day, zoneSeconds: [0, 0, 0, 0, 0], coveredSeconds: 0 };
       days.set(day, entry);
     }
-    entry.coveredMinutes += minutes;
+    entry.coveredSeconds += seconds;
     const zone = edwardsZone(sample.heartRate as number, maxHr);
-    if (zone > 0) {
-      entry.zoneMinutes[zone - 1] += minutes;
-      entry.trimp += zone * minutes;
-    }
+    if (zone > 0) entry.zoneSeconds[zone - 1] += seconds;
   }
-  return [...days.values()]
-    .map((entry) => ({ ...entry, strain: strainFromTrimp(entry.trimp) }))
-    .sort((a, b) => a.day - b.day);
+  return strainFromLoads([...days.values()]);
 }
 
 /** A gap longer than this between a workout's heart-rate samples is a pause; it counts for nothing (as in `splitWorkout`). */

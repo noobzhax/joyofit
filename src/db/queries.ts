@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import type { DayHeartLoad } from '@/features/today/strain';
 import type { SleepSegment, StepSample } from '@/wear';
 
 export async function getLastSync(db: SQLiteDatabase, address: string): Promise<number | null> {
@@ -137,19 +138,50 @@ export function listWorkoutPoints(db: SQLiteDatabase, workoutId: number): Promis
   );
 }
 
-/** The two columns `dailyStrain` reads; the Trends screen skips steps and the rest so 90 days stay light. */
-export type HeartRateRow = Pick<StepSample, 'timestamp' | 'heartRate'>;
-
-/** Heart-rate readings from `sinceSec` on, oldest first. */
-export function listHeartRatesSince(db: SQLiteDatabase, sinceSec: number): Promise<HeartRateRow[]> {
-  return db.getAllAsync<HeartRateRow>(
-    'SELECT timestamp, heart_rate AS heartRate FROM step_samples WHERE timestamp >= ? AND heart_rate > 0 ORDER BY timestamp',
-    sinceSec,
+/**
+ * Heart-rate load per local day, aggregated in SQL so long ranges never put per-minute rows through JS. It is
+ * `dailyStrain`'s arithmetic: a reading counts until the next reading (of any day), at most 600 s, never past
+ * `day + 86400`, and at least 1 s; seconds are summed per Edwards zone. `bounds` are consecutive local midnights (day `i`
+ * spans `bounds[i]` up to `bounds[i + 1]`), and `thresholds` come from `zoneThresholds` (lowest bpm of zones 1..5).
+ * Everything is integer arithmetic, so there is no division to truncate. Days without heart rate are absent.
+ */
+export async function listDayHeartLoad(
+  db: SQLiteDatabase,
+  bounds: readonly number[],
+  thresholds: readonly number[],
+): Promise<DayHeartLoad[]> {
+  const days: number[] = [];
+  for (let i = 0; i + 1 < bounds.length; i++) days.push(bounds[i], bounds[i + 1]);
+  if (days.length === 0) return [];
+  // CROSS JOIN pins `days` as the outer loop, so each day is one range seek on the timestamp primary key. LEAD runs over
+  // the joined rows of all days in timestamp order, so the last reading of a day sees the next day's first.
+  const rows = await db.getAllAsync<{ day: number; covered: number; z1: number; z2: number; z3: number; z4: number; z5: number }>(
+    `WITH days(d0, d1) AS (VALUES ${Array.from({ length: days.length / 2 }, () => '(?, ?)').join(', ')}),
+     hr AS (
+       SELECT s.timestamp AS ts, s.heart_rate AS bpm, d.d0 AS d0,
+              LEAD(s.timestamp) OVER (ORDER BY s.timestamp) AS nxt
+       FROM days d CROSS JOIN step_samples s
+       WHERE s.timestamp >= d.d0 AND s.timestamp < d.d1 AND s.heart_rate > 0
+     ),
+     cover AS (
+       SELECT d0, MAX(1, MIN(COALESCE(nxt, ts + 60), ts + 600, d0 + 86400) - ts) AS secs,
+              (bpm >= ?) + (bpm >= ?) + (bpm >= ?) + (bpm >= ?) + (bpm >= ?) AS zone
+       FROM hr
+     )
+     SELECT d0 AS day, SUM(secs) AS covered,
+            COALESCE(SUM(CASE WHEN zone = 1 THEN secs END), 0) AS z1,
+            COALESCE(SUM(CASE WHEN zone = 2 THEN secs END), 0) AS z2,
+            COALESCE(SUM(CASE WHEN zone = 3 THEN secs END), 0) AS z3,
+            COALESCE(SUM(CASE WHEN zone = 4 THEN secs END), 0) AS z4,
+            COALESCE(SUM(CASE WHEN zone = 5 THEN secs END), 0) AS z5
+     FROM cover GROUP BY d0 ORDER BY d0`,
+    [...days, ...thresholds],
   );
+  return rows.map((r) => ({ day: r.day, zoneSeconds: [r.z1, r.z2, r.z3, r.z4, r.z5], coveredSeconds: r.covered }));
 }
 
 /**
- * The watch's resting heart rate per day, as `restingByDay` takes it (the lowest reported that day), aggregated in SQL.
+ * The watch's resting heart rate per day, (the lowest reported that day), aggregated in SQL.
  * `bounds` are consecutive local midnights; day `i` spans `bounds[i]` up to `bounds[i + 1]`, so the local calendar
  * (and daylight-saving days) stay with the caller. Days without a value are absent from the result.
  */

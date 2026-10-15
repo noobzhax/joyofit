@@ -4,7 +4,9 @@ import { useCallback, useState } from 'react';
 
 import {
   getLatestHeartRate,
+  listDayHeartLoad,
   listHrvReadingsSince,
+  listRestingHeartRateByDay,
   listSleepScores,
   listSleepSince,
   listStepSamplesSince,
@@ -13,6 +15,9 @@ import {
 } from '@/db/queries';
 import { errorMessage } from '@/format';
 import { startOfLocalDay } from '@/features/today/stats';
+import { strainFromLoads, zoneThresholds, type DayStrain } from '@/features/today/strain';
+import { dayBounds, dayStarts } from '@/features/trends/series';
+import { userMaxHr } from '@/features/workouts/useWorkoutStrain';
 import type { SleepSegment, StepSample } from '@/wear';
 
 /** Sleep older than this is not "last night"; the session picker only looks this far back. */
@@ -26,10 +31,13 @@ export const HISTORY_DAYS = 30;
 export interface TodayData {
   /** Local midnight (unix seconds) the samples were queried from. */
   dayStart: number;
-  /** Samples from `dayStart` onwards, oldest first. */
+  /** Samples from `dayStart` onwards, oldest first. Only today's per-minute rows are read; history is aggregated in SQL. */
   samples: StepSample[];
-  /** Samples from `HISTORY_DAYS` days before `dayStart` onwards, oldest first (strain, readiness). */
-  historySamples: StepSample[];
+  maxHr: number;
+  /** Strain per day from `HISTORY_DAYS` days before `dayStart` through today, oldest first; days without heart rate are absent. */
+  strain: DayStrain[];
+  /** The watch's resting heart rate per local day over the same span (readiness baseline). */
+  resting: Map<number, number>;
   sleep: SleepSegment[];
   /** The watch's sleep scores; Today picks the one for last night. */
   sleepScores: SleepScoreRow[];
@@ -56,17 +64,21 @@ export function useTodayData(dataVersion: number): TodayState {
       let cancelled = false;
       const nowSec = Math.floor(Date.now() / 1000);
       const dayStart = startOfLocalDay(nowSec);
+      const maxHr = userMaxHr();
+      const bounds = dayBounds(dayStarts(dayStart, HISTORY_DAYS + 1));
       Promise.all([
-        listStepSamplesSince(db, dayStart - HISTORY_DAYS * 86400),
+        listStepSamplesSince(db, dayStart),
+        listDayHeartLoad(db, bounds, zoneThresholds(maxHr)),
+        listRestingHeartRateByDay(db, bounds),
         listSleepSince(db, nowSec - SLEEP_LOOKBACK_SEC),
         getLatestHeartRate(db),
         listSleepScores(db),
         listHrvReadingsSince(db, dayStart - (HISTORY_DAYS + 1) * 86400),
       ]).then(
-        ([historySamples, sleep, latestHeart, sleepScores, hrv]) => {
-          const samples = historySamples.filter((s) => s.timestamp >= dayStart);
+        ([samples, loads, resting, sleep, latestHeart, sleepScores, hrv]) => {
           if (!cancelled) {
-            setState({ data: { dayStart, nowSec, samples, historySamples, sleep, sleepScores, latestHeart, hrv }, error: null });
+            const strain = strainFromLoads(loads);
+            setState({ data: { dayStart, nowSec, samples, maxHr, strain, resting, sleep, sleepScores, latestHeart, hrv }, error: null });
           }
         },
         (e: unknown) => {

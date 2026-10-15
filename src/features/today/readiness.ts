@@ -1,7 +1,6 @@
 import type { Recovery, RecoveryState } from '@/features/today/recovery';
-import { startOfLocalDay, type SleepSummary } from '@/features/today/stats';
+import { type SleepSummary } from '@/features/today/stats';
 import type { DayStrain } from '@/features/today/strain';
-import type { StepSample } from '@/wear';
 
 /**
  * "Should you push today?" from your own history. Each signal is shown with its numbers, and a signal without enough
@@ -44,17 +43,6 @@ export interface Readiness {
   recovery: Recovery | null;
 }
 
-/** The watch's resting heart rate per local day: the lowest value it reported that day. */
-export function restingByDay(samples: readonly StepSample[]): Map<number, number> {
-  const days = new Map<number, number>();
-  for (const s of samples) {
-    if (!s.restingHeartRate || s.restingHeartRate <= 0) continue;
-    const day = startOfLocalDay(s.timestamp);
-    days.set(day, Math.min(days.get(day) ?? Infinity, s.restingHeartRate));
-  }
-  return days;
-}
-
 function mean(values: readonly number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
@@ -70,12 +58,13 @@ function hm(sec: number): string {
 
 export function readiness(input: {
   dayStart: number;
-  samples: readonly StepSample[];
+  /** The watch's resting heart rate per local day (the lowest it reported that day; `listRestingHeartRateByDay`). */
+  resting: ReadonlyMap<number, number>;
   strain: readonly DayStrain[];
   sleep: SleepSummary | null;
   hrv: RecoveryState;
 }): Readiness {
-  const { dayStart, samples, strain, sleep, hrv } = input;
+  const { dayStart, resting, strain, sleep, hrv } = input;
   const signals: Signal[] = [];
   const missing: string[] = [];
 
@@ -93,7 +82,6 @@ export function readiness(input: {
     missing.push(hrv.missing);
   }
 
-  const resting = restingByDay(samples);
   const today = resting.get(dayStart);
   const history = [...resting.entries()].filter(([day]) => day < dayStart && day >= dayStart - 30 * 86400).map(([, v]) => v);
   if (today === undefined) {
