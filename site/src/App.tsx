@@ -825,6 +825,12 @@ function Options() {
                 </li>
               ))}
             </ul>
+            <p className="mt-3 flex items-center gap-2 text-sm">
+              <span className="rounded-full bg-card px-2 py-0.5 text-xs font-bold text-makan-ink">
+                Segera
+              </span>
+              Olahraga otomatis terkirim ke Strava
+            </p>
             <div className="mt-auto pt-6">
               <ButtonLink className="w-full" href={HARGA_URL}>
                 Langganan JoyoRogo Premium
