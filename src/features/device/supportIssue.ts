@@ -11,18 +11,35 @@ export function reportText(report: SupportReport): string {
 }
 
 /**
- * A new issue from `.github/ISSUE_TEMPLATE/watch-report.yml` with the watch and the summary filled in (GitHub fills
- * issue form fields from query parameters named by their ids). The log does not fit a link; the user pastes it.
+ * A new watch-report issue with the watch and the summary in a prefilled body. Form-field parameters
+ * (`template=` plus field ids) were dropped on the phone: only the title arrived. A plain `body` is honoured
+ * everywhere. The log does not fit a link; the user pastes it under "Log".
  */
 export function issueUrl(report: SupportReport): string {
   const what = report.model ?? report.watch ?? 'unknown watch';
-  const params = (summary: string) =>
-    Object.entries({
-      template: 'watch-report.yml',
-      title: `[Watch report] ${what} (${report.support})`,
-      watch: `${report.watch ?? 'no name'} (${report.model ?? 'not in the list'}, ${report.support})`,
+  const body = (summary: string) =>
+    [
+      `**Watch:** ${report.watch ?? 'no name'} (${report.model ?? 'not in the list'}, ${report.support})`,
+      '',
+      '### What works and what does not',
+      '',
+      'Connects: ',
+      'Sync (steps, sleep, heart rate, workouts): ',
+      'Other: ',
+      '',
+      '### Summary',
+      '```',
       summary,
-    })
+      '```',
+      '',
+      '### Log',
+      '<!-- JoyoFit copied the full report to your clipboard. Paste it between the fences. -->',
+      '```',
+      '',
+      '```',
+    ].join('\n');
+  const params = (summary: string) =>
+    Object.entries({ title: `[Watch report] ${what} (${report.support})`, labels: 'watch-report', body: body(summary) })
       .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join('&');
   let summary = report.summary;

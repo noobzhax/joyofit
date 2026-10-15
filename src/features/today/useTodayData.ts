@@ -10,11 +10,16 @@ import type { SleepSegment, StepSample } from '@/wear';
 /** Sleep older than this is not "last night"; the session picker only looks this far back. */
 const SLEEP_LOOKBACK_SEC = 36 * 3600;
 
+/** Strain shows today and the six days before it. */
+export const STRAIN_DAYS = 7;
+
 export interface TodayData {
   /** Local midnight (unix seconds) the samples were queried from. */
   dayStart: number;
   /** Samples from `dayStart` onwards, oldest first. */
   samples: StepSample[];
+  /** Samples from `STRAIN_DAYS - 1` days before `dayStart` onwards, oldest first (strain). */
+  weekSamples: StepSample[];
   sleep: SleepSegment[];
   /** The watch's sleep scores; Today picks the one for last night. */
   sleepScores: SleepScoreRow[];
@@ -38,13 +43,14 @@ export function useTodayData(dataVersion: number): TodayState {
       const nowSec = Math.floor(Date.now() / 1000);
       const dayStart = startOfLocalDay(nowSec);
       Promise.all([
-        listStepSamplesSince(db, dayStart),
+        listStepSamplesSince(db, dayStart - (STRAIN_DAYS - 1) * 86400),
         listSleepSince(db, nowSec - SLEEP_LOOKBACK_SEC),
         getLatestHeartRate(db),
         listSleepScores(db),
       ]).then(
-        ([samples, sleep, latestHeart, sleepScores]) => {
-          if (!cancelled) setState({ data: { dayStart, samples, sleep, sleepScores, latestHeart }, error: null });
+        ([weekSamples, sleep, latestHeart, sleepScores]) => {
+          const samples = weekSamples.filter((s) => s.timestamp >= dayStart);
+          if (!cancelled) setState({ data: { dayStart, samples, weekSamples, sleep, sleepScores, latestHeart }, error: null });
         },
         (e: unknown) => {
           if (!cancelled) setState({ data: null, error: errorMessage(e) });
