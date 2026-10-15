@@ -745,3 +745,18 @@ in Android Bluetooth settings.
   32 34 35`. `07` (FitnessData) is present.
 
 So Gadgetbridge's HiChain3 path works unchanged on the Fit 4.
+
+### 2026-10-15: Band 11 speaks Classic RFCOMM, not BLE (real-device Bluetooth log)
+
+Band: a Huawei Band 11 (DUAL-bonded), at the time bound to Huawei Health.
+
+- Phone Bluetooth log: the band connects over BR/EDR RFCOMM channel 16 with SDP UUID
+  `82FF3820-8411-400C-B85A-55BDB32CF060` — the same `UUID_SERVICE_HUAWEI_SDP`
+  `RfcommTransport` uses (Fit 4 Pro path). The link stays open, held by Huawei Health.
+- The band shows DUAL in the bonded list.
+- BLE is a dead end: service `FE86` (`FE01` write / `FE02` notify) exists and accepts
+  writes at the stack level, but no protocol frame is ever answered (zero RX). Any GATT
+  connect makes the band show its Huawei Health prompt (also verified with nRF Connect).
+
+So Band 11 / Band 11 Pro are Classic (`br()`, experimental) like the other untested
+Classic models; the GATT path is parked.

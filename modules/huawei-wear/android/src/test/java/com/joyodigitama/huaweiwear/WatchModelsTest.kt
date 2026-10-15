@@ -33,7 +33,26 @@ class WatchModelsTest {
     assertEquals("Huawei Band 9", band.model?.name)
     assertEquals(ModelSupport.UNSUPPORTED, band.support)
     assertFalse(band.connectable)
+    assertEquals(ModelSupport.UNSUPPORTED, WatchModels.match("HUAWEI Band 10-ABC").support)
     assertEquals(ModelSupport.UNSUPPORTED, WatchModels.match("HONOR Watch 5-ABC").support)
+  }
+
+  @Test
+  fun band11IsClassicExperimentalWhileOtherLeBandsStayUnsupported() {
+    val band11 = WatchModels.match("HUAWEI Band 11-ABC")
+    assertEquals("Huawei Band 11", band11.model?.name)
+    assertEquals(ModelTransport.BR, band11.model?.transport)
+    assertEquals(ModelSupport.EXPERIMENTAL, band11.support)
+    assertTrue(band11.connectable)
+    assertEquals(HuaweiConstants.UUID_SERVICE_HUAWEI_SDP, band11.sdp)
+    assertTrue(band11.crypted)
+    // Longest prefix wins: the Pro entry, not Band 11.
+    val pro = WatchModels.match("HUAWEI Band 11 Pro-ABC")
+    assertEquals("Huawei Band 11 Pro", pro.model?.name)
+    assertEquals(ModelTransport.BR, pro.model?.transport)
+    assertEquals(ModelSupport.EXPERIMENTAL, pro.support)
+    assertTrue(pro.connectable)
+    assertEquals(HuaweiConstants.UUID_SERVICE_HUAWEI_SDP, pro.sdp)
   }
 
   @Test

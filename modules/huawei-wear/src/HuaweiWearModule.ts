@@ -36,10 +36,10 @@ import type { PhotoFace } from './HuaweiWearPhotoFace.types';
 import type { CoursesStatus, HealthyLivingStatus, RunningCourse, RunningCoursePushResult } from './HuaweiWearP2p.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
-  /** Bonded classic-Bluetooth devices. Requires BLUETOOTH_CONNECT on Android 12+. */
+  /** Bonded Bluetooth devices (Classic and LE). Requires BLUETOOTH_CONNECT on Android 12+. */
   getBondedDevices(): Promise<BondedDevice[]>;
   /**
-   * RFCOMM connect + LinkParams + auth + init. Resolves when `connected`. There is one link per
+   * RFCOMM (Classic) connect + LinkParams + auth + init. Resolves when `connected`. There is one link per
    * process: if the background service is already connecting to or connected with this watch, this
    * joins that link. A successful connect remembers the watch for background mode and resumes a
    * paused auto-reconnect.

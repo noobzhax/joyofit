@@ -72,13 +72,39 @@ internal class WearLink(
     /** Completes when this connect attempt finishes, so a second caller for the same watch can join it. */
     val ready = CompletableDeferred<Map<String, Any?>>()
     lateinit var session: HuaweiSession
-    val transport = RfcommTransport(
+    // BLE wiring point: FE86/FE01/FE02 defaults from BleGattConfig; confirm the service, write
+    // and notify UUIDs against the Band 11 GATT capture (Task 1) before real-device bring-up.
+    val gattConfig = BleGattConfig()
+    val gattTransport: GattTransport? =
+      if (model.model?.transport == ModelTransport.LE) {
+        GattTransport(
+          context = appContext,
+          device = device,
+          config = gattConfig,
+          onData = { chunk -> session.onData(chunk) },
+          onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
+        )
+      } else {
+        null
+      }
+    val rfcommTransport: RfcommTransport? = if (model.model?.transport == ModelTransport.LE) null else RfcommTransport(
       adapter = adapter,
       device = device,
       sdp = model.sdp,
       onData = { chunk -> session.onData(chunk) },
       onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
     )
+    /** The sink the session speaks; exactly one of the two transports above is non-null. */
+    val transport: FrameSink = rfcommTransport ?: requireNotNull(gattTransport)
+
+    /** Transport half of the connect log: the SDP record for RFCOMM, the GATT endpoints for BLE. */
+    fun transportDescription(): String {
+      return if (gattTransport != null) {
+        "BLE GATT, service ${gattConfig.serviceUuid}, write ${gattConfig.writeUuid}, notify ${gattConfig.notifyUuid}"
+      } else {
+        "RFCOMM, SDP ${model.sdp}"
+      }
+    }
 
     init {
       session = HuaweiSession(transport, events)
@@ -200,12 +226,18 @@ internal class WearLink(
       null,
       null,
       "Connecting to $address \"${lastAttemptName ?: "no name"}\": ${model.model?.name ?: "unknown model"} (${model.support.wire}), " +
-        "RFCOMM, SDP ${model.sdp}, encrypted ${model.crypted}",
+        "${connection.transportDescription()}, encrypted ${model.crypted}",
     )
 
     try {
-      connection.transport.connect(Timeouts.CONNECT_MS)
-      events.log(LogDirection.INFO, null, null, null, "RFCOMM connected")
+      val rfcomm = connection.rfcommTransport
+      if (rfcomm != null) {
+        rfcomm.connect(Timeouts.CONNECT_MS)
+      } else {
+        requireNotNull(connection.gattTransport).connect(Timeouts.CONNECT_MS)
+      }
+      val linkName = if (connection.gattTransport != null) "GATT" else "RFCOMM"
+      events.log(LogDirection.INFO, null, null, null, "$linkName connected")
 
       setState(connection, LinkState.AUTHENTICATING)
       val identity = store.forDevice(address)
@@ -323,7 +355,8 @@ internal class WearLink(
     connection.closeCause = cause
     connection.ready.completeExceptionally(cause)
     connection.session.close(cause)
-    connection.transport.close()
+    connection.rfcommTransport?.close()
+    connection.gattTransport?.close()
     val wasCurrent = synchronized(lock) {
       if (current === connection) {
         current = null

@@ -14,6 +14,13 @@ internal enum class ModelSupport(val wire: String) {
   /** In Gadgetbridge's list and on the same link JoyoFit speaks; never tried with JoyoFit. */
   EXPERIMENTAL("experimental"),
 
+  /**
+   * Bluetooth LE model JoyoFit routes over GATT; never tried with JoyoFit. Wire-compatible with
+   * [EXPERIMENTAL] ("experimental") so the JS contract is unchanged; Kotlin keeps it distinct so
+   * only flagged models are LE-connectable.
+   */
+  EXPERIMENTAL_LE("experimental"),
+
   /** A Huawei or Honor name Gadgetbridge does not list; JoyoFit tries it like a Huawei watch. */
   UNKNOWN("unknown"),
 
@@ -37,6 +44,8 @@ internal class WatchModel(
   /** GB supportsHiChainPake: Honor's newer pairing, which JoyoFit does not implement. */
   val pake: Boolean = false,
   val tested: Boolean = false,
+  /** Bluetooth LE model flagged for the experimental GATT path; every other LE model stays UNSUPPORTED. */
+  val leConnectable: Boolean = false,
 )
 
 internal class ModelMatch(val model: WatchModel?, val support: ModelSupport, val reason: String?) {
@@ -55,6 +64,9 @@ internal object WatchModels {
     WatchModel(name, prefix, ModelTransport.BR, honorSdp, crypted, pake, tested)
 
   private fun le(name: String, prefix: String) = WatchModel(name, prefix, ModelTransport.LE)
+
+  private fun leExperimental(name: String, prefix: String) =
+    WatchModel(name, prefix, ModelTransport.LE, leConnectable = true)
 
   val all: List<WatchModel> = listOf(
     br("Huawei Watch Fit 4 Pro", HuaweiConstants.HU_JOYOFIT4PRO_NAME, tested = true),
@@ -112,8 +124,8 @@ internal object WatchModels {
     le("Huawei Band 8", HuaweiConstants.HU_BAND8_NAME),
     le("Huawei Band 9", HuaweiConstants.HU_BAND9_NAME),
     le("Huawei Band 10", HuaweiConstants.HU_BAND10_NAME),
-    le("Huawei Band 11", HuaweiConstants.HU_BAND11_NAME),
-    le("Huawei Band 11 Pro", HuaweiConstants.HU_BAND11PRO_NAME),
+    br("Huawei Band 11", HuaweiConstants.HU_BAND11_NAME),
+    br("Huawei Band 11 Pro", HuaweiConstants.HU_BAND11PRO_NAME),
     le("Honor Band 3", HuaweiConstants.HO_BAND3_NAME),
     le("Honor Band 4", HuaweiConstants.HO_BAND4_NAME),
     le("Honor Band 5", HuaweiConstants.HO_BAND5_NAME),
@@ -137,8 +149,10 @@ internal object WatchModels {
       model == null && (lower.isEmpty() || lower.startsWith("huawei") || lower.startsWith("honor")) ->
         ModelMatch(null, ModelSupport.UNKNOWN, "Not in the list of known watches; it may not work")
       model == null -> ModelMatch(null, ModelSupport.UNSUPPORTED, "Not a Huawei or Honor watch")
-      model.transport == ModelTransport.LE ->
+      model.transport == ModelTransport.LE && !model.leConnectable ->
         ModelMatch(model, ModelSupport.UNSUPPORTED, "Uses Bluetooth LE, which JoyoFit does not support yet")
+      model.transport == ModelTransport.LE ->
+        ModelMatch(model, ModelSupport.EXPERIMENTAL_LE, "Not tested with JoyoFit yet; connects over Bluetooth LE (experimental)")
       model.pake -> ModelMatch(model, ModelSupport.UNSUPPORTED, "Uses Honor's newer pairing, which JoyoFit does not support yet")
       model.tested -> ModelMatch(model, ModelSupport.TESTED, null)
       else -> ModelMatch(model, ModelSupport.EXPERIMENTAL, "Not tested with JoyoFit yet")
