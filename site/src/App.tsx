@@ -558,7 +558,7 @@ function Scores() {
           </p>
         </div>
         <p className="mt-4 rounded-2xl bg-makan-soft p-4 text-[0.9375rem] leading-relaxed text-makan-ink">
-          <span className="font-bold">Segera di JoyoRogo.</span> Kalau kamu masuk dengan akun{" "}
+          <span className="font-bold">Juga di JoyoRogo.</span> Kalau kamu masuk dengan akun{" "}
           <a href={JOYOROGO_URL} className="font-bold underline underline-offset-2">
             JoyoRogo
           </a>
@@ -613,7 +613,7 @@ function Features() {
         </a>
         <p className="mt-4 text-xs text-makan-ink/70">
           Kartu kalori dibuat dari hasil reverse engineering Huawei Health dan belum diuji di Fit 4
-          Pro. Skor harian di JoyoRogo segera hadir.
+          Pro.
         </p>
       </article>
 
