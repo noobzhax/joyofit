@@ -10,16 +10,18 @@ import type { SleepSegment, StepSample } from '@/wear';
 /** Sleep older than this is not "last night"; the session picker only looks this far back. */
 const SLEEP_LOOKBACK_SEC = 36 * 3600;
 
-/** Strain shows today and the six days before it. */
+/** Strain bars show today and the six days before it. */
 export const STRAIN_DAYS = 7;
+/** History for readiness: the 30-day resting heart-rate baseline and 28-day training load. */
+export const HISTORY_DAYS = 30;
 
 export interface TodayData {
   /** Local midnight (unix seconds) the samples were queried from. */
   dayStart: number;
   /** Samples from `dayStart` onwards, oldest first. */
   samples: StepSample[];
-  /** Samples from `STRAIN_DAYS - 1` days before `dayStart` onwards, oldest first (strain). */
-  weekSamples: StepSample[];
+  /** Samples from `HISTORY_DAYS` days before `dayStart` onwards, oldest first (strain, readiness). */
+  historySamples: StepSample[];
   sleep: SleepSegment[];
   /** The watch's sleep scores; Today picks the one for last night. */
   sleepScores: SleepScoreRow[];
@@ -43,14 +45,14 @@ export function useTodayData(dataVersion: number): TodayState {
       const nowSec = Math.floor(Date.now() / 1000);
       const dayStart = startOfLocalDay(nowSec);
       Promise.all([
-        listStepSamplesSince(db, dayStart - (STRAIN_DAYS - 1) * 86400),
+        listStepSamplesSince(db, dayStart - HISTORY_DAYS * 86400),
         listSleepSince(db, nowSec - SLEEP_LOOKBACK_SEC),
         getLatestHeartRate(db),
         listSleepScores(db),
       ]).then(
-        ([weekSamples, sleep, latestHeart, sleepScores]) => {
-          const samples = weekSamples.filter((s) => s.timestamp >= dayStart);
-          if (!cancelled) setState({ data: { dayStart, samples, weekSamples, sleep, sleepScores, latestHeart }, error: null });
+        ([historySamples, sleep, latestHeart, sleepScores]) => {
+          const samples = historySamples.filter((s) => s.timestamp >= dayStart);
+          if (!cancelled) setState({ data: { dayStart, samples, historySamples, sleep, sleepScores, latestHeart }, error: null });
         },
         (e: unknown) => {
           if (!cancelled) setState({ data: null, error: errorMessage(e) });

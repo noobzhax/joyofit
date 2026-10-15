@@ -1,0 +1,147 @@
+import { startOfLocalDay, type SleepSummary } from '@/features/today/stats';
+import type { DayStrain } from '@/features/today/strain';
+import type { StepSample } from '@/wear';
+
+/**
+ * "Should you push today?" from signals the Fit 4 Pro actually gives JoyoFit. HRV is left out on purpose: the watch has
+ * sent no HRV entries so far, and a recovery read without it would only look complete. Each signal is shown with its
+ * numbers, and a signal without enough history is left out instead of guessed.
+ *
+ *  - Resting heart rate against your own 30-day average (Lamberts: a resting heart rate a few beats above baseline
+ *    goes with fatigue or illness).
+ *  - Last night's sleep against a need of 7 h 30 min plus up to 1 h after a hard day (yesterday's strain / 21).
+ *  - Training load balance: the average strain of the last 7 days against the last 28 (acute:chronic workload ratio,
+ *    Gabbett 2016; above 1.5 raises injury risk, below 0.8 is detraining).
+ */
+export const BASE_SLEEP_NEED_SEC = 7.5 * 3600;
+const EXTRA_NEED_SEC = 3600;
+/** Days of history the resting heart rate needs before it is compared. */
+const MIN_BASELINE_DAYS = 7;
+/** Days with heart rate the load balance needs. */
+const MIN_LOAD_DAYS = 14;
+export const LOAD_DAYS = 28;
+
+export type SignalTone = 'good' | 'neutral' | 'bad';
+export interface Signal {
+  key: 'rhr' | 'sleep' | 'load';
+  title: string;
+  value: string;
+  detail: string;
+  tone: SignalTone;
+}
+
+export type ReadinessHeadline = 'Primed' | 'Balanced' | 'Strained' | 'Run down';
+
+export interface Readiness {
+  headline: ReadinessHeadline | null;
+  signals: Signal[];
+  /** Signals that could not be computed yet, with the reason. */
+  missing: string[];
+}
+
+/** The watch's resting heart rate per local day: the lowest value it reported that day. */
+export function restingByDay(samples: readonly StepSample[]): Map<number, number> {
+  const days = new Map<number, number>();
+  for (const s of samples) {
+    if (!s.restingHeartRate || s.restingHeartRate <= 0) continue;
+    const day = startOfLocalDay(s.timestamp);
+    days.set(day, Math.min(days.get(day) ?? Infinity, s.restingHeartRate));
+  }
+  return days;
+}
+
+function mean(values: readonly number[]): number {
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+export function sleepNeedSec(yesterdayStrain: number | null): number {
+  return BASE_SLEEP_NEED_SEC + EXTRA_NEED_SEC * Math.min(1, Math.max(0, (yesterdayStrain ?? 0) / 21));
+}
+
+function hm(sec: number): string {
+  const min = Math.round(sec / 60);
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`;
+}
+
+export function readiness(input: {
+  dayStart: number;
+  samples: readonly StepSample[];
+  strain: readonly DayStrain[];
+  sleep: SleepSummary | null;
+}): Readiness {
+  const { dayStart, samples, strain, sleep } = input;
+  const signals: Signal[] = [];
+  const missing: string[] = [];
+
+  const resting = restingByDay(samples);
+  const today = resting.get(dayStart);
+  const history = [...resting.entries()].filter(([day]) => day < dayStart && day >= dayStart - 30 * 86400).map(([, v]) => v);
+  if (today === undefined) {
+    missing.push('Resting heart rate: the watch has not reported one today.');
+  } else if (history.length < MIN_BASELINE_DAYS) {
+    missing.push(`Resting heart rate: ${history.length} of ${MIN_BASELINE_DAYS} days of history so far.`);
+  } else {
+    const baseline = mean(history);
+    const delta = today - baseline;
+    signals.push({
+      key: 'rhr',
+      title: 'Resting heart rate',
+      value: `${today} bpm`,
+      detail: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} against your ${history.length}-day average of ${baseline.toFixed(0)}`,
+      tone: delta >= 5 ? 'bad' : delta <= -2 ? 'good' : 'neutral',
+    });
+  }
+
+  const yesterday = strain.find((d) => d.day < dayStart && d.day >= dayStart - 26 * 3600)?.strain ?? null;
+  if (!sleep) {
+    missing.push('Sleep: nothing stored for last night.');
+  } else {
+    const awake = sleep.byStage.find((s) => s.stage === 'awake')?.seconds ?? 0;
+    const slept = sleep.byStage.length > 0 ? sleep.totalSeconds - awake : sleep.totalSeconds;
+    const need = sleepNeedSec(yesterday);
+    const share = slept / need;
+    signals.push({
+      key: 'sleep',
+      title: 'Sleep',
+      value: `${Math.round(share * 100)} %`,
+      detail: `${hm(slept)} of the ${hm(need)} you needed${yesterday !== null ? ` after strain ${yesterday.toFixed(1)}` : ''}`,
+      tone: share >= 0.9 ? 'good' : share >= 0.75 ? 'neutral' : 'bad',
+    });
+  }
+
+  const loadDays = strain.filter((d) => d.day < dayStart && d.day >= dayStart - LOAD_DAYS * 86400);
+  if (loadDays.length < MIN_LOAD_DAYS) {
+    missing.push(`Training load: ${loadDays.length} of ${MIN_LOAD_DAYS} days with heart rate so far.`);
+  } else {
+    // Days without stored heart rate count as 0 strain over the window, like rest days.
+    const sum = (from: number) => loadDays.filter((d) => d.day >= from).reduce((a, d) => a + d.strain, 0);
+    const acute = sum(dayStart - 7 * 86400) / 7;
+    // Over the days since the first one with heart rate, so a short history is not diluted by days before it.
+    const span = Math.min(LOAD_DAYS, Math.round((dayStart - loadDays[0].day) / 86400));
+    const chronic = sum(dayStart - LOAD_DAYS * 86400) / span;
+    if (chronic <= 0) {
+      missing.push('Training load: no strain in the last 28 days.');
+    } else {
+      const ratio = acute / chronic;
+      signals.push({
+        key: 'load',
+        title: 'Training load',
+        value: ratio.toFixed(2),
+        detail: `last 7 days average ${acute.toFixed(1)} against 28 days ${chronic.toFixed(1)}${ratio > 1.5 ? ', a sharp rise' : ratio < 0.8 ? ', lighter than usual' : ''}`,
+        tone: ratio > 1.5 ? 'bad' : ratio < 0.8 ? 'neutral' : 'good',
+      });
+    }
+  }
+
+  return { headline: headline(signals), signals, missing };
+}
+
+function headline(signals: readonly Signal[]): ReadinessHeadline | null {
+  if (signals.length === 0) return null;
+  const bad = signals.filter((s) => s.tone === 'bad').length;
+  const good = signals.filter((s) => s.tone === 'good').length;
+  if (bad >= 2) return 'Run down';
+  if (bad === 1) return 'Strained';
+  if (good === signals.length && signals.length >= 2) return 'Primed';
+  return 'Balanced';
+}

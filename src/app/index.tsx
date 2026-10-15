@@ -25,6 +25,8 @@ import { useLiveHeartRate } from '@/features/today/useLiveHeartRate';
 import { useStepGoal } from '@/features/today/useStepGoal';
 import { useTodayData } from '@/features/today/useTodayData';
 import { WatchHero } from '@/features/today/WatchHero';
+import { ReadinessSection } from '@/features/today/ReadinessSection';
+import { readiness } from '@/features/today/readiness';
 import { StrainSection } from '@/features/today/StrainSection';
 import { dailyStrain } from '@/features/today/strain';
 import { DEFAULT_AGE, maxHeartRate } from '@/features/workouts/substrate';
@@ -62,6 +64,7 @@ export default function TodayScreen() {
     const sleep = lastSleepSession(data.sleep);
     const birthYear = HuaweiWear.getUserProfile()?.birthYear;
     const maxHr = maxHeartRate(birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE);
+    const strain = dailyStrain(data.historySamples, maxHr);
     return {
       totals: watchTotals ?? sumTotals(data.samples),
       totalsFromWatch: watchTotals !== null,
@@ -71,7 +74,8 @@ export default function TodayScreen() {
       sleepScore: sleep ? scoreFor(sleep.start, sleep.end, data.sleepScores) : null,
       hasSamples: data.samples.length > 0,
       maxHr,
-      strain: dailyStrain(data.weekSamples, maxHr),
+      strain,
+      readiness: readiness({ dayStart: data.dayStart, samples: data.historySamples, strain, sleep }),
     };
   }, [data, totals]);
 
@@ -149,6 +153,7 @@ export default function TodayScreen() {
         </View>
       )}
 
+      {view ? <ReadinessSection readiness={view.readiness} /> : null}
       {view ? <StrainSection days={view.strain} dayStart={data?.dayStart ?? 0} maxHr={view.maxHr} /> : null}
 
       <Section title="Heart rate today" icon="heart" tint="heart">
