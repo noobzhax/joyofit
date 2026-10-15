@@ -37,6 +37,9 @@ internal fun ModuleDefinitionBuilder.watchExtrasApi(runtime: () -> WearRuntime) 
   }
 
   AsyncFunction("setSosRelayEnabled") { enabled: Boolean ->
+    if (enabled && !Distribution.canSendSms) {
+      throw WearException(ErrorCodes.UNSUPPORTED, "This version of JoyoFit (Google Play) cannot send text messages")
+    }
     runtime().extras.settings.sosRelayEnabled = enabled
     runtime().sink.log(LogDirection.INFO, null, null, null, "SOS relay: switched ${if (enabled) "ON" else "OFF"} by the user")
   }

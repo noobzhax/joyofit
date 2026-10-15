@@ -16,8 +16,12 @@ export function CloudSection() {
   return (
     <Section title="Cloud" icon="cloud-upload">
       <AppText variant="caption" muted>
-        Backs up steps, heart rate, sleep and workouts to your JoyoFit cloud with your JoyoRogo
-        account. Off until you sign in. It only uploads; the app never reads from the cloud yet.
+        Backs up your steps, heart rate, SpO2, sleep and workouts, including GPS tracks and the
+        watch&apos;s Bluetooth address, to the JoyoFit cloud with your JoyoRogo account. Off until you
+        sign in; after that it uploads on its own, starting with your whole history. While signed
+        in, JoyoFit also exchanges meals, weight and daily scores with JoyoRogo. To delete cloud
+        data, email dzulfikar@joyorogo.com (see fit.joyorogo.com/privasi). The app never reads from
+        the cloud yet.
       </AppText>
       {!cloud.configured ? (
         <Notice tone="danger">

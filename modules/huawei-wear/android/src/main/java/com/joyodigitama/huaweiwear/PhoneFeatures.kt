@@ -178,6 +178,7 @@ internal class PhoneFeatures(
     "readPhoneState" to granted(Manifest.permission.READ_PHONE_STATE),
     "readCallLog" to granted(Manifest.permission.READ_CALL_LOG),
     "readContacts" to granted(Manifest.permission.READ_CONTACTS),
+    "callerIdSupported" to Distribution.canIdentifyCaller,
     "answerPhoneCalls" to granted(Manifest.permission.ANSWER_PHONE_CALLS),
     // Only known once a watch is connected and has reported its capabilities.
     "findWatchSupported" to (DeviceCaps.expandCapability(FIND_DEVICE_CAPABILITY) && DeviceCaps.expandCapability(CONFIG_COMMAND_CAPABILITY)),

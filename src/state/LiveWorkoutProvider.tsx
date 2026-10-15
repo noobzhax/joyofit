@@ -1,10 +1,14 @@
 import { useEventListener } from 'expo';
 import { useRootNavigationState, useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppState, PermissionsAndroid } from 'react-native';
+import Storage from 'expo-sqlite/kv-store';
+import { Alert, AppState, PermissionsAndroid } from 'react-native';
 
 import { isActive } from '@/features/live/liveWorkout';
 import { HuaweiWear, type LiveWorkout } from '@/wear';
+
+/** Set once the location explanation was shown, so the dialog does not come back on every launch. */
+const GPS_EXPLAINED_KEY = 'joyofit.gpsExplained';
 
 const LiveWorkoutContext = createContext<LiveWorkout | null | undefined>(undefined);
 
@@ -39,12 +43,23 @@ export function LiveWorkoutProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, []);
 
-  // The watch asks for the phone's GPS during outdoor workouts; that needs precise location.
+  // The watch asks for the phone's GPS during outdoor workouts; that needs precise location. Explain it once before
+  // Android's dialog; Settings > Phone and calls can ask again.
   useEffect(() => {
     const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-    void PermissionsAndroid.check(fine).then((granted) => {
-      if (!granted) return PermissionsAndroid.request(fine);
-    });
+    void (async () => {
+      if (await PermissionsAndroid.check(fine)) return;
+      if ((await Storage.getItem(GPS_EXPLAINED_KEY)) === '1') return;
+      await Storage.setItem(GPS_EXPLAINED_KEY, '1');
+      Alert.alert(
+        'Phone GPS for outdoor workouts',
+        'When you start an outdoor workout on your watch, the watch asks for this phone\'s GPS. JoyoFit then reads your precise location while the workout runs and sends it to the watch over Bluetooth. It is not stored or uploaded, and JoyoFit does not ask for location access in the background.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Continue', onPress: () => void PermissionsAndroid.request(fine) },
+        ],
+      );
+    })();
   }, []);
 
   const activeId = isActive(live) ? live.id : null;

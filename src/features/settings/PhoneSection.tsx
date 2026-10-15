@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking, PermissionsAndroid, type Permission } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -29,7 +29,17 @@ export function PhoneSection() {
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
 
-  const refresh = useCallback(() => setFeatures(HuaweiWear.getPhoneFeatures()), []);
+  const [gps, setGps] = useState<boolean | null>(null);
+  const checkGps = useCallback(
+    () => void PermissionsAndroid.check(PERMISSIONS.ACCESS_FINE_LOCATION).then(setGps),
+    [],
+  );
+  useEffect(checkGps, [checkGps]);
+
+  const refresh = useCallback(() => {
+    setFeatures(HuaweiWear.getPhoneFeatures());
+    checkGps();
+  }, [checkGps]);
   useNativeRefresh(refresh);
 
   const run = async (action: () => Promise<void>) => {
@@ -49,7 +59,7 @@ export function PhoneSection() {
       if (enabled) {
         const result = await ask(
           [PERMISSIONS.READ_PHONE_STATE],
-          [PERMISSIONS.READ_CALL_LOG, PERMISSIONS.READ_CONTACTS],
+          features.callerIdSupported ? [PERMISSIONS.READ_CALL_LOG, PERMISSIONS.READ_CONTACTS] : [],
         );
         if (!result.granted) {
           setBlocked(result.blocked);
@@ -87,13 +97,21 @@ export function PhoneSection() {
       <SwitchRow
         icon="call"
         label="Show incoming calls on the watch"
-        hint="Without call log access Android hides the caller number. Without contacts access you see the number instead of the name."
+        hint={
+          features.callerIdSupported
+            ? 'Without call log access Android hides the caller number. Without contacts access you see the number instead of the name.'
+            : 'The watch shows that the phone is ringing. This version of JoyoFit does not read your call log or contacts, so it cannot show who is calling.'
+        }
         value={features.callsEnabled}
         onValueChange={toggleCalls}
       />
       <KeyValue icon="phone-portrait" label="Phone state" value={features.readPhoneState ? 'Granted' : 'Not granted'} />
-      <KeyValue icon="list" label="Caller number (call log)" value={features.readCallLog ? 'Granted' : 'Not granted'} />
-      <KeyValue icon="people" label="Contact names" value={features.readContacts ? 'Granted' : 'Not granted'} />
+      {features.callerIdSupported ? (
+        <>
+          <KeyValue icon="list" label="Caller number (call log)" value={features.readCallLog ? 'Granted' : 'Not granted'} />
+          <KeyValue icon="people" label="Contact names" value={features.readContacts ? 'Granted' : 'Not granted'} />
+        </>
+      ) : null}
       <Divider />
       <SwitchRow
         icon="call-outline"
@@ -102,6 +120,22 @@ export function PhoneSection() {
         onValueChange={toggleCallControl}
       />
       <KeyValue icon="checkmark-circle" label="Answer phone calls" value={features.answerPhoneCalls ? 'Granted' : 'Not granted'} />
+      <Divider />
+      <KeyValue icon="navigate" label="Phone GPS for outdoor workouts" value={gps === null ? null : gps ? 'Granted' : 'Not granted'} />
+      {gps === false ? (
+        <Button
+          label="Allow precise location"
+          variant="secondary"
+          icon="location"
+          onPress={() =>
+            run(async () => {
+              setBlocked(false);
+              const result = await PermissionsAndroid.request(PERMISSIONS.ACCESS_FINE_LOCATION);
+              setBlocked(result === RESULTS.NEVER_ASK_AGAIN);
+            })
+          }
+        />
+      ) : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {blocked ? (
         <Button

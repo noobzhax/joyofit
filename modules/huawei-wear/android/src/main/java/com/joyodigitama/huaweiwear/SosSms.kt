@@ -19,9 +19,12 @@ internal class SosReadiness(
   val smsPermission: Boolean,
   val telephony: Boolean,
   val simReady: Boolean,
+  /** False in the Google Play build, whose manifest has no SEND_SMS (see [Distribution]). */
+  val buildCanSendSms: Boolean = true,
 ) {
   /** Every reason the SMS cannot go out, in the order Huawei Health checks them (`nev.onDataReceived`) plus the user switch. */
   fun blockers(): List<String> = buildList {
+    if (!buildCanSendSms) add("this version of JoyoFit (Google Play) cannot send text messages")
     if (!relayEnabled) add("the SOS SMS relay is switched off in JoyoFit")
     if (!smsPermission) add("the SEND_SMS permission is not granted")
     if (!telephony) add("this phone has no telephony")
@@ -70,6 +73,7 @@ internal class SosSmsGateway(context: Context) {
       telephony = telephony,
       // Huawei Health: TelephonyManager.getSimState() == 5 (SIM_STATE_READY).
       simReady = manager?.simState == TelephonyManager.SIM_STATE_READY,
+      buildCanSendSms = Distribution.canSendSms,
     )
   }
 

@@ -10,6 +10,8 @@ export interface SafetyStatus {
   fallUpdatedMs: number;
   /** The user's switch for sending the SMS the watch asks for. Off by default; no SMS is ever sent while off. */
   sosRelayEnabled: boolean;
+  /** This build can send SMS at all. False in the Google Play build, which has no SEND_SMS in its manifest. */
+  smsSupported: boolean;
   /** SEND_SMS is granted. */
   smsPermission: boolean;
   telephony: boolean;

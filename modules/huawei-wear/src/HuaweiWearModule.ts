@@ -38,6 +38,11 @@ import type { PhotoFace } from './HuaweiWearPhotoFace.types';
 import type { CoursesStatus, HealthyLivingStatus, RunningCourse, RunningCoursePushResult } from './HuaweiWearP2p.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
+  /**
+   * Which build this is. `play` (Google Play) has no SEND_SMS, READ_CALL_LOG or READ_CONTACTS, so SOS texts and caller
+   * names are not available; `sideload` is the APK from the website or a self-build. Set by `JOYOFIT_DISTRIBUTION` at build time.
+   */
+  readonly distribution: 'play' | 'sideload';
   /** Bonded Bluetooth devices, each with the support level of its model. Requires BLUETOOTH_CONNECT on Android 12+. */
   getBondedDevices(): Promise<BondedDevice[]>;
   /**

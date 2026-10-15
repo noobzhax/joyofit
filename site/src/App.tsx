@@ -24,7 +24,8 @@ import {
   Watch,
   type LucideIcon,
 } from "lucide-react";
-import { CLOUDAGNI_URL, GITHUB_URL, HARGA_URL, JOYOROGO_URL } from "./lib";
+import { CLOUDAGNI_URL, GITHUB_URL, HARGA_URL, JOYOROGO_URL, setMeta } from "./lib";
+import { PRIVASI_PATH, PrivasiPage } from "./Privasi";
 import { ButtonLink, GithubMark, Phone, Ring } from "./ui";
 
 /** Harga paket Founder JoyoRogo, sama dengan joyorogo.com/harga (api.joyorogo.com/api/config). */
@@ -234,6 +235,9 @@ function Footer() {
           </a>
           <a href={GITHUB_URL} className={link}>
             Kode sumber
+          </a>
+          <a href={PRIVASI_PATH} className={link}>
+            Privasi
           </a>
         </nav>
       </div>
@@ -942,10 +946,6 @@ const SELF_HOST_META = {
     "Panduan memasang server cloud JoyoFit (Cloudflare Worker, D1, R2) di CloudAgni. Datamu tetap di akunmu sendiri.",
 };
 
-function setMeta(selector: string, attr: string, value: string) {
-  document.head.querySelector(selector)?.setAttribute(attr, value);
-}
-
 function SelfHostPage() {
   useEffect(() => {
     const { title, description } = SELF_HOST_META;
@@ -1132,6 +1132,7 @@ export function App() {
   const path = window.location.pathname.replace(/\/+$/, "");
   const selfHost = path === SELF_HOST_PATH;
   const jam = path === JAM_PATH;
+  const privasi = path === PRIVASI_PATH;
   return (
     <div className="min-h-svh">
       <Header />
@@ -1140,6 +1141,8 @@ export function App() {
           <SelfHostPage />
         ) : jam ? (
           <JamPage />
+        ) : privasi ? (
+          <PrivasiPage />
         ) : (
           <>
             <Hero />

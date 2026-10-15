@@ -38,7 +38,9 @@ internal class WatchExtras(
       "fallNote" to (fallGate ?: "the watch reports fall detection support"),
       "fallSwitch" to settings.fallSwitch,
       "fallUpdatedMs" to settings.fallUpdatedMs,
-      "sosRelayEnabled" to settings.sosRelayEnabled,
+      // A switch left on by an earlier build still reads off here: the Play build never sends an SMS.
+      "sosRelayEnabled" to (settings.sosRelayEnabled && Distribution.canSendSms),
+      "smsSupported" to Distribution.canSendSms,
       "smsPermission" to readiness.smsPermission,
       "telephony" to readiness.telephony,
       "simReady" to readiness.simReady,

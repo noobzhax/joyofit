@@ -267,11 +267,11 @@ browser. It builds on [`packages/hwt`](packages/hwt/README.md), the TypeScript `
 | `WAKE_LOCK` | keep the CPU awake while a reconnect or sync runs in the background |
 | Notification access (special, granted in Android settings) | read posted notifications to forward them |
 | `VIBRATE` | find my phone vibration |
-| `READ_PHONE_STATE`, `READ_CALL_LOG`, `READ_CONTACTS` | show incoming calls on the watch: call state, the caller's number, the contact name (runtime prompt from Settings; only the first is required) |
+| `READ_PHONE_STATE`, `READ_CALL_LOG`, `READ_CONTACTS` | show incoming calls on the watch: call state, the caller's number, the contact name (runtime prompt from Settings; only the first is required). The Google Play build has only `READ_PHONE_STATE`: the watch shows "Incoming call" without a caller |
 | `ANSWER_PHONE_CALLS` | accept or reject a call from the watch (runtime prompt from Settings) |
 | `android.permission.health.WRITE_STEPS`, `WRITE_DISTANCE`, `WRITE_ACTIVE_CALORIES_BURNED`, `WRITE_HEART_RATE`, `WRITE_RESTING_HEART_RATE`, `WRITE_OXYGEN_SATURATION`, `WRITE_SLEEP`, `WRITE_EXERCISE` | write the watch data to Health Connect (asked from Settings through Health Connect's own dialog; write only, no read) |
 | `INTERNET` | fetch the weather and search cities from Open-Meteo; sign in with JoyoRogo and upload to the JoyoFit cloud server (Settings → Health & cloud → Cloud) |
-| `SEND_SMS` | send the SOS text the watch asks for, only with Settings → Safety → "Send SOS texts for the watch" switched on (runtime prompt from that switch; off by default) |
+| `SEND_SMS` | send the SOS text the watch asks for, only with Settings → Safety → "Send SOS texts for the watch" switched on (runtime prompt from that switch; off by default). Not in the Google Play build, which tells the watch that no SMS was sent |
 | `ACCESS_COARSE_LOCATION` | weather for the phone's position (runtime prompt from Settings → Weather; not needed in city mode) |
 
 There is no `QUERY_ALL_PACKAGES`: the app chooser lists launcher apps through a `<queries>` entry.
@@ -402,6 +402,21 @@ bun run typecheck && bun run lint
 ```
 
 Keep `JAVA_HOME` pointed at JDK 17 and `ANDROID_HOME` at the SDK.
+
+### Release builds: sideload APK and Google Play AAB
+
+Both are signed with `keystore/keystore.properties` (restore it as described in `~/.config/joyofit/KEYSTORE_BACKUP.md`) and
+get `versionCode` = minutes since 2024-01-01 UTC (`plugins/with-version-code.js`), so every build is newer than the last.
+
+```bash
+scripts/build-release.sh          # dist/joyofit-<versionCode>.apk: every permission, SOS texts and caller names work
+scripts/build-release.sh --play   # dist/joyofit-play-<versionCode>.aab: the Google Play build
+```
+
+`--play` sets `JOYOFIT_DISTRIBUTION=play`. Gradle (`modules/huawei-wear/android/build.gradle`) then merges
+`src/play/AndroidManifest.xml`, which removes `SEND_SMS`, `READ_CALL_LOG` and `READ_CONTACTS`, and the app reads the native
+constant `HuaweiWear.distribution` (`'play'` or `'sideload'`) to hide the features that need them. The script fails if the
+AAB's merged manifest still has a restricted permission. Publishing on Google Play: [`docs/play-store.md`](docs/play-store.md).
 
 ## Layout
 

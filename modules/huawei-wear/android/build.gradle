@@ -6,13 +6,29 @@ plugins {
 group = 'com.joyodigitama.huaweiwear'
 version = '0.1.0'
 
+// "play" for Google Play builds (JOYOFIT_DISTRIBUTION=play or -PjoyofitDistribution=play), "sideload" otherwise.
+// Play builds drop SEND_SMS, READ_CALL_LOG and READ_CONTACTS (src/play/AndroidManifest.xml) and the code that needs them
+// switches itself off (Distribution.kt).
+def joyofitDistribution = (findProperty('joyofitDistribution') ?: System.getenv('JOYOFIT_DISTRIBUTION') ?: 'sideload').toString().toLowerCase()
+if (!(joyofitDistribution in ['play', 'sideload'])) {
+  throw new GradleException("JOYOFIT_DISTRIBUTION must be 'play' or 'sideload', got '${joyofitDistribution}'")
+}
+
 android {
   namespace "com.joyodigitama.huaweiwear"
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    buildConfigField "String", "DISTRIBUTION", "\"${joyofitDistribution}\""
+  }
+  buildFeatures {
+    buildConfig true
   }
   sourceSets {
+    if (joyofitDistribution == 'play') {
+      debug.manifest.srcFile 'src/play/AndroidManifest.xml'
+      release.manifest.srcFile 'src/play/AndroidManifest.xml'
+    }
     main {
       // The shared database migrations (also imported by src/db/migrations.ts) ship as an asset.
       assets.srcDirs += file('../schema')

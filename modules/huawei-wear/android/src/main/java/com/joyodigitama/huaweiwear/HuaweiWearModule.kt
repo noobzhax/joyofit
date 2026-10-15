@@ -122,6 +122,9 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
+    // "play" for the Google Play build, "sideload" otherwise (see Distribution.kt).
+    Constant("distribution") { Distribution.name }
+
     Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged", "onFaceCustomization", "onLiveWorkout", "onHrvProgress")
 
     OnCreate {

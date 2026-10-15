@@ -12,6 +12,8 @@ export interface PhoneFeatures {
   readCallLog: boolean;
   /** READ_CONTACTS: shows the contact name instead of the number. */
   readContacts: boolean;
+  /** This build can learn who is calling. False in the Google Play build, which has neither READ_CALL_LOG nor READ_CONTACTS. */
+  callerIdSupported: boolean;
   /** ANSWER_PHONE_CALLS: needed to accept or reject a call from the watch. */
   answerPhoneCalls: boolean;
   /** The connected watch reported find-device support. False while disconnected. */

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { KeyValue } from '@/components/KeyValue';
@@ -12,6 +12,12 @@ import { HuaweiWear } from '@/wear';
 
 /** Android 13 (API 33) introduced the runtime POST_NOTIFICATIONS permission. */
 const RUNTIME_NOTIFICATION_API = 33;
+
+/** Shown before Android's notification-access screen: what is read, where it goes, what is kept. */
+const DISCLOSURE =
+  'JoyoFit reads the notifications on this phone (app name, title and text) so it can show them on your watch. ' +
+  'They are sent to the watch over Bluetooth only. JoyoFit does not store them and does not send them over the internet. ' +
+  'You can choose which apps are forwarded, and turn this off at any time.';
 
 export function NotificationsSection() {
   const [access, setAccess] = useState(() => HuaweiWear.getNotificationAccess());
@@ -55,13 +61,20 @@ export function NotificationsSection() {
         label="Open notification access"
         variant="secondary"
         icon="open-outline"
-        onPress={() => run(() => HuaweiWear.openNotificationAccess())}
+        onPress={() =>
+          Alert.alert('Read your notifications?', DISCLOSURE, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => void run(() => HuaweiWear.openNotificationAccess()) },
+          ])
+        }
       />
-      <Notice>
-        On Android 13 and newer, an app installed outside the Play Store must first be allowed to
-        use restricted settings: App info, then the menu (three dots), then Allow restricted
-        settings.
-      </Notice>
+      {HuaweiWear.distribution === 'sideload' ? (
+        <Notice>
+          On Android 13 and newer, an app installed outside the Play Store must first be allowed to
+          use restricted settings: App info, then the menu (three dots), then Allow restricted
+          settings.
+        </Notice>
+      ) : null}
       <SwitchRow
         icon="notifications"
         label="Forward notifications to the watch"

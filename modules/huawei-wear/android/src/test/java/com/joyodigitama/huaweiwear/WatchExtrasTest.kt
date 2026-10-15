@@ -113,6 +113,10 @@ class WatchExtrasTest {
       SosReadiness(false, false, true, false).blockers(),
     )
     assertEquals(listOf("this phone has no telephony"), SosReadiness(true, true, false, false).blockers())
+    assertEquals(
+      listOf("this version of JoyoFit (Google Play) cannot send text messages"),
+      SosReadiness(true, true, true, true, buildCanSendSms = false).blockers(),
+    )
   }
 
   @Test

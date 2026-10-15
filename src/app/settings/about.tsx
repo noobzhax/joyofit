@@ -12,7 +12,8 @@ export default function AboutScreen() {
         <KeyValue icon="pricetag" label="Version" value={Constants.expoConfig?.version ?? null} />
         <KeyValue icon="document-text" label="License" value="AGPL-3.0-or-later" />
         <Notice icon="lock-closed">
-          Data stays on this phone in joyofit.db until you sign in to the cloud.
+          Watch data stays on this phone in joyofit.db until you sign in to the cloud. Weather, if switched on, sends
+          rounded coordinates to Open-Meteo. Privacy policy: fit.joyorogo.com/privasi
         </Notice>
       </Section>
     </Screen>

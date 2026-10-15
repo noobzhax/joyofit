@@ -138,7 +138,7 @@ internal class CallForwarder(
       callerNumber = number
     }
     queue.trySend {
-      val name = withContext(Dispatchers.IO) { contactName(callerNumber) } ?: callerNumber ?: UNKNOWN_CALLER
+      val name = withContext(Dispatchers.IO) { contactName(callerNumber) } ?: callerNumber ?: if (Distribution.canIdentifyCaller) UNKNOWN_CALLER else INCOMING_CALL
       sendRinging(name, callerNumber)
     }
   }
@@ -246,6 +246,9 @@ internal class CallForwarder(
     /** How long a RINGING without a number waits for the second broadcast that carries it. */
     const val NUMBER_WAIT_MS = 1_500L
     const val UNKNOWN_CALLER = "Unknown caller"
+
+    /** The Google Play build has no READ_CALL_LOG, so Android never hands it the caller. */
+    const val INCOMING_CALL = "Incoming call"
   }
 }
 
