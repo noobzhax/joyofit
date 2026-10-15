@@ -9,7 +9,7 @@ import { EmptyState, Notice, Skeleton } from '@/components/States';
 import { useWatchfaces } from '@/features/watchfaces/useWatchfaces';
 import { formatDateTime } from '@/format';
 import { radius, spacing, tintColors, useColors } from '@/theme';
-import { FIT4_SCREEN, type WatchfaceInfo } from '@/wear';
+import type { WatchfaceInfo } from '@/wear';
 
 const SKELETON_ROWS = [0, 1, 2];
 
@@ -81,9 +81,11 @@ export function WatchfacesScreen() {
     <View style={styles.header}>
       <Section title="Install a watch face" icon="cloud-upload">
         <AppText variant="caption">
-          Make faces in Huawei Theme Studio Pro and export them as .hwt files. The Watch Fit 4 and Fit 4 Pro screen
-          is {FIT4_SCREEN.width} x {FIT4_SCREEN.height} px. A face made for another screen is refused before it is
-          sent.
+          Make faces in Huawei Theme Studio Pro and export them as .hwt files.{' '}
+          {list?.width && list.height
+            ? `This watch's screen is ${list.width} x ${list.height} px.`
+            : 'Make them for your watch\'s screen size.'}{' '}
+          A face made for another screen is refused before it is sent.
         </AppText>
         <AppText variant="caption" muted>
           Whether the watch accepts a face that Huawei did not sign is not known. If it refuses, the exact status

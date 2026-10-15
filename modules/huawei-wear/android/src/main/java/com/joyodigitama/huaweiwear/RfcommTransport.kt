@@ -15,7 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants
+import java.util.UUID
 
 /** Where [HuaweiSession] puts frames. */
 internal interface FrameSink {
@@ -24,13 +24,14 @@ internal interface FrameSink {
 }
 
 /**
- * Bluetooth Classic RFCOMM link to the watch, resolved through SDP
- * (`UUID_SERVICE_HUAWEI_SDP`), as GB's BtBRQueue does for HuaweiBRSupport: discovery cancelled
+ * Bluetooth Classic RFCOMM link to the watch, resolved through SDP ([sdp]: `UUID_SERVICE_HUAWEI_SDP`, or
+ * `UUID_SERVICE_HONOR_SDP` for GB's HonorBRSupport), as GB's BtBRQueue does: discovery cancelled
  * before connecting, one read thread handing raw chunks to [onData], writes serialized.
  */
 internal class RfcommTransport(
   private val adapter: BluetoothAdapter,
   private val device: BluetoothDevice,
+  private val sdp: UUID,
   private val onData: (ByteArray) -> Unit,
   /** Called once if the link ends without [close] having been called; null cause means clean EOF. */
   private val onRemoteClosed: (IOException?) -> Unit,
@@ -50,7 +51,7 @@ internal class RfcommTransport(
       } catch (ignored: SecurityException) {
         // No BLUETOOTH_SCAN: we never started discovery, so there is nothing of ours to cancel.
       }
-      device.createRfcommSocketToServiceRecord(HuaweiConstants.UUID_SERVICE_HUAWEI_SDP)
+      device.createRfcommSocketToServiceRecord(sdp)
     } catch (e: IOException) {
       throw WearException(ErrorCodes.CONNECT_FAILED, "Unable to open RFCOMM socket: ${e.message}", e)
     } catch (e: SecurityException) {

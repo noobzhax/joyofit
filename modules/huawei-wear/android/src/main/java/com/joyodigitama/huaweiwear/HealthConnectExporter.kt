@@ -22,6 +22,7 @@ import androidx.health.connect.client.units.Percentage
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.util.Locale
 import kotlin.reflect.KClass
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -252,12 +253,15 @@ internal class HealthConnectExporter(
   // Export bodies
 
   private fun deviceInfo(): Device {
-    val model = syncStore.read { db ->
-      db.rawQuery("SELECT product_model FROM device ORDER BY last_sync DESC LIMIT 1", null).use {
-        if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null
+    val (name, productModel) = syncStore.read { db ->
+      db.rawQuery("SELECT name, product_model FROM device ORDER BY last_sync DESC LIMIT 1", null).use {
+        if (it.moveToFirst()) it.getString(0) to (if (it.isNull(1)) null else it.getString(1)) else null to null
       }
     }
-    return Device(manufacturer = "Huawei", model = model ?: "Watch Fit 4 Pro", type = Device.TYPE_WATCH)
+    val manufacturer = if (name?.trim()?.lowercase(Locale.ROOT)?.startsWith("honor") == true) "Honor" else "Huawei"
+    // "Watch GT 4" without the brand, which is the manufacturer field.
+    val catalogModel = WatchModels.match(name).model?.name?.substringAfter(' ')
+    return Device(manufacturer = manufacturer, model = productModel ?: catalogModel, type = Device.TYPE_WATCH)
   }
 
   private suspend fun exportWindow(

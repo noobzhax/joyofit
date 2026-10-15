@@ -49,6 +49,12 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   getState(): LinkState;
   /** The connected watch (also when the background service connected it), or null. */
   getDevice(): DeviceInfo | null;
+  /**
+   * Plain text for people who add support for a watch: app, phone, the last watch (model, software, supported commands,
+   * ExpandCapability) and the log of its last connect plus the newest lines. Bluetooth addresses and the serial number
+   * are left out. Works without a connected watch.
+   */
+  getSupportReport(): Promise<string>;
   refreshBattery(): Promise<number>;
   /**
    * Pulls sleep, steps and today's totals since the last stored sync (7 days on the first sync,

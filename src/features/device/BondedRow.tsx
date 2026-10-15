@@ -3,6 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { IconChip } from '@/components/IconChip';
+import { canConnect, SUPPORT_LABEL } from '@/features/device/modelSupport';
 import { spacing } from '@/theme';
 import type { BondedDevice, LinkState } from '@/wear';
 
@@ -38,9 +39,11 @@ export function BondedRow({
     );
   }
 
+  const connectable = canConnect(device);
+
   return (
     <View style={styles.row}>
-      <View style={[styles.header, !device.supported && styles.dimmed]}>
+      <View style={[styles.header, !connectable && styles.dimmed]}>
         <IconChip icon="watch" tint={isActive ? 'link' : 'neutral'} />
         <View style={styles.text}>
           <AppText variant="bodyStrong" numberOfLines={1}>
@@ -50,8 +53,13 @@ export function BondedRow({
             {device.address}
           </AppText>
           <AppText variant="caption" muted>
-            {device.supported ? 'Huawei Watch Fit 4 / Fit 4 Pro' : 'Not a supported watch'}
+            {device.model ? `${device.model} · ${SUPPORT_LABEL[device.support]}` : SUPPORT_LABEL[device.support]}
           </AppText>
+          {device.reason ? (
+            <AppText variant="caption" muted>
+              {device.reason}
+            </AppText>
+          ) : null}
         </View>
       </View>
       <View style={styles.actions}>
@@ -65,11 +73,11 @@ export function BondedRow({
           <Button
             label="Connect"
             variant="primary"
-            disabled={!device.supported || !idle}
+            disabled={!connectable || !idle}
             onPress={() => onConnect(device.address)}
           />
         )}
-        {device.supported ? (
+        {connectable ? (
           <Button label="Forget pairing" variant="destructive" disabled={!idle && !isActive} onPress={confirmForget} />
         ) : null}
       </View>

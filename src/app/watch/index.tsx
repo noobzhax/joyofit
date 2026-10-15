@@ -10,6 +10,8 @@ import { Divider, Screen, Section } from '@/components/Screen';
 import { EmptyState, LoadingState, Notice } from '@/components/States';
 import { BondedRow } from '@/features/device/BondedRow';
 import { FindWatchSection } from '@/features/device/FindWatchSection';
+import { SUPPORT_LABEL, supportRank } from '@/features/device/modelSupport';
+import { SupportReportSection } from '@/features/device/SupportReportSection';
 import { WatchStatusCard } from '@/features/device/WatchStatusCard';
 import { useBluetoothPermission } from '@/features/device/useBluetoothPermission';
 import { useBondedDevices } from '@/features/device/useBondedDevices';
@@ -59,13 +61,13 @@ export default function WatchScreen() {
   const showEmpty = bonded.devices.length === 0 && !bonded.loading && !bonded.error;
   const linked = watch.linkState === 'connected' || watch.linkState === 'syncing';
 
-  // The watch in use first, then the ones this app can talk to.
+  // The watch in use first, then the ones this app can talk to best.
   const devices = useMemo(
     () =>
       [...bonded.devices].sort(
         (a, b) =>
           Number(b.address === watch.activeAddress) - Number(a.address === watch.activeAddress) ||
-          Number(b.supported) - Number(a.supported),
+          supportRank(a.support) - supportRank(b.support),
       ),
     [bonded.devices, watch.activeAddress],
   );
@@ -145,7 +147,9 @@ export default function WatchScreen() {
   const watchDetails = device ? (
     <Section title="Watch details" icon="watch">
       <KeyValue icon="pricetag" label="Name" value={device.name} />
-      <KeyValue icon="watch" label="Model" value={device.productModel} />
+      <KeyValue icon="watch" label="Model" value={device.model ?? device.productModel} />
+      <KeyValue icon="flask" label="JoyoFit support" value={SUPPORT_LABEL[device.support]} />
+      {device.model ? <KeyValue icon="hardware-chip" label="Product code" value={device.productModel} /> : null}
       <KeyValue icon="code-slash" label="Software" value={device.softwareVersion} />
       <KeyValue icon="hardware-chip" label="Hardware" value={device.hardwareVersion} />
       <KeyValue icon="barcode" label="Serial" value={device.serialNumber} />
@@ -205,6 +209,7 @@ export default function WatchScreen() {
           <FindWatchSection />
           {watchDetails}
           {pairedWatches}
+          <SupportReportSection />
         </>
       ) : (
         <>
@@ -213,6 +218,7 @@ export default function WatchScreen() {
           {watchDetails}
           {device ? <FindWatchSection /> : null}
           {onTheWatch}
+          <SupportReportSection />
         </>
       )}
       {device ? <ConnectSteps /> : null}

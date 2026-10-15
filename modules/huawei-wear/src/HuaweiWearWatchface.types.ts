@@ -67,6 +67,3 @@ export interface UploadResultEvent {
   code: number | null;
   message: string;
 }
-
-/** Huawei Watch Fit 4 and Fit 4 Pro screen: 408 x 480 px (width x height), theme version HWHD13 in Theme Studio Pro. */
-export const FIT4_SCREEN = { width: 408, height: 480 } as const;

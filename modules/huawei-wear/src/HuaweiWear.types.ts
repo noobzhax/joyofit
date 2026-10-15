@@ -13,11 +13,21 @@ export type LinkState =
 /** Authentication path negotiated from LinkParams.deviceSupportType + SecurityNegotiation.authType. */
 export type AuthMode = 'normal' | 'hichain-lite' | 'hichain' | 'hichain3';
 
+/**
+ * How far JoyoFit gets with a watch model: `tested` on a real watch; `experimental` in Gadgetbridge's device list and on
+ * the Bluetooth link JoyoFit speaks, never tried; `unknown` a Huawei or Honor name in no list, tried like a Huawei watch;
+ * `unsupported` JoyoFit cannot talk to it (see `reason`).
+ */
+export type ModelSupport = 'tested' | 'experimental' | 'unknown' | 'unsupported';
+
 export interface BondedDevice {
   address: string;
   name: string;
-  /** Name matches a Huawei Watch Fit 4 / Fit 4 Pro advertisement ("HUAWEI WATCH FIT 4-XXX"). */
-  supported: boolean;
+  /** The model the Bluetooth name belongs to ("Huawei Watch GT 4"); null when it is in no list. */
+  model: string | null;
+  support: ModelSupport;
+  /** Why it is not `tested`, in a few words; null for tested models. */
+  reason: string | null;
 }
 
 export interface DeviceInfo {
@@ -29,6 +39,9 @@ export interface DeviceInfo {
   serialNumber: string | null;
   batteryLevel: number | null;
   authMode: AuthMode;
+  /** See `BondedDevice.model`. */
+  model: string | null;
+  support: ModelSupport;
 }
 
 /** One-minute activity sample from FitnessData step frames. Timestamps are unix seconds. */

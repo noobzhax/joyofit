@@ -60,8 +60,13 @@ internal class WearRuntime private constructor(context: Context) {
   var paused = false
     private set
 
+  /** What the support report quotes; fed from [events] whether or not a screen listens. */
+  val supportLog = SupportLog()
+
   private val events: WearEvents = object : WearEvents {
     override fun state(state: LinkState, error: String?) {
+      if (state == LinkState.CONNECTING) supportLog.connectStarted()
+      supportLog.add("STATE ${state.wire}" + if (error != null) ": $error" else "")
       status.update { it.copy(state = state, note = if (state == LinkState.DISCONNECTED) it.note else null) }
       listeners.forEach { it.state(state, error) }
       if (state == LinkState.DISCONNECTED || state == LinkState.CONNECTED) controller?.onLinkChanged()
@@ -91,6 +96,8 @@ internal class WearRuntime private constructor(context: Context) {
       val ids = if (serviceId != null) " svc=%02x cmd=%02x".format(serviceId, commandId ?: 0) else ""
       val line = "${direction.wire.uppercase()}$ids $message" + if (hex != null) " $hex" else ""
       if (direction == LogDirection.ERROR) android.util.Log.e("JoyoFit", line) else android.util.Log.i("JoyoFit", line)
+      // Without the frame hex: it is encrypted with this phone's key and means nothing to anyone reading the report.
+      supportLog.add("${direction.wire.uppercase()}$ids $message")
       listeners.forEach { it.log(direction, serviceId, commandId, hex, message) }
     }
 
@@ -124,6 +131,19 @@ internal class WearRuntime private constructor(context: Context) {
   val sink: WearEvents get() = events
 
   val link = WearLink(appContext, events, settings, syncStore)
+
+  /** Plain text for "Share a support report": the last watch, its capabilities and the kept log, without addresses or serial. */
+  fun supportReport(): String {
+    val device = link.deviceInfo() ?: link.lastDeviceInfo
+    return SupportReport.build(
+      context = appContext,
+      watchName = link.lastAttemptName ?: settings.watchName,
+      device = device,
+      linkState = link.currentState(),
+      log = supportLog.lines(),
+    )
+  }
+
   val forwarder = NotificationForwarder(appContext, settings, link, events, scope)
   val features = PhoneFeatures(appContext, PhoneFeatureSettings(appContext), link, events, scope, forwarder::nextMessageId)
   val healthConnect = HealthConnectExporter(appContext, syncStore, events, scope)

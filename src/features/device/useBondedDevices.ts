@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
+import { supportRank } from '@/features/device/modelSupport';
 import { errorMessage } from '@/format';
 import { HuaweiWear, type BondedDevice } from '@/wear';
 
@@ -10,10 +11,10 @@ interface BondedState {
   error: string | null;
 }
 
-/** Supported watches first, then by name. */
+/** Tested watches first, then experimental, unknown and unsupported, each by name. */
 function sortBonded(devices: BondedDevice[]): BondedDevice[] {
   return [...devices].sort(
-    (a, b) => Number(b.supported) - Number(a.supported) || a.name.localeCompare(b.name),
+    (a, b) => supportRank(a.support) - supportRank(b.support) || a.name.localeCompare(b.name),
   );
 }
 

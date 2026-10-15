@@ -191,7 +191,7 @@ internal object WatchfacePackages {
       throw WearException(
         ErrorCodes.INVALID_ARGUMENT,
         "This watch face is made for a ${WatchfaceResolutions.screenByThemeVersion(description.screen)} screen (${description.screen}), " +
-          "but the watch reports $deviceScreen. Make it in Theme Studio Pro for the Watch Fit 4 (408 x 480).",
+          "but the watch reports $deviceScreen. Make it in Theme Studio Pro for this watch's screen.",
       )
     }
   }
@@ -240,7 +240,7 @@ internal object WatchfacePackages {
       ErrorCodes.INVALID_ARGUMENT,
       "This watch face was made for watch face version ${face.first}.${face.second} (description.xml version " +
         "${description.version}), but the watch supports up to $maxVersion" +
-        (if (otherVersions.isNotBlank()) " (and $otherVersions)" else "") + ". Export it again from Theme Studio Pro for the Watch Fit 4.",
+        (if (otherVersions.isNotBlank()) " (and $otherVersions)" else "") + ". Export it again from Theme Studio Pro for this watch.",
     )
   }
 

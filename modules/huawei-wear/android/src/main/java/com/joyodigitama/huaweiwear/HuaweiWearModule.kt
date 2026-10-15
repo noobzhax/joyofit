@@ -168,6 +168,10 @@ class HuaweiWearModule : Module() {
       }
     }
 
+    AsyncFunction("getSupportReport") {
+      runtime().supportReport()
+    }
+
     AsyncFunction("refreshBattery") Coroutine { ->
       runtime().link.refreshBattery()
     }

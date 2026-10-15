@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants
 
 /** What the notification and profile senders need from the live connection. */
 internal class LinkHandle(
@@ -56,7 +55,7 @@ internal class WearLink(
   @Volatile
   private var state = LinkState.DISCONNECTED
 
-  private inner class Connection(val address: String, val device: BluetoothDevice, adapter: BluetoothAdapter) {
+  private inner class Connection(val address: String, val device: BluetoothDevice, adapter: BluetoothAdapter, val model: ModelMatch) {
     val closed = AtomicBoolean(false)
     val operationLock = Mutex()
 
@@ -76,12 +75,14 @@ internal class WearLink(
     val transport = RfcommTransport(
       adapter = adapter,
       device = device,
+      sdp = model.sdp,
       onData = { chunk -> session.onData(chunk) },
       onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
     )
 
     init {
       session = HuaweiSession(transport, events)
+      session.params.setTransactionsCrypted(model.crypted)
     }
   }
 
@@ -100,6 +101,16 @@ internal class WearLink(
     if (connection == null || (state != LinkState.CONNECTED && state != LinkState.SYNCING)) null else connection.info
   }
 
+  /** The last watch this process connected to, as `connect` returned it; kept after it disconnects (support report). */
+  @Volatile
+  var lastDeviceInfo: Map<String, Any?>? = null
+    private set
+
+  /** The Bluetooth name of the watch of the last connect attempt, successful or not (support report). */
+  @Volatile
+  var lastAttemptName: String? = null
+    private set
+
   /** True until a HiChain bind with [address] has completed; a bind needs the user to confirm on the watch. */
   fun needsBind(address: String): Boolean = store.forDevice(address.trim().uppercase(Locale.ROOT)).isFirstConnection
 
@@ -112,19 +123,12 @@ internal class WearLink(
       return adapter.bondedDevices
         .map { device ->
           val name = device.name ?: device.address
-          mapOf("address" to device.address, "name" to name, "supported" to isSupportedName(name))
+          mapOf("address" to device.address, "name" to name) + WatchModels.match(device.name).toJs()
         }
         .sortedBy { (it["name"] as String).lowercase(Locale.ROOT) }
     } catch (e: SecurityException) {
       throw WearException(ErrorCodes.BLUETOOTH_PERMISSION, "BLUETOOTH_CONNECT permission denied: ${e.message}", e)
     }
-  }
-
-  /** HuaweiJoyoFit4ProCoordinator.getSupportedDeviceName: Fit 4 and Fit 4 Pro, case-insensitive. */
-  private fun isSupportedName(name: String): Boolean {
-    val lower = name.lowercase(Locale.ROOT)
-    return lower.startsWith(HuaweiConstants.HU_JOYOFIT4_NAME) ||
-      lower.startsWith(HuaweiConstants.HU_JOYOFIT4PRO_NAME)
   }
 
   private fun requireAdapter(): BluetoothAdapter {
@@ -173,7 +177,14 @@ internal class WearLink(
         }
       }
       if (joining == null) {
-        connection = Connection(address, adapter.getRemoteDevice(address), adapter)
+        val device = adapter.getRemoteDevice(address)
+        val name = bondedName(device)
+        val model = WatchModels.match(name)
+        if (!model.connectable) {
+          throw WearException(ErrorCodes.UNSUPPORTED, "${name ?: address}: ${model.reason}")
+        }
+        connection = Connection(address, device, adapter, model)
+        lastAttemptName = name
         current = connection
         state = LinkState.CONNECTING
       } else {
@@ -182,7 +193,15 @@ internal class WearLink(
     }
     joining?.let { return it.ready.await() }
     events.state(LinkState.CONNECTING, null)
-    events.log(LogDirection.INFO, null, null, null, "Connecting to $address (RFCOMM, SDP ${HuaweiConstants.UUID_SERVICE_HUAWEI_SDP})")
+    val model = connection.model
+    events.log(
+      LogDirection.INFO,
+      null,
+      null,
+      null,
+      "Connecting to $address \"${lastAttemptName ?: "no name"}\": ${model.model?.name ?: "unknown model"} (${model.support.wire}), " +
+        "RFCOMM, SDP ${model.sdp}, encrypted ${model.crypted}",
+    )
 
     try {
       connection.transport.connect(Timeouts.CONNECT_MS)
@@ -214,6 +233,8 @@ internal class WearLink(
         "serialNumber" to init.serialNumber,
         "batteryLevel" to init.batteryLevel,
         "authMode" to authMode.wire,
+        "model" to model.model?.name,
+        "support" to model.support.wire,
       )
 
       synchronized(lock) {
@@ -221,6 +242,7 @@ internal class WearLink(
           throw WearException(ErrorCodes.DISCONNECTED, "Disconnected while connecting")
         }
         connection.info = info
+        lastDeviceInfo = info
         connection.handle = LinkHandle(address, connection.session, init.notificationState, connection.operationLock)
         state = LinkState.CONNECTED
       }

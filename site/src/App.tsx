@@ -32,9 +32,17 @@ const PRICE = { monthly: "Rp15.000", yearly: "Rp150.000" };
 const FACTS = [
   { value: "Tanpa", label: "akun Huawei" },
   { value: "AGPL-3.0", label: "lisensi kode terbuka" },
-  { value: "Fit 4 + Pro", label: "jam yang didukung" },
+  { value: "Fit 4 Pro", label: "diuji, jam lain eksperimen" },
   { value: "Lokal dulu", label: "data di HP, cloud opsional" },
 ] as const;
+
+const JAM_SUDAH_DIUJI = ["Huawei Watch Fit 4 Pro"] as const;
+
+const JAM_EKSPERIMEN = ["Huawei Watch Fit 4", "Huawei Watch Fit 5", "Huawei Watch Fit 5 Pro", "Huawei Watch Fit 3", "Huawei Watch Fit 2", "Huawei Watch GT 2", "Huawei Watch GT 2 Pro", "Huawei Watch GT 3", "Huawei Watch GT 3 Pro", "Huawei Watch GT 3 SE", "Huawei Watch GT 4", "Huawei Watch GT 5", "Huawei Watch GT 5 Pro", "Huawei Watch GT 6", "Huawei Watch GT 6 Pro", "Huawei Watch GT 7", "Huawei Watch GT 7 Pro", "Huawei Watch GT Runner", "Huawei Watch GT Runner 2", "Huawei Watch GT Cyber", "Huawei Watch 3", "Huawei Watch 3 Pro", "Huawei Watch 4", "Huawei Watch 4 Pro", "Huawei Watch 5", "Huawei Watch D2", "Huawei Watch Ultimate", "Huawei Watch Ultimate 2", "Huawei TalkBand B6", "Honor MagicWatch 2", "Honor Watch GS 3", "Honor Watch GS Pro", "Honor Watch 4", "Honor Watch 4 Pro"] as const;
+
+const JAM_BELUM_BLE = ["Huawei Watch Fit", "Huawei Watch GT", "Huawei Watch GT 2e", "Huawei Band 2", "Huawei Band 2 Pro", "Huawei Band 3", "Huawei Band 3 Pro", "Huawei Band 3e", "Huawei Band 4", "Huawei Band 4 Pro", "Huawei Band 4e", "Huawei Band 6", "Huawei Band 7", "Huawei Band 8", "Huawei Band 9", "Huawei Band 10", "Huawei Band 11", "Huawei Band 11 Pro", "Honor Band 3", "Honor Band 4", "Honor Band 5", "Honor Band 6", "Honor Band 7", "Honor Band 9", "Honor Band 10", "Honor Watch"] as const;
+
+const JAM_BELUM_PAKE = ["Honor Watch 5", "Honor Watch 5 Pro", "Honor Watch 6"] as const;
 
 const BASICS = [
   {
@@ -118,7 +126,7 @@ const FAQ = [
   },
   {
     q: "Jam apa saja yang didukung?",
-    a: "Huawei Watch Fit 4 dan Fit 4 Pro. Aplikasinya untuk Android 10 ke atas. Belum ada versi iPhone.",
+    a: "Baru Huawei Watch Fit 4 Pro yang sudah diuji. Jam Huawei dan Honor lain yang memakai Bluetooth Classic masih eksperimen, dan jam Bluetooth LE (band, Watch Fit pertama, GT pertama) belum bisa. Daftar lengkapnya ada di bagian Jam yang didukung. Aplikasinya untuk Android 10 ke atas. Belum ada versi iPhone.",
   },
   {
     q: "Sudah stabil dipakai?",
@@ -163,6 +171,9 @@ function Header() {
         <nav aria-label="Utama" className="hidden items-center gap-1 md:flex">
           <a href="/#fitur" className={link}>
             Fitur
+          </a>
+          <a href="/#jam" className={link}>
+            Jam
           </a>
           <a href="/#cara" className={link}>
             Tiga cara pakai
@@ -267,7 +278,7 @@ function Hero() {
           </ButtonLink>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          Gratis dan open source. Untuk Huawei Watch Fit 4 dan Fit 4 Pro, Android 10 ke atas.
+          Gratis dan open source. Diuji di Huawei Watch Fit 4 Pro, jam lain eksperimen. Android 10 ke atas.
         </p>
       </div>
 
@@ -554,6 +565,74 @@ function WatchSection() {
           src="/shots/watch.webp"
           alt="Layar Watch di JoyoFit: Watch faces, Photo face, Alarms, dan tombol Ring the watch untuk mencari jam. Antarmuka berbahasa Inggris."
         />
+      </div>
+    </section>
+  );
+}
+
+function Chips({ items }: { items: readonly string[] }) {
+  return (
+    <ul className="mt-4 flex flex-wrap gap-2">
+      {items.map((m) => (
+        <li key={m} className="rounded-full bg-muted px-3 py-1 text-sm font-medium text-foreground">
+          {m}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SupportedWatches() {
+  return (
+    <section id="jam" data-section="jam" className="scroll-mt-16 border-t border-border/70 py-20 md:py-24">
+      <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+        <SectionTitle>Jam yang didukung</SectionTitle>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Baru Huawei Watch Fit 4 Pro yang sudah kami uji. Jam lain di daftar Gadgetbridge masih
+          eksperimen: sambungannya sama, tapi belum pernah dicoba dengan JoyoFit.
+        </p>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-[1.75rem] bg-makan-soft p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Sudah diuji</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Dicek langsung di jam asli.</p>
+            <Chips items={JAM_SUDAH_DIUJI} />
+          </div>
+          <div className="rounded-[1.75rem] bg-card p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Eksperimen</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Bluetooth Classic, belum pernah dicoba. Sebagian fitur mungkin tidak jalan.
+            </p>
+            <Chips items={JAM_EKSPERIMEN} />
+          </div>
+          <div className="rounded-[1.75rem] bg-card p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Belum bisa</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Bluetooth LE: JoyoFit belum punya jalur BLE.
+            </p>
+            <Chips items={JAM_BELUM_BLE} />
+            <p className="mt-5 text-sm text-muted-foreground">
+              Pairing baru Honor belum diimplementasi:
+            </p>
+            <Chips items={JAM_BELUM_PAKE} />
+            <p className="mt-5 text-sm text-muted-foreground">
+              Earphone (FreeBuds dan sejenisnya) bukan jam.
+            </p>
+          </div>
+        </div>
+        <p className="mt-6 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground">
+          Jam Huawei atau Honor yang tidak ada di daftar tetap dicoba, tapi mungkin tidak jalan.
+          Punya jam eksperimen? Sambungkan sekali, buka tab Watch, pilih Help support your watch, lalu
+          Share support report, dan kirim lewat{" "}
+          <a
+            href={`${GITHUB_URL}/issues`}
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-foreground underline underline-offset-4"
+          >
+            GitHub issue
+          </a>
+          . Laporannya teks biasa tanpa alamat Bluetooth dan nomor seri.
+        </p>
       </div>
     </section>
   );
@@ -910,6 +989,7 @@ export function App() {
             <Workouts />
             <Features />
             <WatchSection />
+            <SupportedWatches />
             <Promises />
             <Options />
             <Faq />
