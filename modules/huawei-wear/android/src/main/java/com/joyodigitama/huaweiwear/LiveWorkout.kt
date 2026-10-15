@@ -20,10 +20,11 @@ import kotlinx.coroutines.launch
 /**
  * A workout on the watch, followed live on the phone. Two sources:
  *  - the watch's own numbers, when it sends them (Huawei Health's reverse linkage [LiveWorkoutWire], or the `17/11` report);
- *  - otherwise JoyoFit's own session ([Source.GPS] / [Source.MANUAL]): the Fit 4 Pro (6.1.0.117) sends neither, but asks
- *    for the phone's GPS about every 20 s while an outdoor workout runs, and pushes realtime heart rate when asked. The
- *    session runs on that heart rate: time from the phone, calories from [HeartRateEnergy], ended when the GPS requests
- *    stop for [GPS_SILENCE_MS] or the user taps Finish.
+ *  - otherwise JoyoFit's own session ([Source.GPS] / [Source.STATUS] / [Source.MANUAL]): the Fit 4 Pro (6.1.0.117) sends
+ *    neither, but asks for the phone's GPS about every 20 s while an outdoor workout runs, answers the `17/03` status poll,
+ *    and pushes realtime heart rate when asked. The session runs on that heart rate: time from the phone, calories from
+ *    [HeartRateEnergy]. It ends when the status poll says "no workout" [IDLE_ANSWERS_TO_END] times in a row with no GPS
+ *    request for [GPS_SILENCE_MS], on GPS silence alone only if the poll is not answered, or when the user taps Finish.
  * Either way it keeps JoyoFit's fat and carbohydrate estimate ([SubstrateEstimator]), an ongoing notification that opens the
  * live screen, and reports every change to JS (`onLiveWorkout`).
  */
@@ -59,6 +60,10 @@ internal class LiveWorkout(
   )
 
   private var watchdog: Job? = null
+
+  /** Last answer of the 17/03 status poll, and how many answers in a row said "no workout". */
+  private var lastStatusAtMs = 0L
+  private var idleAnswers = 0
 
   private val appContext = context.applicationContext
   private val lock = Any()
@@ -234,6 +239,8 @@ internal class LiveWorkout(
     var ended = false
     var changed = false
     synchronized(lock) {
+      lastStatusAtMs = System.currentTimeMillis()
+      idleAnswers = if (running) 0 else idleAnswers + 1
       val s = session?.takeIf { it.status != Status.ENDED }
       when {
         running && s == null -> {
@@ -252,7 +259,10 @@ internal class LiveWorkout(
             }
           }
         }
-        !running && s != null && (s.source == Source.STATUS || s.source == Source.GPS) -> ended = true
+        // One idle answer is not enough to end a workout the user is still doing, and a watch still asking for the
+        // phone's GPS is running one whatever the poll says.
+        !running && s != null && (s.source == Source.STATUS || s.source == Source.GPS) ->
+          ended = idleAnswers >= IDLE_ANSWERS_TO_END && System.currentTimeMillis() - s.lastGpsAtMs > GPS_SILENCE_MS
       }
     }
     when {
@@ -261,7 +271,7 @@ internal class LiveWorkout(
         liveHeartRate.setWorkoutActive(true)
         publish(force = true)
       }
-      ended -> end("the watch reports no workout")
+      ended -> end("the watch reported no workout $idleAnswers times in a row")
       changed -> publish(force = true)
     }
   }
@@ -287,9 +297,13 @@ internal class LiveWorkout(
         delay(15_000L)
         val silent = synchronized(lock) {
           val s = session
-          s != null && s.source == Source.GPS && s.status != Status.ENDED && System.currentTimeMillis() - s.lastGpsAtMs > GPS_SILENCE_MS
+          val now = System.currentTimeMillis()
+          // The watch stops asking once its own GPS has a fix, so silence alone says nothing while the status poll
+          // answers; then the poll decides. Silence ends the session only on watches that do not answer the poll.
+          s != null && s.source == Source.GPS && s.status != Status.ENDED &&
+            now - s.lastGpsAtMs > GPS_SILENCE_MS && now - lastStatusAtMs > STATUS_STALE_MS
         }
-        if (silent) end("the watch stopped asking for GPS")
+        if (silent) end("the watch stopped asking for GPS and does not answer the status poll")
       }
     }
     publish(force = true)
@@ -453,7 +467,13 @@ internal class LiveWorkout(
     /** Weight for the heart-rate energy estimate when no profile is saved. */
     const val DEFAULT_WEIGHT_KG = 70.0
 
-    /** No GPS request for this long ends a GPS-started session (the watch asks about every 20 s). */
+    /** No GPS request for this long counts as GPS silence (the watch asks about every 20 s until its own GPS has a fix). */
     const val GPS_SILENCE_MS = 120_000L
+
+    /** "No workout" answers in a row (one per 30 s poll) that end a phone-side session. */
+    const val IDLE_ANSWERS_TO_END = 2
+
+    /** No status answer for this long means the poll stopped (the watch does not answer 17/03). */
+    const val STATUS_STALE_MS = 90_000L
   }
 }

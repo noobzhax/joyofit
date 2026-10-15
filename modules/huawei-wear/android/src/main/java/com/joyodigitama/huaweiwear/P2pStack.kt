@@ -31,6 +31,8 @@ internal class P2pStack(
   private val events: WearEvents,
   private val settings: P2pSettings,
   private val healthModelFactory: (HuaweiP2PManager) -> HealthModelService,
+  /** Age for the default heart-rate zones, read at each send (the profile can change). */
+  private val heartRateAge: () -> Int,
 ) : HuaweiP2PManager.Transport {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val inbound = Channel<HuaweiPacket>(Channel.UNLIMITED)
@@ -38,6 +40,9 @@ internal class P2pStack(
   private var subscription: AutoCloseable? = null
 
   val manager = HuaweiP2PManager(this)
+
+  @Volatile
+  private var trackService: TrackService? = null
 
   @Volatile
   var dictionary: HuaweiP2PDataDictionarySyncService? = null
@@ -115,6 +120,20 @@ internal class P2pStack(
       healthModel = service
       service.register()
     }
+
+    log(HeartRateZonesSync.capsLine())
+    if (HeartRateZonesSync.supportsTrack) {
+      val service = TrackService(manager, events, heartRateAge)
+      trackService = service
+      service.register()
+    }
+  }
+
+  /** Re-sends the zones after the profile age changed; false when this watch takes them another way. */
+  fun resendHeartRateZones(): Boolean {
+    val service = trackService ?: return false
+    service.resend()
+    return true
   }
 
   fun close() {

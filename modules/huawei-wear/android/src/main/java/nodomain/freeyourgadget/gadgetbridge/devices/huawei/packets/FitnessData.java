@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-// Modified for watch-fit (AGPL-3.0-or-later): removed DeviceReportThreshold, HeartRateZoneConfigPacket and RunPaceConfig.Request (depend on unported GB model classes).
+// Modified for watch-fit (AGPL-3.0-or-later): removed DeviceReportThreshold and RunPaceConfig.Request (depend on unported GB model classes); HeartRateZoneConfigPacket re-added with plain int parameters.
 package nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets;
 
 import java.util.ArrayList;
@@ -576,6 +576,72 @@ public class FitnessData {
                         );
 
                 this.complete = true;
+            }
+        }
+    }
+
+    /** GB's HeartRateZoneConfigPacket, re-added with plain ints instead of GB's zone model classes (see HeartRateZonesCalc). */
+    public static class HeartRateZoneConfigPacket {
+        // It can use two IDs with basically the same format.
+        public static final byte id_simple = 0x13;
+        public static final byte id_extended = 0x21;
+
+        public static class Request extends HuaweiPacket {
+            /**
+             * @param mhr {zone1..zone5, threshold} of the MHR zones or null; written only with a warning limit > 0 and threshold > 0
+             * @param hrr {zone1..zone5, resting} of the HRR zones or null; extended command only
+             */
+            private Request(
+                    ParamsProvider paramsProvider,
+                    byte id,
+                    boolean warningEnable,
+                    int warningHRLimit,
+                    int[] mhr,
+                    int calculationMethod,
+                    int[] hrr
+            ) {
+                super(paramsProvider);
+
+                this.serviceId = FitnessData.id;
+                this.commandId = id;
+
+                HuaweiTLV subTlv = new HuaweiTLV().
+                        put(0x08, warningEnable);
+
+                if (mhr != null && warningHRLimit > 0 && mhr[5] > 0) {
+                    subTlv
+                            .put(0x09, (byte) warningHRLimit)
+                            .put(0x02, (byte) mhr[0])
+                            .put(0x03, (byte) mhr[1])
+                            .put(0x04, (byte) mhr[2])
+                            .put(0x05, (byte) mhr[3])
+                            .put(0x06, (byte) mhr[4])
+                            .put(0x07, (byte) mhr[5])
+                            .put(0x0b, (byte) mhr[5]);
+                }
+
+                if (id == id_extended && hrr != null) {
+                    subTlv
+                            .put(0x0d, (byte) hrr[0])
+                            .put(0x0e, (byte) hrr[1])
+                            .put(0x0f, (byte) hrr[2])
+                            .put(0x10, (byte) hrr[3])
+                            .put(0x11, (byte) hrr[4])
+                            .put(0x0a, (byte) calculationMethod)
+                            .put(0x0c, (byte) hrr[5]);
+                }
+
+                this.tlv = new HuaweiTLV().put(0x81, subTlv);
+
+                this.complete = true;
+            }
+
+            public static Request requestSimple(ParamsProvider paramsProvider, boolean warningEnable, int warningHRLimit, int[] mhr) {
+                return new Request(paramsProvider, id_simple, warningEnable, warningHRLimit, mhr, 0, null);
+            }
+
+            public static Request requestExtended(ParamsProvider paramsProvider, boolean warningEnable, int warningHRLimit, int[] mhr, int calculationMethod, int[] hrr) {
+                return new Request(paramsProvider, id_extended, warningEnable, warningHRLimit, mhr, calculationMethod, hrr);
             }
         }
     }

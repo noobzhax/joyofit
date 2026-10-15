@@ -113,10 +113,15 @@ internal class WorkoutLink(
     if (!DeviceCaps.supports(WORKOUT_SERVICE, STATUS)) log("Workout link: the watch does not list 17/03; probing it")
     statusPoll = scope.launch {
       kotlinx.coroutines.delay(STATUS_FIRST_MS)
+      // Once the watch has answered, a failed poll is a busy or briefly lost link, not a missing command: keep polling,
+      // or a running workout would lose its end signal.
+      var answered = false
       while (true) {
         val handle = link.handle() ?: return@launch
         if (handle.session !== session) return@launch
-        if (!pollStatus(handle.session)) {
+        if (pollStatus(handle.session)) {
+          answered = true
+        } else if (!answered) {
           log("Workout link: no workout status from the watch; indoor workouts need Start on the phone")
           return@launch
         }

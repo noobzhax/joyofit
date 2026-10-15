@@ -198,6 +198,10 @@ internal class HuaweiInitializer(
       soft("FitnessProfile") { ProfileSender.sendProfile(session, events, saved) }
     }
 
+    // SendHeartRateZonesConfig: the zones the workout screen shows; Track watches get them over P2P once it registers.
+    events.log(LogDirection.INFO, null, null, null, HeartRateZonesSync.capsLine())
+    soft("HeartRateZones") { HeartRateZonesSync.sendFitnessData(session, events, HeartRateZonesSync.age(profile)) }
+
     // The heart-rate capability notifications and the sensor switches. GB sends none of these at init
     // (only when a setting changes, all off by default), so a wiped watch never records heart rate.
     soft("HealthSensors") {

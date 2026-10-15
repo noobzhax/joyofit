@@ -404,7 +404,12 @@ internal class WearRuntime private constructor(context: Context) {
     settings.profile = profile
     val handle = link.handle() ?: return false
     return try {
-      ProfileSender.sendProfile(handle.session, events, profile) > 0
+      val sent = ProfileSender.sendProfile(handle.session, events, profile) > 0
+      // The zones depend on the age; Track watches get them again over P2P.
+      if (p2p.stack()?.resendHeartRateZones() != true) {
+        HeartRateZonesSync.sendFitnessData(handle.session, events, HeartRateZonesSync.age(profile))
+      }
+      sent
     } catch (e: CancellationException) {
       throw e
     } catch (e: WearException) {

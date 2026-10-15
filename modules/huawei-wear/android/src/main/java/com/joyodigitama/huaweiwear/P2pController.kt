@@ -54,9 +54,11 @@ internal class P2pController(
         if (handle.session === attached) return
         detach()
         attached = handle.session
-        val created = P2pStack(handle.session, events, settings) { manager ->
-          HealthModelService(manager, settings, events, scope, ::loadDay, ::goals)
-        }
+        val created = P2pStack(
+          handle.session, events, settings,
+          { manager -> HealthModelService(manager, settings, events, scope, ::loadDay, ::goals) },
+          { HeartRateZonesSync.age(wearSettings.profile) },
+        )
         stack = created
         created.start()
         created.registerServices()
