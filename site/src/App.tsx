@@ -597,12 +597,22 @@ function Features() {
             </li>
           ))}
         </ul>
+        <a
+          href={JOYOROGO_URL}
+          className="group mt-6 flex items-center gap-4 rounded-2xl bg-card p-3 pr-5 transition-colors hover:bg-background focus-visible:ring-2 focus-visible:ring-makan-ink focus-visible:outline-none"
+        >
+          <img src="/brand/joyorogo-icon.png" alt="" className="size-14 shrink-0 rounded-xl" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-extrabold tracking-tight">Coba JoyoRogo</span>
+            <span className="block text-sm text-muted-foreground">
+              Catat makan dari foto, gratis untuk mulai
+            </span>
+          </span>
+          <ArrowRight className="size-5 shrink-0 text-makan-ink transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </a>
         <p className="mt-4 text-xs text-makan-ink/70">
           Kartu kalori dibuat dari hasil reverse engineering Huawei Health dan belum diuji di Fit 4
-          Pro. Skor harian di JoyoRogo segera hadir.{" "}
-          <a href={JOYOROGO_URL} className="font-bold underline underline-offset-2">
-            Coba JoyoRogo
-          </a>
+          Pro. Skor harian di JoyoRogo segera hadir.
         </p>
       </article>
 
