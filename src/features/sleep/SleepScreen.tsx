@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -10,14 +10,19 @@ import { HiddenTabHeader } from '@/components/HiddenTabHeader';
 import { Metric } from '@/components/Metric';
 import { Divider, Screen, Section } from '@/components/Screen';
 import { EmptyState, Notice, Skeleton } from '@/components/States';
-import { listAllSleep, listSleepScores } from '@/db/queries';
+import { listAllSleep, listSleepScores, listStepSamplesSince } from '@/db/queries';
 import { HourlyStages } from '@/features/sleep/HourlyStages';
 import { Hypnogram } from '@/features/sleep/Hypnogram';
 import { buildNights, hourlyStages, NIGHT_STAGES, type Night } from '@/features/sleep/nights';
 import { SleepScoreRing } from '@/features/sleep/SleepScoreRing';
 import { STAGE_LABELS, stageColor } from '@/features/sleep/stageStyle';
+import { sleepNeedSec } from '@/features/today/readiness';
+import { startOfLocalDay } from '@/features/today/stats';
+import { dailyStrain } from '@/features/today/strain';
+import { DEFAULT_AGE, maxHeartRate } from '@/features/workouts/substrate';
 import { errorMessage, formatClock, formatDuration } from '@/format';
 import { useWatch } from '@/state/WatchProvider';
+import { HuaweiWear } from '@/wear';
 import { HIT, radius, spacing, useColors } from '@/theme';
 
 /** Stage changes listed before "Show all"; a night has 30 to 60. */
@@ -64,6 +69,7 @@ export function SleepScreen() {
   const index = Math.max(0, nights?.findIndex((n) => n.start === selected) ?? 0);
   const night = nights?.[index] ?? null;
   const hours = useMemo(() => (night ? hourlyStages(night) : []), [night]);
+  const need = useNightNeed(night && !night.nap ? night.start : null);
 
   const select = (next: Night) => {
     setSelected(next.start);
@@ -133,6 +139,13 @@ export function SleepScreen() {
           {changes.length === 1 ? 'change' : 'changes'}.
           {night.score ? ` Score from the watch${night.score.efficiency !== null ? `, ${night.score.efficiency}% of the time in bed asleep` : ''}.` : ''}
         </AppText>
+        {need ? (
+          <AppText variant="caption">
+            Needed {formatDuration(need.seconds)}
+            {need.strain !== null ? ` after a strain of ${need.strain.toFixed(1)} that day` : ''}, got{' '}
+            {Math.round((night.asleepSeconds / need.seconds) * 100)}%.
+          </AppText>
+        ) : null}
         {stages.map((stage) => (
           <View key={stage} style={styles.legendRow}>
             <View style={[styles.swatch, { backgroundColor: stageColor(stage, colors) }]} />
@@ -226,6 +239,32 @@ export function SleepScreen() {
       </Section>
     </Screen>
   );
+}
+
+/**
+ * The sleep a night needed: 7 h 30 min plus up to 1 h after the strain of the day it started on (see `readiness.ts`).
+ * `strain` is null when that day has no stored heart rate; the base need still applies.
+ */
+function useNightNeed(nightStart: number | null): { seconds: number; strain: number | null } | null {
+  const db = useSQLiteContext();
+  const [need, setNeed] = useState<{ start: number; seconds: number; strain: number | null } | null>(null);
+  useEffect(() => {
+    if (nightStart === null) return;
+    let cancelled = false;
+    // A night that starts after midnight belongs to the day before it.
+    const day = startOfLocalDay(nightStart - 6 * 3600);
+    void listStepSamplesSince(db, day).then((samples) => {
+      if (cancelled) return;
+      const birthYear = HuaweiWear.getUserProfile()?.birthYear;
+      const maxHr = maxHeartRate(birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE);
+      const strain = dailyStrain(samples.filter((s) => s.timestamp < nightStart), maxHr).find((d) => d.day === day)?.strain ?? null;
+      setNeed({ start: nightStart, seconds: sleepNeedSec(strain), strain });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, nightStart]);
+  return need && need.start === nightStart ? need : null;
 }
 
 function StepButton({ icon, label, disabled, onPress }: { icon: 'chevron-back' | 'chevron-forward'; label: string; disabled: boolean; onPress: () => void }) {

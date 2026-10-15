@@ -25,17 +25,13 @@ import { useLiveHeartRate } from '@/features/today/useLiveHeartRate';
 import { useStepGoal } from '@/features/today/useStepGoal';
 import { useTodayData } from '@/features/today/useTodayData';
 import { WatchHero } from '@/features/today/WatchHero';
-import { ReadinessSection } from '@/features/today/ReadinessSection';
-import { readiness } from '@/features/today/readiness';
-import { StrainSection } from '@/features/today/StrainSection';
-import { dailyStrain } from '@/features/today/strain';
-import { DEFAULT_AGE, maxHeartRate } from '@/features/workouts/substrate';
+import { computeScores } from '@/features/today/scores';
+import { ScoresCard } from '@/features/today/ScoresCard';
 import { formatElapsed } from '@/features/workouts/summary';
 import { formatClock, formatCount, formatDistance } from '@/format';
 import { useNow } from '@/hooks/useNow';
 import { useLiveWorkout } from '@/state/LiveWorkoutProvider';
 import { useWatch } from '@/state/WatchProvider';
-import { HuaweiWear } from '@/wear';
 import { spacing, useColors } from '@/theme';
 
 /** Splits `1.23 km` into its number and unit. */
@@ -62,9 +58,6 @@ export default function TodayScreen() {
     if (!data) return null;
     const watchTotals = totals && totals.at >= data.dayStart ? totals : null;
     const sleep = lastSleepSession(data.sleep);
-    const birthYear = HuaweiWear.getUserProfile()?.birthYear;
-    const maxHr = maxHeartRate(birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE);
-    const strain = dailyStrain(data.historySamples, maxHr);
     return {
       totals: watchTotals ?? sumTotals(data.samples),
       totalsFromWatch: watchTotals !== null,
@@ -73,9 +66,7 @@ export default function TodayScreen() {
       sleep,
       sleepScore: sleep ? scoreFor(sleep.start, sleep.end, data.sleepScores) : null,
       hasSamples: data.samples.length > 0,
-      maxHr,
-      strain,
-      readiness: readiness({ dayStart: data.dayStart, samples: data.historySamples, strain, sleep }),
+      scores: computeScores(data),
     };
   }, [data, totals]);
 
@@ -132,6 +123,8 @@ export default function TodayScreen() {
         {loadError ? <Notice tone="danger">Could not read stored data: {loadError}</Notice> : null}
       </View>
 
+      {view ? <ScoresCard readiness={view.scores.readiness} today={view.scores.today} onPress={() => router.push('/readiness')} /> : null}
+
       {loading ? (
         <View style={styles.tiles}>
           <Skeleton width="48%" height={112} radius={18} />
@@ -152,9 +145,6 @@ export default function TodayScreen() {
           </AppText>
         </View>
       )}
-
-      {view ? <ReadinessSection readiness={view.readiness} /> : null}
-      {view ? <StrainSection days={view.strain} dayStart={data?.dayStart ?? 0} maxHr={view.maxHr} /> : null}
 
       <Section title="Heart rate today" icon="heart" tint="heart">
         {view?.heart ? (

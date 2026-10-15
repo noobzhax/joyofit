@@ -28,6 +28,8 @@ export interface Signal {
   value: string;
   detail: string;
   tone: SignalTone;
+  /** The number behind `value`: bpm above baseline, share of sleep need (0..), or the load ratio. */
+  amount: number;
 }
 
 export type ReadinessHeadline = 'Primed' | 'Balanced' | 'Strained' | 'Run down';
@@ -89,6 +91,7 @@ export function readiness(input: {
       value: `${today} bpm`,
       detail: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} against your ${history.length}-day average of ${baseline.toFixed(0)}`,
       tone: delta >= 5 ? 'bad' : delta <= -2 ? 'good' : 'neutral',
+      amount: delta,
     });
   }
 
@@ -106,6 +109,7 @@ export function readiness(input: {
       value: `${Math.round(share * 100)} %`,
       detail: `${hm(slept)} of the ${hm(need)} you needed${yesterday !== null ? ` after strain ${yesterday.toFixed(1)}` : ''}`,
       tone: share >= 0.9 ? 'good' : share >= 0.75 ? 'neutral' : 'bad',
+      amount: share,
     });
   }
 
@@ -129,6 +133,7 @@ export function readiness(input: {
         value: ratio.toFixed(2),
         detail: `last 7 days average ${acute.toFixed(1)} against 28 days ${chronic.toFixed(1)}${ratio > 1.5 ? ', a sharp rise' : ratio < 0.8 ? ', lighter than usual' : ''}`,
         tone: ratio > 1.5 ? 'bad' : ratio < 0.8 ? 'neutral' : 'good',
+        amount: ratio,
       });
     }
   }

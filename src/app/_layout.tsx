@@ -106,6 +106,7 @@ export default function RootLayout() {
                   {/* Pushed from Today; each draws its own header (HiddenTabHeader). */}
                   <Tabs.Screen name="health" options={{ href: null }} />
                   <Tabs.Screen name="sleep" options={{ href: null }} />
+                  <Tabs.Screen name="readiness" options={{ href: null }} />
                   {/* Opens by itself when a workout starts on the watch (LiveWorkoutProvider). */}
                   <Tabs.Screen name="workout-live" options={{ href: null }} />
                 </Tabs>
