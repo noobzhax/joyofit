@@ -146,7 +146,7 @@ const FAQ = [
   },
   {
     q: "Apa hubungannya dengan JoyoRogo?",
-    a: "Kartu kalori di jam bisa menampilkan asupan dari JoyoRogo, dan masuk ke cloud JoyoFit memakai akun JoyoRogo. JoyoFit tetap bisa dipakai sendiri tanpa JoyoRogo.",
+    a: "JoyoRogo adalah aplikasi catatan makan kami. Asupan kalori dari JoyoRogo bisa tampil di kartu kalori jam, skor Recovery dan Strain JoyoFit akan ikut tampil di catatan makan JoyoRogo, dan masuk ke cloud JoyoFit memakai akun JoyoRogo. JoyoFit tetap bisa dipakai sendiri tanpa JoyoRogo.",
   },
 ] as const;
 
@@ -556,6 +556,15 @@ function Scores() {
             medis.
           </p>
         </div>
+        <p className="mt-4 rounded-2xl bg-makan-soft p-4 text-[0.9375rem] leading-relaxed text-makan-ink">
+          <span className="font-bold">Segera di JoyoRogo.</span> Kalau kamu masuk dengan akun{" "}
+          <a href={JOYOROGO_URL} className="font-bold underline underline-offset-2">
+            JoyoRogo
+          </a>
+          , skor harian ikut tampil di catatan makanmu, lengkap dengan saran singkat. Misalnya saat
+          Strain tinggi, kebutuhan energi dan karbohidratmu lebih besar dari biasa. Saat Recovery
+          rendah, utamakan protein, cairan, dan tidur.
+        </p>
       </div>
     </section>
   );
@@ -569,18 +578,18 @@ function Features() {
     >
       <article className="rounded-[1.75rem] bg-makan-soft p-6 md:p-8">
         <h3 className="text-2xl font-extrabold tracking-tight text-makan-ink">
-          Kalori JoyoRogo tampil di jam
+          Makan di JoyoRogo, gerak di JoyoFit
         </h3>
         <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-makan-ink/80">
-          Asupan kalorimu dari JoyoRogo bisa dikirim ke kartu kalori di jam. Jam juga
-          menjawab permintaan berat badan, metabolisme istirahat, target cincin aktivitas, dan
-          pengingat.
+          JoyoRogo mencatat makananmu dari foto. Asupan kalorinya bisa dikirim ke kartu kalori di
+          jam, dan skor harian JoyoFit kembali ke catatan makanmu. JoyoFit tetap bisa dipakai tanpa
+          JoyoRogo.
         </p>
         <ul className="mt-6 grid gap-2 sm:grid-cols-3">
           {[
             ["Kartu kalori", "asupan dari JoyoRogo"],
-            ["Target cincin", "bisa diatur dari HP"],
-            ["Pengingat", "ke jam"],
+            ["Skor harian", "Recovery dan Strain di JoyoRogo"],
+            ["Satu akun", "masuk cloud JoyoFit dengan akun JoyoRogo"],
           ].map(([name, note]) => (
             <li key={name} className="rounded-2xl bg-card px-4 py-3.5">
               <p className="text-sm leading-snug font-semibold">{name}</p>
@@ -589,7 +598,11 @@ function Features() {
           ))}
         </ul>
         <p className="mt-4 text-xs text-makan-ink/70">
-          Fitur ini diimplementasi dari hasil reverse engineering Huawei Health dan belum diuji di Fit 4 Pro.
+          Kartu kalori dibuat dari hasil reverse engineering Huawei Health dan belum diuji di Fit 4
+          Pro. Skor harian di JoyoRogo segera hadir.{" "}
+          <a href={JOYOROGO_URL} className="font-bold underline underline-offset-2">
+            Coba JoyoRogo
+          </a>
         </p>
       </article>
 
