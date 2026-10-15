@@ -284,7 +284,7 @@ export interface LiveWorkout {
    * `watch`: the watch's own numbers. `gps` / `manual`: JoyoFit's session on the watch's realtime heart rate, started
    * because the watch asked for the phone's GPS or by hand; time is counted by the phone and calories are estimated.
    */
-  source: 'watch' | 'gps' | 'manual';
+  source: 'watch' | 'gps' | 'status' | 'manual';
   /** Huawei sport type (1 running, 2 walking, 3 cycling, 5 indoor running, 7 indoor cycling, 13 indoor walking ...). */
   sportType: number | null;
   sportName: string | null;

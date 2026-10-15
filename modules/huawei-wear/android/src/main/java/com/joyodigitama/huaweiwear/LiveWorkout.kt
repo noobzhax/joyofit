@@ -40,7 +40,7 @@ internal class LiveWorkout(
   enum class Status(val wire: String) { PREPARING("preparing"), RUNNING("running"), PAUSED("paused"), ENDED("ended") }
 
   /** Where the numbers come from: the watch, or JoyoFit's heart-rate session started by the GPS requests or by hand. */
-  enum class Source(val wire: String) { WATCH("watch"), GPS("gps"), MANUAL("manual") }
+  enum class Source(val wire: String) { WATCH("watch"), GPS("gps"), STATUS("status"), MANUAL("manual") }
 
   private class Session(
     val id: Long,
@@ -223,6 +223,47 @@ internal class LiveWorkout(
       }
     }
     publish(force = false)
+  }
+
+  /**
+   * The watch's answer to the 30 s status poll (`17/03`): starts a heart-rate session for a running workout (indoor ones
+   * included), follows pause and resume, and ends a session it or the GPS requests started once the watch is idle.
+   */
+  fun watchStatus(running: Boolean, paused: Boolean, workoutType: Int?) {
+    var created = false
+    var ended = false
+    var changed = false
+    synchronized(lock) {
+      val s = session?.takeIf { it.status != Status.ENDED }
+      when {
+        running && s == null -> {
+          session = newSession(workoutType, if (paused) Status.PAUSED else Status.RUNNING, Source.STATUS)
+          created = true
+        }
+        running && s != null -> {
+          if (workoutType != null && s.sportType == null) s.sportType = workoutType
+          if (s.source != Source.WATCH) {
+            val want = if (paused) Status.PAUSED else Status.RUNNING
+            if (s.status != want) {
+              s.status = want
+              // A pause must not count as workout time once resumed.
+              s.lastHeartRateAtMs = null
+              changed = true
+            }
+          }
+        }
+        !running && s != null && (s.source == Source.STATUS || s.source == Source.GPS) -> ended = true
+      }
+    }
+    when {
+      created -> {
+        log("Live workout: the watch reports a workout running (type $workoutType); following its heart rate")
+        liveHeartRate.setWorkoutActive(true)
+        publish(force = true)
+      }
+      ended -> end("the watch reports no workout")
+      changed -> publish(force = true)
+    }
   }
 
   /** The watch asked for the phone's GPS: an outdoor workout is running (the request repeats about every 20 s). */

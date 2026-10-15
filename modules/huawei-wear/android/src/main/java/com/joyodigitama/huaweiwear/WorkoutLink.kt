@@ -83,6 +83,7 @@ internal class WorkoutLink(
         )
         // A workout may already be running (the app restarted mid-walk); the watch only pushes after an open.
         if (DeviceCaps.supports(WORKOUT_SERVICE, REPORT_OPEN)) scope.launch { openReport() }
+        startStatusPoll(session)
       }
       LinkState.DISCONNECTED -> {
         synchronized(lock) {
@@ -91,10 +92,67 @@ internal class WorkoutLink(
           attached = null
           reportOpenOn = null
         }
+        statusPoll?.cancel()
+        statusPoll = null
         stopGps()
       }
       else -> Unit
     }
+  }
+
+  // Workout status poll (17/03, Huawei Health `HwLinkageServiceManager.getOperator`): the only signal an indoor workout
+  // gives. Request `81 00`; the answer's 81 holds 02 trainMonitorState, 03 operatorType (1 start, 2 pause, 3 resume,
+  // 4 stop), 04 sportType, 06 workoutType.
+
+  private var statusPoll: kotlinx.coroutines.Job? = null
+  private var lastStatusLog: String? = null
+
+  private fun startStatusPoll(session: HuaweiSession) {
+    statusPoll?.cancel()
+    // The Fit 4 Pro does not list 17/03; it is probed anyway and the poll stops on the first failure.
+    if (!DeviceCaps.supports(WORKOUT_SERVICE, STATUS)) log("Workout link: the watch does not list 17/03; probing it")
+    statusPoll = scope.launch {
+      kotlinx.coroutines.delay(STATUS_FIRST_MS)
+      while (true) {
+        val handle = link.handle() ?: return@launch
+        if (handle.session !== session) return@launch
+        if (!pollStatus(handle.session)) {
+          log("Workout link: no workout status from the watch; indoor workouts need Start on the phone")
+          return@launch
+        }
+        kotlinx.coroutines.delay(STATUS_EVERY_MS)
+      }
+    }
+  }
+
+  /** False when the watch does not answer with a status (unsupported). */
+  private suspend fun pollStatus(session: HuaweiSession): Boolean {
+    val answer = try {
+      session.request(RawPacket(session.params, WORKOUT_SERVICE, STATUS, HuaweiTLV().put(0x81)), REQUEST_MS, "workout status")
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log("Workout link: workout status failed: ${e.message}")
+      return false
+    }
+    val tlv = answer.getTlv() ?: return false
+    val text = tlv.toString()
+    // Logged when it changes, so the log shows what each state looks like.
+    if (text != lastStatusLog) {
+      lastStatusLog = text
+      log("Workout link: workout status $text")
+    }
+    if (!tlv.contains(0x81)) return false
+    val body = tlv.getObject(0x81)
+    fun int(tag: Int) = body.getBytes(tag, null)?.let { LiveWorkoutWire.unsigned(it)?.toInt() }
+    val operator = int(0x03)
+    val workoutType = int(0x06) ?: int(0x04)
+    when (operator) {
+      1, 3 -> live.watchStatus(running = true, paused = false, workoutType = workoutType)
+      2 -> live.watchStatus(running = true, paused = true, workoutType = workoutType)
+      else -> live.watchStatus(running = false, paused = false, workoutType = workoutType)
+    }
+    return true
   }
 
   // Phone GPS
@@ -238,6 +296,9 @@ internal class WorkoutLink(
     const val REPORT_OPEN = 0x12
     const val OK = 100000
     const val REQUEST_MS = 5_000L
+    const val STATUS = 0x03
+    const val STATUS_FIRST_MS = 5_000L
+    const val STATUS_EVERY_MS = 30_000L
   }
 }
 
