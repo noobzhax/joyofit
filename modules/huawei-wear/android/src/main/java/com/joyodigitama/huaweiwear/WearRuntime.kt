@@ -132,8 +132,8 @@ internal class WearRuntime private constructor(context: Context) {
 
   val link = WearLink(appContext, events, settings, syncStore)
 
-  /** Plain text for "Share a support report": the last watch, its capabilities and the kept log, without addresses or serial. */
-  fun supportReport(): String {
+  /** The support report: the last watch, its capabilities and the kept log, without addresses or serial. */
+  fun supportReport(): Map<String, Any?> {
     val device = link.deviceInfo() ?: link.lastDeviceInfo
     return SupportReport.build(
       context = appContext,

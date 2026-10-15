@@ -44,6 +44,18 @@ export interface DeviceInfo {
   support: ModelSupport;
 }
 
+/** `getSupportReport`: the summary is short enough for a GitHub issue link; the log is not. */
+export interface SupportReport {
+  /** App, phone, watch, supported commands and ExpandCapability, as plain text. */
+  summary: string;
+  /** The kept log lines, oldest first, as plain text. */
+  log: string;
+  /** Bluetooth name of the watch the report is about; null before any connect. */
+  watch: string | null;
+  model: string | null;
+  support: ModelSupport;
+}
+
 /** One-minute activity sample from FitnessData step frames. Timestamps are unix seconds. */
 export interface StepSample {
   timestamp: number;

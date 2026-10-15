@@ -30,10 +30,10 @@ import { ButtonLink, GithubMark, Phone, Ring } from "./ui";
 const PRICE = { monthly: "Rp15.000", yearly: "Rp150.000" };
 
 const FACTS = [
-  { value: "Tanpa", label: "akun Huawei" },
-  { value: "AGPL-3.0", label: "lisensi kode terbuka" },
-  { value: "Fit 4 Pro", label: "diuji, jam lain eksperimen" },
-  { value: "Lokal dulu", label: "data di HP, cloud opsional" },
+  { value: "35 model", label: "jam Huawei dan Honor bisa dicoba", href: "/jam" },
+  { value: "Live", label: "detak, kkal, lemak dan karbo saat olahraga" },
+  { value: "AGPL-3.0", label: "kode terbuka" },
+  { value: "Lokal", label: "data di HP, cloud opsional" },
 ] as const;
 
 const JAM_SUDAH_DIUJI = ["Huawei Watch Fit 4 Pro"] as const;
@@ -91,7 +91,7 @@ const WATCH_FEATURES = [
 const PROMISES = [
   {
     icon: ShieldCheck,
-    title: "Tanpa akun Huawei",
+    title: "Langsung ke HP",
     body: "Jam terhubung langsung lewat Bluetooth ke HP-mu. Huawei Health tidak perlu terpasang.",
   },
   {
@@ -172,7 +172,7 @@ function Header() {
           <a href="/#fitur" className={link}>
             Fitur
           </a>
-          <a href="/#jam" className={link}>
+          <a href="/jam" className={link}>
             Jam
           </a>
           <a href="/#cara" className={link}>
@@ -262,11 +262,12 @@ function Hero() {
     >
       <div>
         <h1 className="max-w-xl text-[2.625rem] leading-[1.04] font-extrabold tracking-tight text-balance md:text-[4rem]">
-          Watch Fit 4 tanpa akun Huawei
+          Jammu. Datamu. HP-mu.
         </h1>
         <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted-foreground md:text-xl">
-          JoyoFit menggantikan Huawei Health di HP Android-mu. Langkah, detak jantung, tidur, dan
-          olahraga dari jam masuk ke database di HP, dan kamu yang memutuskan perlu cloud atau tidak.
+          Pendamping jam Huawei yang jalan di HP sendiri. Langkah, detak jantung, tidur, dan olahraga
+          ditarik langsung lewat Bluetooth dan disimpan di HP. Tanpa Huawei Health, cloud hanya kalau
+          kamu mau.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <ButtonLink size="lg" href="#cara">
@@ -326,10 +327,21 @@ function Facts() {
             className={`py-6 md:py-8 ${i % 2 === 1 ? "pl-5 md:pl-8" : i > 0 ? "md:pl-8" : ""} ${i > 0 ? "md:border-l md:border-border/70" : ""} ${i % 2 === 1 ? "border-l border-border/70" : ""} ${i > 1 ? "border-t border-border/70 md:border-t-0" : ""}`}
           >
             <dd>
-              <span className="block text-2xl font-extrabold tracking-tight tabular-nums md:text-3xl">
-                {fact.value}
-              </span>
-              <span className="mt-1 block text-sm text-muted-foreground">{fact.label}</span>
+              {"href" in fact ? (
+                <a href={fact.href} className="block rounded-lg hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none">
+                  <span className="block text-2xl font-extrabold tracking-tight tabular-nums underline decoration-border decoration-2 underline-offset-4 md:text-3xl">
+                    {fact.value}
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground">{fact.label}</span>
+                </a>
+              ) : (
+                <>
+                  <span className="block text-2xl font-extrabold tracking-tight tabular-nums md:text-3xl">
+                    {fact.value}
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground">{fact.label}</span>
+                </>
+              )}
             </dd>
           </div>
         ))}
@@ -493,7 +505,7 @@ function Features() {
           Kalori JoyoRogo tampil di jam
         </h3>
         <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-makan-ink/80">
-          Asupan kalorimu dari JoyoRogo bisa dikirim ke kartu kalori di Watch Fit 4. Jam juga
+          Asupan kalorimu dari JoyoRogo bisa dikirim ke kartu kalori di jam. Jam juga
           menjawab permintaan berat badan, metabolisme istirahat, target cincin aktivitas, dan
           pengingat.
         </p>
@@ -582,57 +594,16 @@ function Chips({ items }: { items: readonly string[] }) {
   );
 }
 
-function SupportedWatches() {
+function JamTeaser() {
   return (
-    <section id="jam" data-section="jam" className="scroll-mt-16 border-t border-border/70 py-20 md:py-24">
-      <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
-        <SectionTitle>Jam yang didukung</SectionTitle>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-          Baru Huawei Watch Fit 4 Pro yang sudah kami uji. Jam lain di daftar Gadgetbridge masih
-          eksperimen: sambungannya sama, tapi belum pernah dicoba dengan JoyoFit.
+    <section data-section="jam" className="border-t border-border/70 py-14 md:py-16">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 md:flex-row md:items-center md:justify-between md:px-6">
+        <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl">
+          Diuji di Watch Fit 4 Pro, puluhan jam Huawei dan Honor lain bisa dicoba.
         </p>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-[1.75rem] bg-makan-soft p-6">
-            <h3 className="text-xl font-extrabold tracking-tight">Sudah diuji</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Dicek langsung di jam asli.</p>
-            <Chips items={JAM_SUDAH_DIUJI} />
-          </div>
-          <div className="rounded-[1.75rem] bg-card p-6">
-            <h3 className="text-xl font-extrabold tracking-tight">Eksperimen</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Bluetooth Classic, belum pernah dicoba. Sebagian fitur mungkin tidak jalan.
-            </p>
-            <Chips items={JAM_EKSPERIMEN} />
-          </div>
-          <div className="rounded-[1.75rem] bg-card p-6">
-            <h3 className="text-xl font-extrabold tracking-tight">Belum bisa</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Bluetooth LE: JoyoFit belum punya jalur BLE.
-            </p>
-            <Chips items={JAM_BELUM_BLE} />
-            <p className="mt-5 text-sm text-muted-foreground">
-              Pairing baru Honor belum diimplementasi:
-            </p>
-            <Chips items={JAM_BELUM_PAKE} />
-            <p className="mt-5 text-sm text-muted-foreground">
-              Earphone (FreeBuds dan sejenisnya) bukan jam.
-            </p>
-          </div>
-        </div>
-        <p className="mt-6 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground">
-          Jam Huawei atau Honor yang tidak ada di daftar tetap dicoba, tapi mungkin tidak jalan.
-          Punya jam eksperimen? Sambungkan sekali, buka tab Watch, pilih Help support your watch, lalu
-          Share support report, dan kirim lewat{" "}
-          <a
-            href={`${GITHUB_URL}/issues`}
-            target="_blank"
-            rel="noopener"
-            className="font-semibold text-foreground underline underline-offset-4"
-          >
-            GitHub issue
-          </a>
-          . Laporannya teks biasa tanpa alamat Bluetooth dan nomor seri.
-        </p>
+        <ButtonLink variant="secondary" className="shrink-0" href={JAM_PATH}>
+          Lihat daftar jam
+        </ButtonLink>
       </div>
     </section>
   );
@@ -836,7 +807,7 @@ function Closing() {
     <section data-section="signup" className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6">
       <div className="rounded-[2rem] bg-primary px-6 py-12 text-center text-primary-foreground md:px-14 md:py-16">
         <h2 className="mx-auto max-w-xl text-3xl font-extrabold tracking-tight text-balance md:text-[2.75rem] md:leading-[1.1]">
-          Lepaskan Watch Fit 4 dari akun Huawei
+          Pindahkan data jammu ke HP hari ini
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-primary-foreground/80">
           Pasang JoyoFit, sambungkan jam lewat Bluetooth, dan data jammu ada di HP-mu hari ini juga.
@@ -923,7 +894,7 @@ function SelfHostPage() {
               [
                 "Ambil kodenya",
                 <>
-                  Klon <Code>github.com/dzulfikar08/watch-fit</Code> dan masuk ke folder{" "}
+                  Klon <Code>github.com/dzulfikar08/joyofit</Code> dan masuk ke folder{" "}
                   <Code>server/</Code>. Konfigurasinya ada di <Code>wrangler.jsonc</Code>: Worker{" "}
                   <Code>joyofit-api</Code>, D1 <Code>DB</Code> (<Code>joyofit</Code>), R2{" "}
                   <Code>IMPORTS</Code> (<Code>joyofit-imports</Code>).
@@ -971,15 +942,107 @@ function SelfHostPage() {
   );
 }
 
+const JAM_PATH = "/jam";
+
+const JAM_META = {
+  title: "Jam yang didukung JoyoFit",
+  description:
+    "Daftar jam Huawei dan Honor untuk JoyoFit: sudah diuji di Watch Fit 4 Pro, eksperimen, dan yang belum bisa. Cara mengirim laporan dukungan.",
+};
+
+function JamPage() {
+  useEffect(() => {
+    const { title, description } = JAM_META;
+    const url = `https://fit.joyorogo.com${JAM_PATH}`;
+    document.title = `${title} | JoyoFit`;
+    setMeta('meta[name="description"]', "content", description);
+    setMeta('link[rel="canonical"]', "href", url);
+    setMeta('meta[property="og:url"]', "content", url);
+    setMeta('meta[property="og:title"]', "content", title);
+    setMeta('meta[property="og:description"]', "content", description);
+    setMeta('meta[name="twitter:title"]', "content", title);
+    setMeta('meta[name="twitter:description"]', "content", description);
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <section data-section="jam" className="py-12 md:py-16">
+      <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+        <a
+          href="/"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          Kembali ke beranda
+        </a>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-balance md:text-[2.75rem] md:leading-[1.1]">
+          Jam yang didukung
+        </h1>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Baru Huawei Watch Fit 4 Pro yang sudah kami uji. Jam lain di daftar Gadgetbridge masih
+          eksperimen: sambungannya sama, tapi belum pernah dicoba dengan JoyoFit.
+        </p>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-[1.75rem] bg-makan-soft p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Sudah diuji</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Dicek langsung di jam asli.</p>
+            <Chips items={JAM_SUDAH_DIUJI} />
+          </div>
+          <div className="rounded-[1.75rem] bg-card p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Eksperimen</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Bluetooth Classic, belum pernah dicoba. Sebagian fitur mungkin tidak jalan.
+            </p>
+            <Chips items={JAM_EKSPERIMEN} />
+          </div>
+          <div className="rounded-[1.75rem] bg-card p-6">
+            <h3 className="text-xl font-extrabold tracking-tight">Belum bisa</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Bluetooth LE: JoyoFit belum punya jalur BLE.
+            </p>
+            <Chips items={JAM_BELUM_BLE} />
+            <p className="mt-5 text-sm text-muted-foreground">
+              Pairing baru Honor belum diimplementasi:
+            </p>
+            <Chips items={JAM_BELUM_PAKE} />
+            <p className="mt-5 text-sm text-muted-foreground">
+              Earphone (FreeBuds dan sejenisnya) bukan jam.
+            </p>
+          </div>
+        </div>
+        <p className="mt-6 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground">
+          Jam Huawei atau Honor yang tidak ada di daftar tetap dicoba, tapi mungkin tidak jalan.
+          Punya jam eksperimen? Sambungkan sekali, lalu di aplikasi buka tab Watch, pilih Help
+          support your watch, dan ketuk Report on GitHub. Aplikasi membuka GitHub issue yang sudah
+          terisi, dan laporan lengkapnya disalin ke clipboard untuk ditempel di kolom Log. Laporannya
+          teks biasa tanpa alamat Bluetooth dan nomor seri. Daftar issue ada di{" "}
+          <a
+            href={`${GITHUB_URL}/issues`}
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-foreground underline underline-offset-4"
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function App() {
   const path = window.location.pathname.replace(/\/+$/, "");
   const selfHost = path === SELF_HOST_PATH;
+  const jam = path === JAM_PATH;
   return (
     <div className="min-h-svh">
       <Header />
       <main>
         {selfHost ? (
           <SelfHostPage />
+        ) : jam ? (
+          <JamPage />
         ) : (
           <>
             <Hero />
@@ -989,7 +1052,7 @@ export function App() {
             <Workouts />
             <Features />
             <WatchSection />
-            <SupportedWatches />
+            <JamTeaser />
             <Promises />
             <Options />
             <Faq />

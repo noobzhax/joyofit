@@ -32,8 +32,8 @@ A Huawei or Honor watch that is not in the list is **unknown**: JoyoFit tries to
 If you own an experimental or unknown model, connecting once helps a lot:
 
 1. Pair the watch and connect it in JoyoFit.
-2. Open the **Watch** tab, then **Help support your watch**, then **Share support report**.
-3. Send the report in a [GitHub issue](https://github.com/dzulfikar08/watch-fit/issues).
+2. Open the **Watch** tab, then **Help support your watch**, then **Report on GitHub**.
+3. The app opens a prefilled [watch report issue](https://github.com/dzulfikar08/joyofit/issues/new?template=watch-report.yml) and copies the full report to the clipboard. Say what works and what does not, paste the report into the **Log** field, and submit. **Share as text** sends the same report anywhere else.
 
 The report is plain text: app version, phone, watch model and software, supported commands, ExpandCapability and the connect log. It has no Bluetooth addresses and no serial number.
 

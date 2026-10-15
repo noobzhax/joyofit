@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const GITHUB_URL = "https://github.com/dzulfikar08/watch-fit";
+export const GITHUB_URL = "https://github.com/dzulfikar08/joyofit";
 export const HARGA_URL = "https://joyorogo.com/harga";
 export const CLOUDAGNI_URL = "https://cloudagni.my.id";
 export const JOYOROGO_URL = "https://joyorogo.com";

@@ -1,0 +1,42 @@
+name: Watch report
+description: Help JoyoFit support your Huawei or Honor watch. Start it from the app (Watch tab, Help support your watch, Report on GitHub) so the fields below are filled in.
+title: "[Watch report] "
+labels: ["watch-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing JoyoFit on your watch. The app fills in the watch and the summary; the full log is on your clipboard.
+        The report has no Bluetooth addresses and no serial number. Read it before you submit if you want to be sure.
+  - type: input
+    id: watch
+    attributes:
+      label: Watch
+      description: Bluetooth name and model, as the app sees them.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What works and what does not
+      description: Connecting, sync (steps, sleep, heart rate, workouts), notifications, watch faces, live workout, anything else you tried.
+      placeholder: |
+        Connects: yes
+        Sync: steps yes, sleep no
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: App, phone, watch software, supported commands and ExpandCapability.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Paste the full report here (the app copied it to your clipboard). Long logs are fine.
+      render: text

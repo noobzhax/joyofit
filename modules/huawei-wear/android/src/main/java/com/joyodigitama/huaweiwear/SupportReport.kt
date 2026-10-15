@@ -54,6 +54,7 @@ internal object SupportReport {
     return out
   }
 
+  /** `SupportReport` in `HuaweiWear.types.ts`: the summary (fits a GitHub issue link) apart from the long log. */
   fun build(
     context: Context,
     watchName: String?,
@@ -61,44 +62,50 @@ internal object SupportReport {
     linkState: String,
     log: List<SupportLog.Line>,
     nowMs: Long = System.currentTimeMillis(),
-  ): String {
+  ): Map<String, Any?> {
     val serial = device?.get("serialNumber") as String?
     val name = device?.get("name") as String? ?: watchName
     val match = WatchModels.match(name)
     val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.ROOT)
     val clock = SimpleDateFormat("HH:mm:ss.SSS", Locale.ROOT)
-    val out = StringBuilder()
-    out.appendLine("JoyoFit support report")
-    out.appendLine("Created: ${stamp.format(Date(nowMs))}")
-    out.appendLine("App: ${appVersion(context)}")
-    out.appendLine("Phone: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-    out.appendLine("Watch: ${name ?: "none yet"}")
-    out.appendLine("Model: ${match.model?.name ?: "not in the list"} (${match.support.wire})")
+    val summary = StringBuilder()
+    summary.appendLine("JoyoFit support report")
+    summary.appendLine("Created: ${stamp.format(Date(nowMs))}")
+    summary.appendLine("App: ${appVersion(context)}")
+    summary.appendLine("Phone: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+    summary.appendLine("Watch: ${name ?: "none yet"}")
+    summary.appendLine("Model: ${match.model?.name ?: "not in the list"} (${match.support.wire})")
     if (device != null) {
-      out.appendLine(
+      summary.appendLine(
         "Product: ${device["productModel"] ?: "?"}, software ${device["softwareVersion"] ?: "?"}, " +
           "hardware ${device["hardwareVersion"] ?: "?"}, auth ${device["authMode"] ?: "?"}",
       )
     }
-    out.appendLine("Link: $linkState")
+    summary.appendLine("Link: $linkState")
     val commands = DeviceCaps.supportedCommands
     if (commands.isNotEmpty()) {
-      out.appendLine("Supported commands (last connect, service: commands):")
+      summary.appendLine("Supported commands (last connect, service: commands):")
       for ((service, list) in commands.toSortedMap()) {
-        out.appendLine("  %02x: %s".format(service, list.joinToString(" ") { "%02x".format(it.toInt() and 0xFF) }))
+        summary.appendLine("  %02x: %s".format(service, list.joinToString(" ") { "%02x".format(it.toInt() and 0xFF) }))
       }
     }
-    out.appendLine("ExpandCapability: ${DeviceCaps.expandCapabilities?.toHex() ?: "none"}")
-    out.appendLine("Bluetooth addresses and the serial number are left out.")
-    out.appendLine()
-    out.appendLine("Log, oldest first (${log.size} lines):")
+    summary.appendLine("ExpandCapability: ${DeviceCaps.expandCapabilities?.toHex() ?: "none"}")
+    summary.append("Bluetooth addresses and the serial number are left out.")
+    val text = StringBuilder()
+    text.appendLine("Log, oldest first (${log.size} lines):")
     var previous: Long? = null
     for (line in log) {
-      if (previous != null && line.seq > previous + 1) out.appendLine("... ${line.seq - previous - 1} lines left out ...")
-      out.append(clock.format(Date(line.atMs))).append(' ').appendLine(line.text)
+      if (previous != null && line.seq > previous + 1) text.appendLine("... ${line.seq - previous - 1} lines left out ...")
+      text.append(clock.format(Date(line.atMs))).append(' ').appendLine(line.text)
       previous = line.seq
     }
-    return redact(out.toString(), serial)
+    return mapOf(
+      "summary" to redact(summary.toString(), serial),
+      "log" to redact(text.toString(), serial),
+      "watch" to name,
+      "model" to match.model?.name,
+      "support" to match.support.wire,
+    )
   }
 
   private fun appVersion(context: Context): String =
