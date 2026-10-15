@@ -8,12 +8,13 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { Tabs } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { Suspense, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { migrate } from '@/db/migrations';
+import { serializeQueries } from '@/db/serialize';
 import { CloudProvider } from '@/state/CloudProvider';
 import { LiveWorkoutProvider } from '@/state/LiveWorkoutProvider';
 import { MealsProvider } from '@/state/MealsProvider';
@@ -21,6 +22,12 @@ import { WatchProvider } from '@/state/WatchProvider';
 import { fonts, useColors } from '@/theme';
 
 const DATABASE_NAME = 'joyofit.db';
+
+/** Schema first, then one query at a time on the shared handle (see `serialize.ts`). */
+async function initDatabase(db: SQLiteDatabase): Promise<void> {
+  await migrate(db);
+  serializeQueries(db);
+}
 
 // Hold the splash until the fonts and tab icons are ready, so the first frame is already typeset.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -45,7 +52,7 @@ export default function RootLayout() {
 
   return (
     <Suspense fallback={null}>
-      <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
+      <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase} useSuspense>
         <WatchProvider>
           <CloudProvider>
             <MealsProvider>
