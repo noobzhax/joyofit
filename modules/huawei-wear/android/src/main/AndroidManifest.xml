@@ -32,7 +32,11 @@
   <!-- Workouts: the watch asks for the phone's GPS while it records (GpsAndTime 18/02); fixes need precise location. -->
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   <uses-feature android:name="android.hardware.location" android:required="false" />
+  <!-- AGPS: the phone answers the watch's ephemeris request with 100007 when it has no network (Huawei Health does the same). -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+  <!-- Huawei and Honor bands are reached over Bluetooth LE (GATT, BleTransport); the Classic-only watches do not need it. Connecting by address needs no BLUETOOTH_SCAN or location. -->
+  <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
   <!-- Lets the notification app chooser list launcher apps without QUERY_ALL_PACKAGES. -->
   <queries>

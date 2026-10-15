@@ -14,9 +14,14 @@ something below, note it under **Observations**.
 | Socket | `createRfcommSocketToServiceRecord` (secure, needs a bond) | `btbr/BtBRQueue.connect` |
 | Advertised name | `HUAWEI WATCH FIT 4-XXX` / `HUAWEI WATCH FIT 4 Pro-XXX` | `HuaweiConstants.HU_JOYOFIT4*_NAME` |
 
-The BLE service `0xFE86` (`FE01` write / `FE02` notify) is how older BLE-only Huawei bands connect.
-The Fit 4 is a BR device, so that service doesn't apply to it. This is why the old GATT explorer
-never found a usable channel.
+The BLE service `0xFE86` (`FE01` write / `FE02` notify) is how Huawei and Honor bands connect (`HuaweiLECoordinator`,
+`BleTransport`; Honor Band 7, 9 and 10 use Honor's own service, `isNewHonorProtocol`). The Fit 4 is a BR device, so that
+service doesn't apply to it. This is why the old GATT explorer never found a usable channel. The packet format, the
+HiChain / Lite / normal auth and the init requests are the same on both links. What differs over LE (`WatchModels.kt` picks
+the link per model): no Android bonding (`BONDING_STYLE_NONE`); notifications are enabled on `FE02` before LinkParams; each
+packet is written in pieces of at most LinkParams' `mtu` and at most what one ATT write carries; `DeviceStatus` is skipped
+for `HuaweiDeviceType.BLE`; normal mode continues with BondParams and Bond; Band 3e and 4e (`AW`) ask LinkParams and
+ProductInfo with their own tag sets. None of this has been tried on a real band yet.
 
 ## Frame
 
@@ -141,6 +146,27 @@ Sport type bytes map to GB's `HuaweiActivityType` names (`WorkoutSportTypes.kt`,
 altitude is present), start time, longitude, latitude (degrees, plus altitude), padding up to offset 62 / 70, then
 15 / 19-byte records `(time delta s, ?, lon delta f32, lat delta f32, ?, ?, pause[, altitude i16, ?])`. GB's loop
 leaves out a final record that would end exactly at the end of the file.
+
+### AGPS / ephemeris (service `1F` + file service `1C`; `Ephemeris.kt`, `EphemerisDownload.kt`; UNVERIFIED on the Fit 4 Pro)
+
+Without it an outdoor workout sits on "Locating..." until the watch finds the satellites unaided. The watch drives; sources are
+Gadgetbridge `HuaweiEphemerisManager` and Huawei Health's `HwEphemerisManager` (RE notes: `AGPS_PROTOCOL.md`). Log lines carry `AGPS:`.
+
+| Step | Direction | Wire |
+|---|---|---|
+| 1 | watch | `1F/01 81{02 op, 03 time}`; op 1 = new request, op 2 = progress poll |
+| 2 | phone | op 1: `1F/01 {7F 100000}` (`100007` without network), then `1F/02 {81}` consult. op 2: `1F/01 81{02: 02, 03: the time bytes, 04: state}` |
+| 3 | watch | `1F/02 81{04 time, 05 downloadVersion, 06 tag list joined by ';', children 8x{03 url}}` (version 0 only uses the urls) |
+| 4 | phone | downloads (IO dispatcher), then `1F/03 {01 state}`: 3 ready, 4 failed, 5 unknown version |
+| 5 | watch | `1C/01 {02 type, 03 product}` file list; `1C/02` consult (`01` protocol, `03` transfer size, `04` max data, `06` type); `1C/03 {01 name}` file info; `1C/04 {01 name, 02 offset, 03 len}` data request; `1C/06 {01 result}` done |
+| 6 | phone | `1C/01 {01 "a;b"}`; `1C/02 {7F 100000}`; `1C/03 {02 size i32, 03 CRC16 (init 0) i16}`; `1C/04 {7F, 02 sha256hex(address) + name, 03 offset}` then `1C/05` frames `index byte + bytes` (each encrypted, up to max data per request); `1C/06 {7F 100000}`; `100001` for anything refused |
+
+Served: version 0 (`https://gllto.glpals.com/7day/v6/latest/lto.dat`, file `gpslocation.dat`, no auth, 6 h cache), versions 1 and 2
+(config server lookup, UNTESTED, file named after the download url), version 3 `HW_AGNSS` (GET `https://geo-dra.platform.hicloud.com/` +
+the entry minus its last `/segment`, gunzip, file `HW_AGNSS_RTCM_33`, 30 min cache). The other version 3 tags (`HW_PGNSS_PRED`,
+`HW_PGNSS_TRANS`, `HW_RSMC_*`, `HW_PRECSION_ION`) need Huawei's native decoder or an account credential and are declined with
+state 4, as Huawei Health reports a failed download. The real `HW_AGNSS` path and tag strings are only known once the watch sends
+them; they are logged to logcat (tag `JoyoFit`, `AGPS: consult tag=...`) and kept out of the shareable support log.
 
 ### Live workout (`LiveWorkout.kt`, `LiveWorkoutCodec.kt`; Huawei Health 17.0.8.300 RE, UNVERIFIED on the Fit 4 Pro)
 

@@ -78,6 +78,7 @@ internal class WearRuntime private constructor(context: Context) {
       extras.onLinkState(state)
       workoutLink.onLinkState(state)
       p2p.onLinkState(state)
+      ephemeris.onLinkState(state)
     }
 
     override fun battery(level: Int) {
@@ -146,6 +147,7 @@ internal class WearRuntime private constructor(context: Context) {
       device = device,
       linkState = link.currentState(),
       log = supportLog.lines(),
+      transport = link.lastAttemptTransport,
     )
   }
 
@@ -168,6 +170,7 @@ internal class WearRuntime private constructor(context: Context) {
   val workoutLink = WorkoutLink(appContext, link, events, scope, liveWorkout)
   val extras = WatchExtras(appContext, syncStore, link, events, scope)
   val p2p = P2pController(appContext, P2pSettings(appContext), link, settings, syncStore, events, scope)
+  val ephemeris = EphemerisLink(appContext, link, events, scope)
 
   init {
     DataSyncFeatures.install(this)
