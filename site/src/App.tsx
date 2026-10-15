@@ -574,7 +574,7 @@ function Features() {
   return (
     <section
       data-section="features"
-      className="mx-auto grid w-full max-w-6xl gap-4 px-4 pb-20 md:grid-cols-[1.4fr_1fr] md:px-6 md:pb-28"
+      className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-20 md:grid-cols-[1.4fr_1fr] md:px-6 md:py-28"
     >
       <article className="rounded-[1.75rem] bg-makan-soft p-6 md:p-8">
         <h3 className="text-2xl font-extrabold tracking-tight text-makan-ink">
