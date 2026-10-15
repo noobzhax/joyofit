@@ -133,12 +133,21 @@ internal fun watchfaceOperationPacket(params: HuaweiPacket.ParamsProvider, fileN
   return watchfaceOperationPacket(params, id, version, operation)
 }
 
-internal fun watchfaceOperationPacket(params: HuaweiPacket.ParamsProvider, id: String, version: String, operation: Byte): HuaweiPacket =
-  HuaweiPacket(params).also {
-    it.serviceId = Watchface.id
-    it.commandId = Watchface.WatchfaceOperation.id
-    it.setTlv(HuaweiTLV().put(0x01, id).put(0x02, version).put(0x03, operation))
-  }
+internal fun watchfaceOperationPacket(
+  params: HuaweiPacket.ParamsProvider,
+  id: String,
+  version: String,
+  operation: Byte,
+  signature: String? = null,
+): HuaweiPacket = HuaweiPacket(params).also {
+  it.serviceId = Watchface.id
+  it.commandId = Watchface.WatchfaceOperation.id
+  val tlv = HuaweiTLV().put(0x01, id).put(0x02, version).put(0x03, operation)
+  // Huawei Health sends the whole getresourcesign response string in tag 0x08 of the announcement
+  // (HwWatchFaceBtManager.setWatchfaceSignature). The activation that follows carries no signature.
+  if (signature != null) tlv.put(0x08, signature)
+  it.setTlv(tlv)
+}
 
 /** Huawei Health `WatchFaceWearService.isSignFailErrorCode`. */
 internal val SIGNATURE_FAILURE_CODES = setOf(100007, 100014)
@@ -305,9 +314,9 @@ internal class WatchfaceOps(
    * The watch answers with a status (tag 0x7f: absent or 100000 is fine) and `needReceive` (tag 0x04: 1 = send the
    * file, 0 = it has this face already). GB does not send it. A status other than success ends the install here.
    */
-  private suspend fun announce(id: String, version: String): Announcement {
-    val label = "WatchfaceOperation announce ${id}_$version"
-    val packet = watchfaceOperationPacket(params, id, version, Watchface.WatchfaceOperation.operationActive)
+  private suspend fun announce(id: String, version: String, signature: String? = null): Announcement {
+    val label = "WatchfaceOperation announce ${id}_$version" + (if (signature != null) " (with signature)" else "")
+    val packet = watchfaceOperationPacket(params, id, version, Watchface.WatchfaceOperation.operationActive, signature)
     log("$label TLV before encryption: ${describeTlv(packet.getTlv())}")
     val answer = try {
       session.request(packet, queryMs, label)
@@ -337,6 +346,7 @@ internal class WatchfaceOps(
     pkg: WatchfacePackage,
     progress: (bytes: Int, total: Int) -> Unit,
     fileName: String = WatchfacePackages.randomName(version = pkg.description.version),
+    signature: String? = null,
   ): InstallResult {
     requireService()
     val description = pkg.description
@@ -355,7 +365,7 @@ internal class WatchfaceOps(
       log("the watch's screen size is unknown; the package is not checked against it")
     }
 
-    val announcement = announce(id, version)
+    val announcement = announce(id, version, signature)
     val outcome = if (announcement.needReceive == 0) {
       log("the watch reports it has ${id}_$version already (needReceive=0); nothing is uploaded")
       null
@@ -451,15 +461,26 @@ internal class WatchfaceController(
 ) {
   suspend fun list(): Map<String, Any?> = withWatch { ops -> ops.list().toJs() }
 
+  /** The watch's face list as entries, for callers that need flags rather than the JS map (face customization). */
+  suspend fun entries(): List<WatchfaceEntry> = withWatch { ops -> ops.list().faces }
+
   suspend fun setActive(id: String): Map<String, Any?> = withWatch { ops -> ops.setActive(id).toJs() }
 
   suspend fun delete(id: String): Map<String, Any?> = withWatch { ops -> ops.delete(id).toJs() }
 
-  suspend fun install(uri: String): Map<String, Any?> {
+  /**
+   * [signature] is a Huawei `getresourcesign` response string (Huawei Health sends it in tag 0x08 of the
+   * announcement). [fileName] overrides the random `<id>_<version>` install name; a replayed signature only
+   * names the face id and version it was issued for, so both must match that face.
+   */
+  suspend fun install(uri: String, signature: String? = null, fileName: String? = null): Map<String, Any?> {
     link.handle() ?: throw notConnected()
     val bytes = withContext(Dispatchers.IO) { readUri(uri) }
     val pkg = WatchfacePackages.parse(bytes)
-    val fileName = WatchfacePackages.randomName(version = pkg.description.version)
+    val name = fileName ?: WatchfacePackages.randomName(version = pkg.description.version)
+    if (fileName != null && fileName.indexOf('_') <= 0) {
+      throw WearException(ErrorCodes.INVALID_ARGUMENT, "The install name must be `<id>_<version>`, got '$fileName'")
+    }
     var lastEmit = 0L
     val progress = { done: Int, total: Int ->
       val now = System.nanoTime() / 1_000_000
@@ -470,13 +491,13 @@ internal class WatchfaceController(
     }
     return withWatch { ops ->
       try {
-        val result = ops.install(pkg, progress, fileName)
+        val result = ops.install(pkg, progress, name, signature)
         events.uploadResult(result.listed, result.fileName, result.uploadStatus, result.message)
         result.toJs()
       } catch (e: CancellationException) {
         throw e
       } catch (e: WearException) {
-        events.uploadResult(false, fileName, e.statusCode, e.message ?: e.errorCode)
+        events.uploadResult(false, name, e.statusCode, e.message ?: e.errorCode)
         throw e
       }
     }

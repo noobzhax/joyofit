@@ -81,6 +81,14 @@ class HuaweiWearModule : Module() {
       emit("onWatchMealLogged", payload)
     }
 
+    override fun faceCustomization(payload: Map<String, Any?>) {
+      emit("onFaceCustomization", payload)
+    }
+
+    override fun liveWorkout(payload: Map<String, Any?>) {
+      emit("onLiveWorkout", payload)
+    }
+
     private fun emit(name: String, payload: Map<String, Any?>) {
       if (destroyed) return
       try {
@@ -110,12 +118,21 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged", "onFaceCustomization", "onLiveWorkout")
 
     OnCreate {
       val runtime = runtime()
       runtime.addListener(listener)
       runtime.ensureServiceRunning()
+    }
+
+    // A workout started on the watch, followed live (LiveWorkout.kt).
+    Function("getLiveWorkout") {
+      runtime().liveWorkout.snapshot()
+    }
+
+    Function("dismissLiveWorkout") {
+      runtime().liveWorkout.dismiss()
     }
 
     AsyncFunction("getBondedDevices") {
@@ -226,6 +243,12 @@ class HuaweiWearModule : Module() {
 
     // Watch faces: list, install a .hwt, set active, delete (WatchfaceModuleApi.kt).
     watchfaceApi { runtime() }
+
+    // Editable watch faces: read and apply a face's style, background, colour, widgets (FaceCustomModuleApi.kt).
+    faceCustomApi { runtime() }
+
+    // The photo face: list, add and delete photos, make it active (PhotoFaceModuleApi.kt).
+    photoFaceApi { runtime() }
 
     // Fall detection, SOS SMS relay, morning sleep report and the cycle calendar (WatchExtrasModuleApi.kt).
     watchExtrasApi { runtime() }

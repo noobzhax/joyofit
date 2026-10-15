@@ -669,6 +669,21 @@ class WatchfaceTest {
   }
 
   @Test
+  fun installSendsTheSignatureOnlyInTheAnnouncement() = runBlocking {
+    val (watch, ops, _) = setup()
+
+    ops.install(WatchfacePackages.parse(hwt()), { _, _ -> }, "123456789_2.1.0", "captured-signature")
+
+    val operations = watch.all(0x27, 0x03)
+    val announce = operations.first().tlv!!
+    assertEquals("captured-signature", announce.getString(0x08))
+    // Huawei Health signs the announcement; the activation that follows 27/05 type 2 carries no signature.
+    val activation = operations.last().tlv!!
+    assertEquals(1, activation.getByte(0x03).toInt())
+    assertEquals(listOf(0x01, 0x02, 0x03), activation.get().map { it.tag.toInt() })
+  }
+
+  @Test
   fun installNamesTheFaceAfterItsOwnVersionByDefault() = runBlocking {
     val (watch, ops, _) = setup()
 

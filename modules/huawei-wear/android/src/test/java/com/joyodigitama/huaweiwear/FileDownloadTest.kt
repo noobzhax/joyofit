@@ -295,7 +295,7 @@ class FileDownloadTest {
   @Test
   fun sequenceFileBecomesStagedSegments() {
     val logs = ArrayList<String>()
-    val segments = SleepSync.parseSequenceFile(sequenceFile(), supportsBedTime = false) { logs.add(it) }
+    val result = SleepSync.parseSequenceFile(sequenceFile(), supportsBedTime = false) { logs.add(it) }
 
     // fallAsleepTime 1_700_000_130 is cut to the minute: 1_700_000_100.
     val t = 1_700_000_100L
@@ -306,14 +306,16 @@ class FileDownloadTest {
         Seg(t + 240, t + 420, 0x5658, "awake"),
         Seg(t + 420, t + 480, 1, null),
       ),
-      segments.map { Seg(it.start, it.end, it.type, it.stage) },
+      result.segments.map { Seg(it.start, it.end, it.type, it.stage) },
     )
     assertTrue(logs.any { it.contains("sleepScore=85") })
+    // The watch's score is kept for the night the stages start.
+    assertEquals(listOf(t to 85), result.scores.map { it.start to it.score })
   }
 
   @Test
   fun invalidSequenceFileGivesNoSegments() {
-    assertEquals(0, SleepSync.parseSequenceFile(ByteArray(10), supportsBedTime = false) { }.size)
+    assertEquals(0, SleepSync.parseSequenceFile(ByteArray(10), supportsBedTime = false) { }.segments.size)
   }
 
   @Test
@@ -351,7 +353,7 @@ class FileDownloadTest {
       }
     }
 
-    val segments = SleepSync(session, events).sync(946684800, 1_700_100_000)
+    val segments = SleepSync(session, events).sync(946684800, 1_700_100_000).segments
 
     assertEquals(listOf("light", "deep", "awake", null), segments.map { it.stage })
     assertEquals(700013, watch.requests.first { it.command == 0x01 }.tlv.getInteger(0x0c))
@@ -363,7 +365,7 @@ class FileDownloadTest {
     DeviceCaps.supportedCommands = mapOf(0x07 to byteArrayOf(0x0a, 0x0b))
     val (watch, session, events) = setup { emptyList() }
 
-    val segments = SleepSync(session, events).sync(1, 2)
+    val segments = SleepSync(session, events).sync(1, 2).segments
 
     assertEquals(0, segments.size)
     assertTrue(watch.requests.isEmpty())
@@ -397,7 +399,7 @@ class FileDownloadTest {
       }
     }
 
-    val segments = SleepSync(session, events).sync(1, 2)
+    val segments = SleepSync(session, events).sync(1, 2).segments
 
     assertEquals(listOf(listOf(1000L, 5000L, 0x06, "light"), listOf(7000L, 9000L, 0x06, "light")), segments.map { listOf(it.start, it.end, it.type, it.stage) })
     assertEquals(2, watch.count(0x2c, 0x01)) // sleep_state.bin and sleep_data.bin

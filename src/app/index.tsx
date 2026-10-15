@@ -9,7 +9,9 @@ import { NavRow } from '@/components/NavRow';
 import { Card, Screen, Section } from '@/components/Screen';
 import { Notice, Skeleton } from '@/components/States';
 import { StatTile } from '@/components/StatTile';
+import { elapsedSec, formatGrams, isActive } from '@/features/live/liveWorkout';
 import { HourlyBars } from '@/features/today/HourlyBars';
+import { scoreFor } from '@/features/sleep/nights';
 import { SleepSummaryView } from '@/features/today/SleepSummaryView';
 import { isLinkUp } from '@/features/device/linkState';
 import {
@@ -23,8 +25,10 @@ import { useLiveHeartRate } from '@/features/today/useLiveHeartRate';
 import { useStepGoal } from '@/features/today/useStepGoal';
 import { useTodayData } from '@/features/today/useTodayData';
 import { WatchHero } from '@/features/today/WatchHero';
+import { formatElapsed } from '@/features/workouts/summary';
 import { formatClock, formatCount, formatDistance } from '@/format';
 import { useNow } from '@/hooks/useNow';
+import { useLiveWorkout } from '@/state/LiveWorkoutProvider';
 import { useWatch } from '@/state/WatchProvider';
 import { spacing, useColors } from '@/theme';
 
@@ -46,16 +50,19 @@ export default function TodayScreen() {
   const { data, error: loadError } = useTodayData(dataVersion);
   const goal = useStepGoal();
   const live = useLiveHeartRate(isLinkUp(linkState));
+  const liveWorkout = useLiveWorkout();
 
   const view = useMemo(() => {
     if (!data) return null;
     const watchTotals = totals && totals.at >= data.dayStart ? totals : null;
+    const sleep = lastSleepSession(data.sleep);
     return {
       totals: watchTotals ?? sumTotals(data.samples),
       totalsFromWatch: watchTotals !== null,
       heart: heartRateStats(data.samples),
       hourly: hourlySteps(data.samples),
-      sleep: lastSleepSession(data.sleep),
+      sleep,
+      sleepScore: sleep ? scoreFor(sleep.start, sleep.end, data.sleepScores) : null,
       hasSamples: data.samples.length > 0,
     };
   }, [data, totals]);
@@ -98,6 +105,17 @@ export default function TodayScreen() {
             ) : null
           }
         />
+        {isActive(liveWorkout) ? (
+          <Card>
+            <NavRow
+              icon="pulse"
+              tint="workouts"
+              title={`${liveWorkout.sportName ?? 'Workout'} ${liveWorkout.status === 'paused' ? 'paused' : 'in progress'}`}
+              subtitle={`${formatElapsed(elapsedSec(liveWorkout, nowMs))}${liveWorkout.heartRate !== null ? ` · ${liveWorkout.heartRate} bpm` : ''} · fat ${formatGrams(liveWorkout.fatGrams)} g, carbs ${formatGrams(liveWorkout.carbGrams)} g`}
+              onPress={() => router.push('/workout-live')}
+            />
+          </Card>
+        ) : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {loadError ? <Notice tone="danger">Could not read stored data: {loadError}</Notice> : null}
       </View>
@@ -160,8 +178,8 @@ export default function TodayScreen() {
         <HourlyBars steps={view?.hourly ?? new Array<number>(24).fill(0)} />
       </Section>
 
-      <Section title="Last night's sleep" icon="moon" tint="sleep">
-        {loading ? <Skeleton width="50%" height={38} /> : <SleepSummaryView summary={view?.sleep ?? null} />}
+      <Section title="Last night's sleep" icon="moon" tint="sleep" onPress={() => router.push('/sleep')}>
+        {loading ? <Skeleton width="50%" height={38} /> : <SleepSummaryView summary={view?.sleep ?? null} score={view?.sleepScore ?? null} />}
       </Section>
 
       <Card>

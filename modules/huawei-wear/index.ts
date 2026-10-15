@@ -6,4 +6,6 @@ export * from './src/HuaweiWearPhone.types';
 export * from './src/HuaweiWearExtras.types';
 export * from './src/HuaweiWearDiet.types';
 export * from './src/HuaweiWearWatchface.types';
+export * from './src/HuaweiWearFaceCustom.types';
+export * from './src/HuaweiWearPhotoFace.types';
 export * from './src/HuaweiWearP2p.types';

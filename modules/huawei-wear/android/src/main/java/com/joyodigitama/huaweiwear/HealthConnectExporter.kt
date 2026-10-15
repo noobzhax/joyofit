@@ -371,7 +371,8 @@ internal class HealthConnectExporter(
       val records = HealthConnectPlan.calories(inWindow, writeFrom).map {
         ActiveCaloriesBurnedRecord(
           Instant.ofEpochSecond(it.startSec), offset(it.startSec), Instant.ofEpochSecond(it.endSec), offset(it.endSec),
-          Energy.kilocalories(it.value.toDouble()), meta(it.id),
+          // Step frames count small calories (1/1000 kcal), see StepSample.calories.
+          Energy.calories(it.value.toDouble()), meta(it.id),
         )
       }
       counts.calories += insert(client, records)

@@ -225,7 +225,14 @@ internal class HuaweiSession(
         events.log(LogDirection.ERROR, service, command, null, "${subscription.label}: handler failed: ${e.message ?: e.javaClass.simpleName}")
       }
     } else {
-      events.log(LogDirection.RX, service, command, raw.toHex(), "asynchronous (no pending request)")
+      // The frame is encrypted on most commands; the decoded TLV is what a reader of the log needs.
+      val tlv = try {
+        packet.parseTlv()
+        packet.tlv?.toString()
+      } catch (e: Exception) {
+        "undecodable: ${e.message}"
+      }
+      events.log(LogDirection.RX, service, command, raw.toHex(), "asynchronous (no pending request) tlv=$tlv")
     }
   }
 

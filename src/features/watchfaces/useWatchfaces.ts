@@ -53,7 +53,8 @@ export function useWatchfaces() {
     [run],
   );
 
-  const install = useCallback(async () => {
+  /** Installs a picked .hwt; `signature` + `fileName` replay a captured Huawei signature (see installWatchface). */
+  const install = useCallback(async (signature?: string, fileName?: string) => {
     let picked: DocumentPicker.DocumentPickerResult;
     try {
       picked = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
@@ -66,7 +67,7 @@ export function useWatchfaces() {
     setProgress({ bytes: 0, total: 0 });
     await run('install', async () => {
       try {
-        const result = await HuaweiWear.installWatchface(asset.uri);
+        const result = await HuaweiWear.installWatchface(asset.uri, signature, fileName);
         if (result.list) setList(result.list);
         if (result.listed) setNotice(`${result.name}: ${result.message}`);
         else setError(`${result.name}: ${result.message}`);

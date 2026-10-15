@@ -174,6 +174,13 @@ internal class SyncStore(context: Context) {
         sample.close()
         segment.close()
       }
+      for (s in result.sleepScores) {
+        db.execSQL(
+          """INSERT INTO sleep_scores (start, end, score, efficiency) VALUES (?, ?, ?, ?)
+             ON CONFLICT(start) DO UPDATE SET end = excluded.end, score = excluded.score, efficiency = excluded.efficiency""",
+          arrayOf<Any?>(s.start, s.end, s.score, s.efficiency),
+        )
+      }
       db.execSQL("UPDATE device SET last_sync = ? WHERE address = ?", arrayOf(result.to, address))
       db.setTransactionSuccessful()
     } finally {

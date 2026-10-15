@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { HiddenTabHeader } from '@/components/HiddenTabHeader';
 import { Divider, Screen, Section } from '@/components/Screen';
 import { EmptyState, Notice, Skeleton } from '@/components/States';
 import { MetricCard } from '@/features/health/MetricCard';
@@ -10,23 +10,7 @@ import { metaOrFallback } from '@/features/health/metrics';
 import { useHealthMetrics } from '@/features/health/useHealthMetrics';
 import { useNow } from '@/hooks/useNow';
 import { useWatch } from '@/state/WatchProvider';
-import { fonts, HIT, spacing, useColors } from '@/theme';
-
-/** Back arrow for the header: this route is a hidden tab, so the tab header has no back button of its own. */
-function HeaderBack() {
-  const router = useRouter();
-  const colors = useColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      hitSlop={8}
-      onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-      style={styles.back}>
-      <Ionicons name="arrow-back" size={24} color={colors.foreground} />
-    </Pressable>
-  );
-}
+import { spacing } from '@/theme';
 
 /** Keeps "3 h ago" right without re-querying. */
 const AGO_TICK_MS = 60_000;
@@ -34,7 +18,6 @@ const AGO_TICK_MS = 60_000;
 /** Health metrics the watch stores in its data dictionary: latest value, a 7-day line, and what the watch does not support. */
 export function HealthScreen() {
   const router = useRouter();
-  const colors = useColors();
   const { linkState, device, dataVersion, sync } = useWatch();
   const { data, error } = useHealthMetrics(dataVersion);
   const nowSec = Math.floor(useNow(AGO_TICK_MS) / 1000);
@@ -48,17 +31,7 @@ export function HealthScreen() {
 
   return (
     <Screen refresh={{ refreshing: syncing, onRefresh: () => void sync(), enabled: canSync }}>
-      <Tabs.Screen
-        options={{
-          headerShown: true,
-          title: 'Health',
-          headerLeft: () => <HeaderBack />,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.foreground,
-          headerShadowVisible: false,
-          headerTitleStyle: { fontFamily: fonts.bold, fontSize: 18, color: colors.foreground },
-        }}
-      />
+      <HiddenTabHeader title="Health" />
       {error ? <Notice tone="danger">Could not read stored data: {error}</Notice> : null}
 
       {data === null && error === null ? (
@@ -118,5 +91,4 @@ export function HealthScreen() {
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   item: { gap: 2 },
-  back: { width: HIT, height: HIT, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.xs },
 });

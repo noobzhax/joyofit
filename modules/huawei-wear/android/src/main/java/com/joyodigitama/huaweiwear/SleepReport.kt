@@ -6,6 +6,18 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTLV
 
+/**
+ * Drops unstaged segments that lie within [SleepReport.SESSION_GAP_SEC] of a staged one. The watch stores short
+ * unstaged spans around a staged night (seen in the evening before it); next to real stages they only stretch the
+ * night. An unstaged nap far from any staged sleep stays. Same rule as `withoutStrayUnstaged` in src/features/today/stats.ts.
+ */
+internal fun withoutStrayUnstaged(segments: List<SleepSegment>): List<SleepSegment> {
+  val staged = segments.filter { it.stage != null }
+  return segments.filter { s ->
+    s.stage != null || staged.none { t -> t.start - s.end <= SleepReport.SESSION_GAP_SEC && s.start - t.end <= SleepReport.SESSION_GAP_SEC }
+  }
+}
+
 /** One night as the report describes it, seconds per stage from the stored segments. */
 internal class SleepNight(
   val start: Long,
@@ -55,7 +67,7 @@ internal object SleepReport {
   /** The latest session of [segments], chained with gaps up to [SESSION_GAP_SEC] (`lastSleepSession` in `stats.ts`). */
   fun lastNight(segments: List<SleepSegment>): SleepNight? {
     if (segments.isEmpty()) return null
-    val sorted = segments.sortedBy { it.start }
+    val sorted = withoutStrayUnstaged(segments).sortedBy { it.start }
     var first = sorted.size - 1
     var earliest = sorted[first].start
     while (first > 0 && earliest - sorted[first - 1].end <= SESSION_GAP_SEC) {

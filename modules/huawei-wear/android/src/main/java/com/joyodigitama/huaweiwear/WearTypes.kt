@@ -78,4 +78,10 @@ internal interface WearEvents {
 
   /** The watch logged meals itself (`onWatchMealLogged`): `{date, meals:[{id, eatTime, kcal, whichMeal}]}`. */
   fun watchMealLogged(payload: Map<String, Any?>) = Unit
+
+  /** The watch pushed a face configuration nobody asked for, e.g. the user edited the face on the watch (`onFaceCustomization`). */
+  fun faceCustomization(payload: Map<String, Any?>) = Unit
+
+  /** A workout started on the watch changed state or pushed new numbers (`onLiveWorkout`, see [LiveWorkout]). */
+  fun liveWorkout(payload: Map<String, Any?>) = Unit
 }

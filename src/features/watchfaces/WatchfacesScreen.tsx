@@ -221,6 +221,14 @@ export function WatchfacesScreen() {
                 loading={working && action === 'activate'}
                 onPress={() => void setActive(face.id)}
               />
+              {face.editable ? (
+                <Button
+                  label="Customize"
+                  icon="color-palette"
+                  disabled={!connected || !idle}
+                  onPress={() => router.push({ pathname: '/watch/face-edit', params: { id: face.id, name: face.name } })}
+                />
+              ) : null}
               <Button
                 label="Delete"
                 icon="trash"

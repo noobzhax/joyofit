@@ -73,8 +73,8 @@ never found a usable channel.
 | `2C` / `0A` | as above | GPS file | `<n>_gps.bin` for a workout (file type `0x11`; `0A`: init type `02`, FileParameters type `02`) |
 | `0F` Weather | `09` start, `05` unit, `02` support, `06` extended support, `0A` sun/moon support, `01` current, `08` forecast, `07` / `0C` error, `04` device request | weather push | see Weather |
 | `18` GpsAndTime | `07` | current position | sent after the current weather when `18/06` is listed; see Weather |
-| `27` Watchface | `01` params, `02` list, `06` names, `03` operation, `05` confirm (pushed) | watch faces | list, set active, delete, install confirmation; see Watch faces |
-| `28` FileUpload | `02` info, `03` hash, `04` ack, `05` chunk request (pushed), `06` chunk, `07` result, `08` error (pushed) | watch face upload | the watch drives, the phone answers; see Watch faces |
+| `27` Watchface | `01` params, `02` list, `06` names, `03` operation, `05` confirm (pushed), `08` photo info, `09` photo save | watch faces, photo face | list, set active, delete, install confirmation, photo list; see Watch faces |
+| `28` FileUpload | `01` file request (pushed), `02` info, `03` hash, `04` ack, `05` chunk request (pushed), `06` chunk, `07` result, `08` error (pushed) | watch face upload, photo upload | the watch drives, the phone answers; `01`: the watch asks for a photo; see Watch faces |
 | `34` P2P | `01` | cmd 1 ping, 2 data, 3 answer | module traffic to the watch's apps: health dictionary, Healthy Living, courses; see P2P (service 0x34) |
 
 ## Notifications and profile
@@ -139,6 +139,25 @@ Sport type bytes map to GB's `HuaweiActivityType` names (`WorkoutSportTypes.kt`,
 altitude is present), start time, longitude, latitude (degrees, plus altitude), padding up to offset 62 / 70, then
 15 / 19-byte records `(time delta s, ?, lon delta f32, lat delta f32, ?, ?, pause[, altitude i16, ?])`. GB's loop
 leaves out a final record that would end exactly at the end of the file.
+
+### Live workout (`LiveWorkout.kt`, `LiveWorkoutCodec.kt`; Huawei Health 17.0.8.300 RE, UNVERIFIED on the Fit 4 Pro)
+
+Huawei's "reverse linkage": a workout started on the watch, mirrored on the phone. Full notes in the RE workspace
+(`LIVE_WORKOUT_PROTOCOL.md`). All DataSync, watch package `hw.sport.linkage.device`, phone package `hw.sport.linkage.app`:
+
+- `37/02` event `800400014` (control), data `{01 workoutType, 02 op (0 start, 1 stop, 2 resume, 3 report), 03 time ms,
+  05 watch state (0 pre-sport, 1 running, 2 paused)}`. The phone answers start / stop / resume with the same event id and
+  `02 01 <op> 04 01 00` (code 0 accepts; Huawei rejects types other than 1, 2, 3, 5, 7, 15 and JoyoFit accepts all).
+- `37/02` events `800400002` start, `...03` stop, `...04` pause, `...05` resume, data `{01 time ms, 02 workoutType}`, no answer.
+- `37/03` points, one `86{87{08 dict field id, 09 big-endian value}}` list per push, no answer. Units: duration s, heart
+  rate bpm, distance dm, calories cal (kcal x 1000), speed km/h x 100, pace s/km, step rate /min, steps, cycling cadence rpm,
+  altitude m (signed in 4 bytes), climb / descent m, training effect x 10, `50004770` state (1 running, 2 paused, 3 stopped).
+
+The watch pushes all of it unprompted; the phone sends nothing first. Sending the answer needs ExpandCapability 84. Huawei
+also announces reverse-capability bits 47..59 (55 = service `37`) that GB and JoyoFit do not: the first thing to try if the
+watch never sends the start event. The watch sends no fat or carbohydrate figure and Huawei Health computes none; the fat
+and carbs on the live screen are JoyoFit's estimate (`SubstrateEstimator`: %HRmax to %VO2max after Swain, RER curve,
+fat share `(1 - RER) / 0.3`, 9 and 4 kcal per gram).
 
 ## Weather
 
@@ -270,9 +289,175 @@ The upload itself was never the problem: `28/07` returned `02 = 1` (validity acc
    object, and the user's Huawei account token in `x-usertoken`), and sends the whole response string in tag `08`
    (`HwWatchFaceBtManager.setWatchfaceSignature`, `sendOperateType`). Huawei's own test procedure for `.hwt` files says to
    log in to Huawei Health with a Huawei developer account. A face whose id and version Huawei did not sign is therefore thrown
-   away, however well the file is made; that includes SpaceRed. JoyoFit cannot obtain that signature and reports the reason
-   instead of a bare "not listed". Whether a signature captured from Huawei Health could be replayed (it names the account and
-   a device id) is not known.
+   away, however well the file is made; that includes SpaceRed. Whether a signature captured from Huawei Health could be replayed
+   (it names the account and a device id) is not known. JoyoFit cannot obtain a signature itself, but it can carry one: the
+   announcement puts `installWatchface(uri, signature, fileName)`'s `signature` in tag `08` and installs under the signed face's
+   `<id>_<version>` when `fileName` is given, which is the replay experiment.
+
+### What the signature covers (static analysis of Huawei Health 17.0.8.300, nothing was sent to Huawei)
+
+Analysis only: JoyoFit never calls `getresourcesign` and implements nothing that fetches, forges or reuses a signature. The
+`signature` parameter of `installWatchface` quoted above exists in the code base and is outside this analysis.
+
+**Request** (`GetWatchFaceSignatureThread.g()`, built by `HwWatchfaceSignatureManager.a(hitopId, version, operateType, vipFree)`
+= `com.huawei.watchface.l2.a`; one POST per face and version, the answer is cached under `<id>_<version>`). JSON body:
+
+| Field | Value in the code |
+|---|---|
+| `hitopId` | the face id (`markUpHiTopId` adds 5 to the first digit for a member-free face) |
+| `version` | the face version |
+| `mode` | `"1"` when the watch is in AP mode (`isSportAPModel`), else `"0"` |
+| `operateType` | decimal string; callers pass 0 (store install, `f2`, `a2`, `HwWatchFaceManager`, `g2`) or 1 (trial, `k2`, `g2`) |
+| `watchDeviceInfo.screen` | the watch's screen string (`480*408`) |
+| `watchDeviceInfo.deviceModel` / `phoneType` | watch model plus its software version / watch model |
+| `watchDeviceInfo.deviceId` | `q0.f()` = upper-case SHA-256 of `getDeviceIdentifyByCapability()`: the watch's `device_Identify`, or its shortened `deviceIdCutStr` when the watch says `isSupportMacCut` |
+| `watchDeviceInfo.deviceType` / `clientType` | `"5"` / `"6"` |
+| `watchDeviceInfo.osVersion` | the newest face format the watch takes (`2.10`) |
+| `watchDeviceInfo.adaptScreenInfo` | `{"<w>*<h>": "<supported version>"}` of the first compatible screen, when known |
+
+Headers: `x-versioncode`, `x-clienttraceid` (random UUID), `x-appid: 10003`, `x-hc` (country), `x-language`, `x-devicemodel`,
+`x-ostype: emui`, `x-osversion`, `x-phonetype`, `x-screen`, `x-clienttype: 1`, `x-packagename`, `x-brandChannel`,
+`Content-Type: application/json; charset=UTF-8`, `x-ability` (`{"100009":{"memberSignFlag":"1"}}` when the watch has the member
+signature capability), and the account credentials `x-usertoken` / `x-authtype` (`AT` or `ST`, from `HwUserTokenServiceManager`).
+There is no file hash and no file content in the request: the server answers for an id and version it already knows.
+
+**Response.** The phone parses only `resultCode` / `resultInfo`; the whole response string is cached and sent unchanged as the
+value of tag `08` of `27/03` (`HwWatchFaceBtManager.setWatchfaceSignature`, `sendOperateType`: UTF-8 bytes, length as a varint), and
+only when the operation is 1, 5 or 7. The layout is visible in the privacy filter and the log policy of the same classes
+(`b3.f422a`, `@ReportPolicy` of `GetWatchFaceSignatureThread`): `result.content.{huid, hitopId, version, deviceId,
+watchContentHash, status, recycle}` and `result.contentSign`.
+
+**Bound to** (fields of the signed `content`): the Huawei account (`huid`), the face (`hitopId`), its version (`version`), the watch
+(`deviceId`, the hash above) and the face's content (`watchContentHash`, a hash the server holds for that id and version: the phone
+sends no hash, so the watch has to compare it with the face it received [INFERENCE]), plus `status` and `recycle` flags (meaning
+not visible). `contentSign` is the signature value. **Algorithm: not visible.** The client holds no key, no algorithm name and no
+verification code, so what `contentSign` signs over (the whole `content` object or a subset) and how is only known to the server
+and the watch firmware [INFERENCE: the whole `content`]. The member signature (`GetMemberSignatureThread`, tag `09`, capability
+bits 16 / 32) is the same shape with `content.{huid, deviceId}` and `contentSign`, and carries no face.
+
+**Watch side.** Not decompilable here. Observed (section above): tag `08` is not checked at the announcement (`7f = 0` for a garbage
+value); the check comes at activation (`100014`, or `100007`, Huawei's `isSignFailErrorCode`) and the face is deleted about 3 s
+later. A signature therefore ties one face id and version to one account and one watch; a face Huawei never signed cannot carry a
+valid one. Photo, video and kaleidoscope content is not a face and carries none (next section).
+
+### Editing a face's options (Huawei Health 17.0.8.300 RE; wire layout from source, the watch side UNVERIFIED)
+
+Status legend: **VERIFIED** = seen on the Fit 4 Pro; **UNVERIFIED** = read from Huawei Health's code only. Nothing in this section was
+verified on the watch yet: the watch left JoyoFit's bond while this was being built (HiChain op2 answered `errorCode -1`), so the
+device test below is still to be run.
+
+Classes: `CustomConfigWatchFaceService` (`hwdevice.mainprocess.mgr.hwmywatchfacemgr.deviceside`: `queryCustomConfig`,
+`setCustomConfig`, `onDataReceived`, `buildCustomConfigEventDataBytes`, `buildEventDataStyleList`, `buildEventDataWidgetList`,
+`loadCustomConfigFromSampleEvent`, `loadCustomStyle`, `loadWidgetList`), `CustomConfigWatchFaceManager` (`queryCustomConfig`,
+`applyCustomConfig`, `registerCustomConfigListener`), `CustomConfig` / `CustomConfig$CustomStyle` (the model), `WatchFaceCallback`
+(`@JavascriptInterface queryCustomConfig(long, String)`, `onCustomConfigReceived`), `WatchFaceJs` (`@H5ProMethod applyCustomConfig`),
+`WatchFaceWearService` (`handleWatchFaceExist`, `handleWatchFaceTransferSuccess`, `sendCustomConfigAndApplyWatchFace`), TLV writer
+`cqe` / reader `cqj` / byte helpers `cph`.
+
+**Transport (UNVERIFIED).** DataSync `37/02` sample event, `01 src = hw.app.watchface.custom`, `02 wear = hw.watch.watchface.custom` for the
+phone's requests; level 0. The watch answers with `src = hw.watch.watchface.custom` (`isCheckPkgName`). Sending needs ExpandCapability 84
+(`ynw`, the same gate as every DataSync event); JoyoFit checks it and logs the decision (`FaceCustom: query <id>: ExpandCapability 84 …`).
+
+| Event | Direction | Data (event tag `05`, Huawei's own TLV: tag byte, 7-bit varint length, value; tag top bit = nested) |
+|---|---|---|
+| `800100008` query | phone → watch | `01` marketId, UTF-8 |
+| `800100009` apply | phone → watch | `01` marketId; `82{83{04 mode, 05 index}…}` when any style; `06` colour index; `07` custom colour, UTF-8, left out when empty; `88{89{0a slot, 0b option}…}` when any widget |
+| `800100009` report | watch → phone | same layout: the reply to a query, and (presumably) the push when the user edits the face on the watch |
+
+**Value encodings (`cqe` / `cph`).** `04`, `05`, `0a`, `0b` are one byte (`cqe.a(tag, int)` writes `(byte) i`, so an index is 0 to 255).
+`06` is `cqe.c(tag, int)`: the minimal big-endian bytes of the int (`cph.f`: 1 to 4 bytes, 0 is `00`). Strings are UTF-8. Lists and structs are
+tagged `tag | 0x80`; an empty list is not written. The reader (`cqj.a.a`) reads any int as 1 to 4 big-endian bytes and masks the top bit
+of tags. Order on the wire: `01`, `82`, `06`, `07`, `88`.
+
+**Modes** (`DIAL_EDIT_MODE_*`): 0 style, 1 background, 2 dual, 3 scale, 4 symbol, 5 typeface, 6 time, 7 hand. Huawei Health's model
+(`CustomStyle`) has no field for dual: on read, modes 2 and 3 both fill "scale"; on write the scale index is sent under mode 2 **and** mode 3
+(`buildEventDataStyleList`). JoyoFit keeps the watch's raw modes and sends exactly the modes it is given. On read, a style missing its mode or
+index is skipped, and a widget whose slot is not below the list size is skipped; widget options are taken in list order
+(`loadWidgetList`), so slot = position.
+
+**marketId** is the face id of the watch's face list (`27/02` tag `03`, ASCII digits): `WatchFaceWearService.handleWatchFaceTransferSuccess`
+compares the install params' `watchFaceId` with the `27/05` report's face id, and `CustomConfigWatchFaceService` compares its `marketId`
+with the same report's `WatchFaceIdReportInfo.getWatchFaceId()`. In JoyoFit that is `WatchfaceInfo.id`.
+
+**Where the option lists come from.** Not from the watch. `queryCustomConfig` is a JavaScript bridge method the face's H5 editor page
+calls (`{deviceId, marketId}`); the page is Huawei's per-face editor (an `h5pro` mini-app, downloaded at runtime and not in the APK) and
+knows its own style / background / colour / widget lists. The watch's report carries only the selected index of each option, the
+modes the face exposes, a colour index when it has a palette and one option per widget slot. No count, no label. The list flags
+do not help: Huawei Health reads only type bits 0 (current), 1 (preset), 2 (can delete), 4 / 5 / 7 (video / album / kaleidoscope) and the
+expanded type; it never reads bit 3, the `editable` flag JoyoFit shows (`WatchFaceWearService.queryWatchFaceInfoList`). JoyoFit
+therefore labels options by position and shows "Customize" on faces whose `editable` bit is set (UNVERIFIED that the bit means this).
+
+**Apply / ack flow.** `setCustomConfig` sends `800100009` and remembers the marketId; the callback fires with status 0 when
+`WatchFaceDeviceService.handleReportStatus` (`27/05` tag `03` = 1, `01` = the same face id) arrives for that id
+(`createWatchFaceReportCallback`). It has no timeout and no failure path. In Huawei Health's install flow the apply comes after the
+`27/03` announce says the face exists (`need-receive 0`, `handleWatchFaceExist`) or after the transfer, and the face is activated with
+`27/03` afterwards (`sendCustomConfigAndApplyWatchFace`). The phone's `onDataReceived` ignores any packet with `7f` other than `100000`
+(`SUCCEED_RESPONSE`); no other error code exists in these classes. JoyoFit instead (`WatchfaceCustomizer.apply`): sends `800100009`,
+waits 2.5 s for a watch push, then queries and compares, and reports the parts the watch did not take; it does not subscribe to `27/05`
+(`FileUploader` owns that subscription during an install).
+
+**Device test (to run when the watch is bound to JoyoFit).** On a built-in editable face (Modules 2025, Maximum Modules): Watch →
+Watch faces → Customize. Expect `FaceCustom: report from the watch for face … styles=…` in the Log. Pick one option, Apply, and check
+the log line `apply …: The watch now reports the requested configuration.` and the watch screen; then Revert. Record: whether the
+watch answers a query for a face that is not active, which modes and widgets it reports, whether an index past the last option is
+ignored, clamped or stored, whether `7` takes `#RRGGBB`, and whether an edit on the watch produces a push (`pushed, nobody asked`).
+
+### Photo faces (Huawei Health 17.0.8.300 RE; upload VERIFIED on the Fit 4 Pro 2026-10-14, the watch's "add photo" prompt still OPEN)
+
+Classes: `AlbumWatchFaceManger` / `DiyWatchFace` (the flow), `DiyWatchFaceDeviceService` (`getPhotoWatchInfo`, `handlePhotoInfo`,
+`handleNewBackground`, `handleCustomData`, `handleOptionSelectedList`, `makeNewPhotoInfoCommand`, `combineWatchFaceBgListCommand`),
+`HwCommonFileMgr` (`defpackage.myu`, `handleDeviceRequest`, `d(String,int,int)`), `WatchFaceBitmapUtil` (the `.bin` encoders). The older
+`HwWatchFaceBtManager` / `WatchFacePhotoAlbumManager` path reads the photo list from `82{83}`; the Fit 4 Pro answers with `84{85}`, the
+layout `DiyWatchFaceDeviceService` reads, so that is the one JoyoFit follows.
+
+**Capability.** There is no capability tag: a face is a photo face when bit 5 (`0x20`) of its type in `27/02` is set
+(`getPhotoPackageName` returns the first such face). Video is bit 4, kaleidoscope bit 7, trial bit 6. The Watch Fit 4 Pro lists exactly one:
+`2180736265_2.4.11`, type `0x2a` (factory, editable, photo), no name in `27/06`. The other 13 faces have no photo bit. Each kind has its
+own commands: photo `27/08` get and `27/09` save, video `27/0f` / `27/10`, kaleidoscope `27/11` / `27/12`, "wear" `27/13` / `27/14`;
+the end report is `27/05` with type 4 (photos), 7, 8, 9 respectively.
+
+| Step | Direction | Content |
+|---|---|---|
+| `27/08` | phone | tags `01 02 03 04 0c 0d 08 09 0a` empty (Huawei Health's Diy path asks for `01 02 03 04 08 09`; the watch answers every tag either way) |
+| `27/08` | watch | VERIFIED: `01` max photos (20), `02` text colour from photo (1), `03` background type (2 = `.bin`), `84{85{06 index from **0**, 07 name, 0c port position, 0d portrait mode, 0e time style, 0f time colour, 10 background colour (`#AARRGGBB` strings), 18 / 19 / 1a smart time / font / position, 1b…1e Gaussian saturation / brightness / blur / font opacity, 29 time size}…}`, `08` position (2), `09` style (1), `0a` data index (0), `0b` image option (1 = RGB24), `11` wrist switch, `12` style applies to all, `93{94{15 container, 16 option}}` data slots (6 on the Fit 4 Pro), `17` carousel mode, `9f{a0{21 option}}` selected options (2) |
+| `27/09` | phone | `makeNewPhotoInfoCommand`: `01` count, `82{83{04 index, 05 name, 0a port position, 0b portrait, 0c time style, 0d time colour, 0e background colour, 29 time size, [15 / 16 / 17 smart, 1c Gaussian switch when the switch is not -1], [18…1b Gaussian when it is 1]}…}` the **whole** list, then `06` position, `07` style, `09` data index, `0f` wrist switch, `10` style applies to all, `91{92{13 container, 14 option}}`, `1c` Gaussian switch, `9d{9e{1f option}}` (only with exactly two). Huawei Health writes every value it holds, -1 as `ff`; the values come from its H5 editor page |
+| `27/09` | watch | `7f` 100000 and `08` = how many photos it still needs; 0 = done |
+| `28/01` | watch | for each missing photo: `01` file name (`<name>.png`), `02` file type (3), `05` resource type (optional). Answered by the phone with the same tags plus `7f` 100000, or 140006 when it has no such file |
+| `28/02` to `28/07` | both | the ordinary upload of `FileUploader`, file type **3** (`background image`), under the requested name; no `05` / `06` tags, no hash of a face |
+| `27/05` | watch | `01` face id, `02` version, `03` = 4 (photos received), `04` failed count, `7f`. Acknowledged like every `27/05` (`reportAck`: `01`, `02`, `7f` 100000) |
+
+The bytes sent for a requested name are the face's `.bin` file unless the watch's resource type (tag `05`) is 1, then the PNG
+(`HwCommonFileMgr.d(String,int,int)`). No signature, account or Huawei-server data takes part: `27/09` and `28/xx` have no tag `08`.
+
+**The `.bin` image** (`WatchFaceBitmapUtil.a(String,String,int,int,int)` and helpers). The picture must be exactly the watch's
+screen (408 x 480 on the Fit 4 Pro; otherwise Huawei Health logs "bitmap width or height is not dial width or height" and makes no file).
+Header: `45 23`, then the format code (`88 88` image option 0, `88 08` option 1, `65 F5` option 2), width and height as little-endian
+16-bit, then the pixels row by row, run-length coded, all little-endian:
+
+- option 0, 32-bit: the ARGB int of `Bitmap.getPixels` (B, G, R, A); a run of 4 or more is `89 67 45 23`, the pixel, the count (each 4 bytes);
+- option 1, 24-bit: B, G, R; a run of 4 or more, or any pixel whose colour is `0x456789`, is `89 67 45`, the pixel, the count (each 3 bytes);
+- option 2, RGB565 (`R5 G6 B5`) two pixels to a 32-bit word: a lone pixel is written with the next pixel, an odd run gives its last pixel to
+  the next pair, a run of 8 or more is `89 67 45 23`, the pixel twice, count / 2.
+
+`PhotoBin` (`PhotoFaceCodec.kt`) reproduces the three encoders; `PhotoFaceTest` compares its output with the bytes of the decompiled Huawei
+encoders, compiled unchanged and run on the same pixels. The option is the watch's tag `0b`; Huawei Health treats any value but 1 and 2 as 0.
+Max photos and the option are the watch's, not constants. Count and naming: names are free (Huawei's H5 page chooses them); JoyoFit uses `<epoch ms>.png`.
+
+**JoyoFit** (`PhotoFaceUploader.kt`, `PhotoFaceCodec.kt`, `packets/PhotoFace.java`, module functions `getPhotoFace`, `addPhoto`, `deletePhoto`,
+`setPhotoFaceActive`, screen Watch → Photo face): the picked picture is cropped on the phone (`CropEditor`, `expo-image-picker`,
+`expo-image-manipulator`) to the screen size and saved as PNG, native encodes the `.bin`, sends `27/09` with the old list plus the new
+name, serves the watch's `28/01` request and waits for the type 4 report. Delete sends `27/09` with the list minus the photo. The watch
+offers no preview, so JoyoFit keeps a copy of what it uploaded (`files/photoface`) for the screen. `27/09` echoes the settings the watch
+reported in `27/08` (`PhotoFaceCodec.saveTlv`): a photo already on the watch keeps its per-photo values, a new one goes with index and
+name only, and the top-level indexes, wrist / apply-all switches, data slots and selected options go back unchanged. The smart / Gaussian
+fields are left out because the watch does not report the switch that decides them.
+
+**Device result (2026-10-14 23:10, first upload, before the echo).** JoyoFit sent `01=01 82{83{04=01 05="1791994229644.png"}} 06=02 07=01
+09=00`; the watch answered `08=01`, asked for the file, took the 585551-byte RGB24 `.bin` and reported `27/05` type 4 with 0 failed. It then
+listed the photo at index **0** with `0c=02` (= the position index), `0d=00`, `0e=01` (= the style index) and both colours `#00000000`, i.e.
+its own defaults. The photo shows as the face's background, but the watch keeps showing its "add photos / scan the QR code in Huawei Health"
+prompt. OPEN: whether the full `27/09` (above) clears it. Huawei Health's save path sends nothing more after the save (`DiyWatchFace.onSaveSuccess`
+only unregisters its file callback); what its H5 editor page calls afterwards is not in the APK.
 
 ## Calorie intake (from Huawei Health RE)
 

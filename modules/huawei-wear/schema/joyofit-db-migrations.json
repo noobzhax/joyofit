@@ -44,5 +44,8 @@
     "CREATE TABLE health_metrics (type TEXT NOT NULL, ts INTEGER NOT NULL, last_ts INTEGER NOT NULL, value REAL, values_json TEXT NOT NULL, PRIMARY KEY (type, ts))",
     "CREATE INDEX health_metrics_by_ts ON health_metrics (ts)",
     "CREATE TABLE health_metric_status (type TEXT PRIMARY KEY NOT NULL, dict_class INTEGER NOT NULL, title TEXT NOT NULL, supported INTEGER NOT NULL, gate TEXT NOT NULL, checked_at INTEGER NOT NULL, synced_at INTEGER, rows_added INTEGER, note TEXT)"
+  ],
+  [
+    "CREATE TABLE sleep_scores (start INTEGER PRIMARY KEY NOT NULL, end INTEGER NOT NULL, score INTEGER NOT NULL, efficiency INTEGER)"
   ]
 ]

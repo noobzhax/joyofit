@@ -9,6 +9,8 @@ internal object DataSyncFeatures {
     rt.dataSync.register(rt.diet)
     rt.dataSync.register(rt.bodyMetrics)
     rt.dataSync.register(rt.activityGoals)
+    rt.dataSync.register(rt.faceCustomizer)
+    rt.dataSync.register(rt.liveWorkout)
     rt.extras.features.forEach { rt.dataSync.register(it) }
   }
 }

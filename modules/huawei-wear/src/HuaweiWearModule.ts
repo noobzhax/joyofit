@@ -10,6 +10,7 @@ import type {
   HealthSensorsUpdate,
   HuaweiWearModuleEvents,
   LinkState,
+  LiveWorkout,
   NotificationAccessStatus,
   NotificationApp,
   SyncSummary,
@@ -29,6 +30,8 @@ import type {
   DietStatus,
 } from './HuaweiWearDiet.types';
 import type { WatchfaceInstallResult, WatchfaceList } from './HuaweiWearWatchface.types';
+import type { FaceApplyResult, FaceCustomization } from './HuaweiWearFaceCustom.types';
+import type { PhotoFace } from './HuaweiWearPhotoFace.types';
 import type { CoursesStatus, HealthyLivingStatus, RunningCourse, RunningCoursePushResult } from './HuaweiWearP2p.types';
 
 declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
@@ -97,6 +100,11 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
    * Does nothing when no watch is connected or it does not list the realtime command.
    */
   setLiveHeartRate(active: boolean): Promise<void>;
+
+  /** The workout started on the watch that is running now, or the last one until dismissed; null when none was seen. */
+  getLiveWorkout(): LiveWorkout | null;
+  /** Forgets a finished live workout (status `ended`) and removes its notification. */
+  dismissLiveWorkout(): void;
 
   /**
    * Makes the watch ring and vibrate (`start` true) or stops it. Needs a connected watch that
@@ -177,12 +185,45 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
    * the end. Rejects with ERR_INVALID_ARGUMENT for a file that is no watch face or is made for another
    * screen, ERR_UPLOAD_REJECTED with the exact status code when the watch refuses, ERR_TIMEOUT when it
    * goes silent. A resolved result with `listed: false` means the watch took the upload but dropped the face.
+   *
+   * Signature-replay experiment: watches with the signature capability (27/01 tag 0x11 bit 8) expect a
+   * Huawei `getresourcesign` response in the announcement (27/03 tag 0x08) and delete unsigned faces
+   * seconds after activation (100014). `signature` sends a captured signature string; `fileName`
+   * (`<id>_<version>`) installs under the id and version that signature was issued for instead of a
+   * random name.
    */
-  installWatchface(uri: string): Promise<WatchfaceInstallResult>;
+  installWatchface(uri: string, signature?: string, fileName?: string): Promise<WatchfaceInstallResult>;
   /** Makes the face with this id active; resolves with the list read afterwards, rejects if the watch did not switch. */
   setActiveWatchface(id: string): Promise<WatchfaceList>;
   /** Deletes the face with this id; resolves with the list read afterwards, rejects if the face is still there. */
   deleteWatchface(id: string): Promise<WatchfaceList>;
+  /**
+   * A face's current options (DataSync 800100008). Resolves with what the watch reports; a face with no editable options does not answer
+   * (ERR_TIMEOUT). ERR_NOT_CONNECTED, ERR_UNSUPPORTED (watch lacks ExpandCapability 84), ERR_INVALID_ARGUMENT (face not on the watch).
+   */
+  getFaceCustomization(faceId: string): Promise<FaceCustomization>;
+  /**
+   * Applies the parts in `config` (DataSync 800100009) and reads the face's options back. Resolves with `ok: false` and the parts the watch
+   * did not take; rejects like `getFaceCustomization`. Indexes are 0-255.
+   */
+  applyFaceCustomization(faceId: string, config: FaceCustomization): Promise<FaceApplyResult>;
+
+  /**
+   * The watch's photo face (the face of type bit 5 in its face list), its settings and the photos it holds. Rejects with
+   * ERR_UNSUPPORTED when the watch has no photo face, ERR_TIMEOUT when it does not answer.
+   */
+  getPhotoFace(): Promise<PhotoFace>;
+  /**
+   * Puts the picture at `uri` (`file://` or `content://`) on the photo face. The picture must be a PNG of exactly the watch's
+   * screen size (`PhotoFace.width` x `height`): the crop screen produces it. Emits `onUploadProgress` while the watch pulls
+   * the data and `onUploadResult` at the end. Rejects with ERR_INVALID_ARGUMENT for a wrong size or a full face,
+   * ERR_UPLOAD_REJECTED with the watch's status code when it refuses.
+   */
+  addPhoto(uri: string): Promise<PhotoFace>;
+  /** Removes the photo with this name (`PhotoFacePhoto.name`) from the face. */
+  deletePhoto(name: string): Promise<PhotoFace>;
+  /** Makes the photo face the face on the watch's screen. */
+  setPhotoFaceActive(): Promise<PhotoFace>;
 
   /** Fall detection and SOS SMS relay state, the sleep report switch and what the watch reports for them. */
   getSafety(): SafetyStatus;

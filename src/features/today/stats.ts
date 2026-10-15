@@ -7,6 +7,7 @@ export function startOfLocalDay(nowSec: number): number {
   return Math.floor(d.getTime() / 1000);
 }
 
+/** Totals in the watch's FitnessTotals units: calories in kcal (samples carry small calories). */
 export function sumTotals(samples: readonly StepSample[]): FitnessTotals {
   const totals: FitnessTotals = { steps: 0, calories: 0, distance: 0 };
   for (const s of samples) {
@@ -14,6 +15,7 @@ export function sumTotals(samples: readonly StepSample[]): FitnessTotals {
     totals.calories += s.calories;
     totals.distance += s.distance;
   }
+  totals.calories = Math.round(totals.calories / 1000);
   return totals;
 }
 
@@ -74,7 +76,19 @@ export function hourlySteps(samples: readonly StepSample[]): number[] {
 }
 
 /** Segments closer together than this belong to the same sleep session. */
-const SESSION_GAP_SEC = 3 * 3600;
+export const SESSION_GAP_SEC = 3 * 3600;
+
+/**
+ * Drops unstaged segments within {@link SESSION_GAP_SEC} of a staged one: the watch stores short unstaged spans
+ * around a staged night, and next to real stages they only stretch it. An unstaged nap far from staged sleep
+ * stays. Same rule as `withoutStrayUnstaged` in SleepReport.kt.
+ */
+export function withoutStrayUnstaged<T extends SleepSegment>(segments: readonly T[]): T[] {
+  const staged = segments.filter((s) => s.stage);
+  return segments.filter(
+    (s) => s.stage || !staged.some((t) => t.start - s.end <= SESSION_GAP_SEC && s.start - t.end <= SESSION_GAP_SEC),
+  );
+}
 
 export interface SleepTypeSummary {
   /** Raw watch sleep-state byte; its meaning is not decoded here. */
@@ -107,7 +121,7 @@ export interface SleepSummary {
  */
 export function lastSleepSession(segments: readonly SleepSegment[]): SleepSummary | null {
   if (segments.length === 0) return null;
-  const sorted = [...segments].sort((a, b) => a.start - b.start);
+  const sorted = withoutStrayUnstaged(segments).sort((a, b) => a.start - b.start);
   let first = sorted.length - 1;
   let earliestStart = sorted[first].start;
   while (first > 0 && earliestStart - sorted[first - 1].end <= SESSION_GAP_SEC) {

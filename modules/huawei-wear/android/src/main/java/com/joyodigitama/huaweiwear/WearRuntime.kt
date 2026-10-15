@@ -108,6 +108,14 @@ internal class WearRuntime private constructor(context: Context) {
     override fun watchMealLogged(payload: Map<String, Any?>) {
       listeners.forEach { it.watchMealLogged(payload) }
     }
+
+    override fun faceCustomization(payload: Map<String, Any?>) {
+      listeners.forEach { it.faceCustomization(payload) }
+    }
+
+    override fun liveWorkout(payload: Map<String, Any?>) {
+      listeners.forEach { it.liveWorkout(payload) }
+    }
   }
 
   /** Same fan-out the link reports through; background code logs here so the Log tab shows it. */
@@ -120,11 +128,14 @@ internal class WearRuntime private constructor(context: Context) {
   val weatherSettings = WeatherSettings(appContext)
   val weather = WeatherController(appContext, weatherSettings, link, events, scope)
   val watchfaces = WatchfaceController(appContext, link, events)
+  val photoFaces = PhotoFaceController(appContext, link, events)
   val liveHeartRate = LiveHeartRate(link, settings, events, scope)
   val dataSync = DataSyncService(link, events, scope)
+  val faceCustomizer = WatchfaceCustomizer(events, { watchfaces.entries() })
   val activityGoals = ActivityGoals(appContext, dataSync, events, settings)
   val bodyMetrics = BodyMetrics(appContext, syncStore, dataSync, events, settings)
   val diet = DietSync(appContext, syncStore, dataSync, events, settings, activityGoals, bodyMetrics)
+  val liveWorkout = LiveWorkout(appContext, dataSync, events, settings)
   val extras = WatchExtras(appContext, syncStore, link, events, scope)
   val p2p = P2pController(appContext, P2pSettings(appContext), link, settings, syncStore, events, scope)
 

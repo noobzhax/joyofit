@@ -57,6 +57,7 @@ flowchart LR
 | Incoming calls on the watch (caller name or number), accept / reject from the watch | implemented, ported from GB; unverified on the Fit 4 |
 | Alarms: read the five event alarms and the smart alarm, add, edit, delete, enable, push | implemented, ported from GB; unverified on the Fit 4 |
 | Watch faces: list with the active one, set active, delete, install a `.hwt` from Huawei Theme Studio Pro with upload progress | implemented, ported from GB; unverified on the Fit 4 (whether it accepts unsigned faces is not known) |
+| Customize the editable faces already on the watch (Watch faces → Customize): read a face's selected style, background, typeface, hands, colour and widget options, change them, Apply, Revert | native codec and `WatchfaceCustomizer` (DataSync events 800100008 / 800100009) **implemented from the Huawei Health RE, UNVERIFIED on the watch**; JVM codec tests pass; options are labelled by position because the watch sends no names or counts |
 | Fall detection switch, SOS text relay (`SmsManager`), DST answer, morning sleep report, cycle log with watch calendar and reminders (Settings → Safety, Settings → Cycle) | implemented from the Huawei Health RE (DataSync, service `0x32`); unverified on the Fit 4 |
 | Health metrics from the watch's data dictionary over P2P (service `0x34`): skin temperature, HRV, stress / emotion, sleep apnea, plus raw capture of arterial stiffness and arrhythmia; stored in `health_metrics`, shown on **Today → Health** with the latest value and a 7-day sparkline; metrics the watch does not support (blood pressure, altitude, AMS here) are skipped and listed as such | implemented, ported from GB (`HuaweiP2PDataDictionarySyncService`), gated by ExpandCapability like GB; unverified on the Fit 4 (see `protocol/README.md` → P2P) |
 | Healthy Living (Health Clover) tasks: answers the watch's request with steps, exercise, sleep, calorie intake and clover progress from JoyoFit data (Settings → Health & cloud) | implemented from the Huawei Health RE (protobuf field numbers read from the APK's generated classes); unverified on the Fit 4, clover leaf mapping is a documented substitution |
@@ -146,6 +147,20 @@ when the watch connects, whenever the watch asks for it (opening its weather app
 opens: name, id and version, an *(active)* marker, and *preinstalled* for the factory faces. *Set active* switches the watch to
 that face, *Delete* removes it (not offered for preinstalled faces). After each of these the app reads the list again and
 reports an error if the watch did not do what it was asked.
+
+**Customize** (shown on faces whose `editable` bit is set; UNVERIFIED that the bit means "has options"). Opens an editor that asks the
+watch for the face's current options and shows what it reports: a picker each for style, background, typeface, hands (and symbol, time,
+scale, dual when the face has them), a colour palette with an optional custom colour, and one picker per widget slot. *Apply* sends the
+picks and then asks the watch again; the screen says which picks the watch did not take. *Revert* puts back the options the face had when
+you opened the editor. If the user edits the face on the watch, the watch's report updates the screen.
+
+- **Options are numbered, not named.** The watch reports only which option is selected. How many exist, and what they look like, lives in
+  Huawei's per-face editor page, which JoyoFit does not have. Each picker starts with six numbers and grows with *More*; an index the face
+  does not have is expected to be refused, and the apply result then lists it.
+- Needs ExpandCapability 84 (DataSync events). Without it the editor says so; the decision is logged as `FaceCustom: … ExpandCapability 84 …`.
+- Status: wire format **UNVERIFIED** (read from Huawei Health's `CustomConfigWatchFaceService`; `protocol/README.md` → *Editing a face's
+  options*, including the device test to run). Codec **VERIFIED by JVM tests** against the byte layout derived from `cqe`. The screen,
+  its hook and the native module compile and lint clean but were **not exercised on the watch**.
 
 *Install from file* opens Android's file picker. Pick a `.hwt` exported from **Huawei Theme Studio Pro**. The Watch Fit 4 and
 Fit 4 Pro screen is 480 x 408 px (Theme Studio Pro calls it 408 x 480; GB's theme version `HWHD13`). The app checks the package's

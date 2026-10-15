@@ -130,7 +130,7 @@ internal object HealthConnectPlan {
       stages = ArrayList()
     }
 
-    for (s in segments.sortedWith(compareBy({ it.start }, { it.end }))) {
+    for (s in withoutStrayUnstaged(segments).sortedWith(compareBy({ it.start }, { it.end }))) {
       if (s.end <= s.start) continue
       if (stages.isNotEmpty() && s.start - cursor > SLEEP_SESSION_GAP_SEC) close()
       val start = if (stages.isNotEmpty()) maxOf(s.start, cursor) else s.start

@@ -10,6 +10,8 @@ export default function WatchLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="alarms" options={{ title: 'Alarms' }} />
       <Stack.Screen name="faces" options={{ title: 'Watch faces' }} />
+      <Stack.Screen name="face-edit" options={{ title: 'Customize face' }} />
+      <Stack.Screen name="photos" options={{ title: 'Photo face' }} />
     </Stack>
   );
 }

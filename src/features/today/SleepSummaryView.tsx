@@ -5,21 +5,13 @@ import { KeyValue } from '@/components/KeyValue';
 import { Metric } from '@/components/Metric';
 import { EmptyState } from '@/components/States';
 import { formatClock, formatDuration } from '@/format';
-import type { SleepStageSummary, SleepSummary } from '@/features/today/stats';
-import { radius, spacing, useColors, type Colors } from '@/theme';
+import type { SleepScoreRow } from '@/db/queries';
+import { SleepScoreRing } from '@/features/sleep/SleepScoreRing';
+import { STAGE_LABELS, stageColor } from '@/features/sleep/stageStyle';
+import type { SleepSummary } from '@/features/today/stats';
+import { radius, spacing, useColors } from '@/theme';
 
-const STAGE_LABELS: Record<SleepStageSummary['stage'], string> = {
-  light: 'Light',
-  deep: 'Deep',
-  rem: 'REM',
-  awake: 'Awake',
-};
-
-function stageColor(stage: SleepStageSummary['stage'], colors: Colors): string {
-  return { light: colors.stageLight, deep: colors.stageDeep, rem: colors.stageRem, awake: colors.stageAwake }[stage];
-}
-
-export function SleepSummaryView({ summary }: { summary: SleepSummary | null }) {
+export function SleepSummaryView({ summary, score }: { summary: SleepSummary | null; score: SleepScoreRow | null }) {
   const colors = useColors();
   if (!summary) {
     return (
@@ -38,14 +30,19 @@ export function SleepSummaryView({ summary }: { summary: SleepSummary | null }) 
 
   return (
     <View style={styles.wrap}>
-      <View accessible accessibilityLabel={`Slept ${formatDuration(headlineSeconds)}`} style={styles.headline}>
-        {minutes >= 60 ? <Metric value={String(Math.floor(minutes / 60))} unit="h" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} /> : null}
-        <Metric value={String(minutes % 60).padStart(minutes >= 60 ? 2 : 1, '0')} unit="min" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} />
+      <View style={styles.headlineRow}>
+        <View style={styles.headlineText}>
+          <View accessible accessibilityLabel={`Slept ${formatDuration(headlineSeconds)}`} style={styles.headline}>
+            {minutes >= 60 ? <Metric value={String(Math.floor(minutes / 60))} unit="h" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} /> : null}
+            <Metric value={String(minutes % 60).padStart(minutes >= 60 ? 2 : 1, '0')} unit="min" size="lg" color={colors.sleepText} unitColor={colors.mutedForeground} />
+          </View>
+          <AppText variant="caption" muted>
+            {formatClock(summary.start)} to {formatClock(summary.end)}
+            {hasStages ? ', time awake excluded' : ', segment durations added up'}
+          </AppText>
+        </View>
+        {score ? <SleepScoreRing score={score} /> : null}
       </View>
-      <AppText variant="caption" muted>
-        {formatClock(summary.start)} to {formatClock(summary.end)}
-        {hasStages ? ', time awake excluded' : ', segment durations added up'}
-      </AppText>
       {hasStages ? (
         <>
           <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.stageBar}>
@@ -91,6 +88,8 @@ export function SleepSummaryView({ summary }: { summary: SleepSummary | null }) 
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
+  headlineRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  headlineText: { flex: 1, gap: spacing.sm },
   headline: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   stageBar: { flexDirection: 'row', height: 14, gap: 2, borderRadius: radius.pill, overflow: 'hidden', marginVertical: spacing.xs },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 28 },

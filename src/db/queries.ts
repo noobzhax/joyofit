@@ -34,6 +34,24 @@ export function listSleepSince(db: SQLiteDatabase, sinceSec: number): Promise<Sl
   );
 }
 
+/** Every stored segment, oldest first. A night is tens of rows, so the whole history stays small. */
+export function listAllSleep(db: SQLiteDatabase): Promise<SleepSegment[]> {
+  return db.getAllAsync<SleepSegment>('SELECT start, end, type, stage FROM sleep_segments ORDER BY start, end');
+}
+
+/** The watch's own score for one night (`sleep_scores`); `start` / `end` span the night it scored. */
+export interface SleepScoreRow {
+  start: number;
+  end: number;
+  score: number;
+  /** Percent of the time in bed spent asleep, as the watch reports it. */
+  efficiency: number | null;
+}
+
+export function listSleepScores(db: SQLiteDatabase): Promise<SleepScoreRow[]> {
+  return db.getAllAsync<SleepScoreRow>('SELECT start, end, score, efficiency FROM sleep_scores ORDER BY start');
+}
+
 /** A `workouts` row. `complete` is false while a part of its download failed; the next sync retries. */
 export interface WorkoutRow {
   id: number;

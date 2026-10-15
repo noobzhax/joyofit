@@ -8,6 +8,10 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.FitnessData
 internal class StepSample(
   val timestamp: Long,
   val steps: Int,
+  /**
+   * Small calories (cal, 1/1000 kcal). Checked on the Fit 4 Pro 2026-10-15: 110 samples summed to 4581 while
+   * FitnessTotals, which is kcal, said 5 for the same morning.
+   */
   val calories: Int,
   val distance: Int,
   val heartRate: Int?,
@@ -42,6 +46,8 @@ internal class SyncResult(
   val totalSteps: Int,
   val totalCalories: Int,
   val totalDistance: Int,
+  /** The watch's per-night sleep scores (dictionary sleep only). */
+  val sleepScores: List<SleepScore> = emptyList(),
 ) {
   fun toJs(): Map<String, Any?> = mapOf(
     "from" to from,
@@ -87,14 +93,14 @@ internal class ActivitySync(
     val midnight = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toEpochSecond()
     val today = samples.filter { it.timestamp >= midnight }
     val totalSteps = totals?.totalSteps ?: today.sumOf { it.steps }
-    val totalCalories = totals?.totalCalories ?: today.sumOf { it.calories }
+    val totalCalories = totals?.totalCalories ?: (today.sumOf { it.calories } / 1000)
     val totalDistance = totals?.totalDistance ?: today.sumOf { it.distance }
 
     // GB fetchActivityData: once the totals are in, downloadTruSleepData(start, end) fetches the
     // TruSleep / dictionary sleep files newer watches use. A failure there is logged and leaves
     // the step data intact.
     val trueSleep = SleepSync(session, events).sync(start.toInt(), end)
-    val sleep = (frameSleep + trueSleep).distinctBy { listOf(it.start, it.end, it.type) }.sortedBy { it.start }
+    val sleep = (frameSleep + trueSleep.segments).distinctBy { listOf(it.start, it.end, it.type) }.sortedBy { it.start }
 
     events.log(
       LogDirection.INFO,
@@ -104,7 +110,7 @@ internal class ActivitySync(
       "Sync: ${samples.size} step samples, ${sleep.size} sleep segments, totals steps=$totalSteps " +
         "calories=$totalCalories distance=$totalDistance" + if (totals == null) " (summed from samples)" else "",
     )
-    return SyncResult(start, end.toLong(), samples, sleep, totalSteps, totalCalories, totalDistance)
+    return SyncResult(start, end.toLong(), samples, sleep, totalSteps, totalCalories, totalDistance, trueSleep.scores)
   }
 
   // GetSleepDataCountRequest -> GetSleepDataRequest chain

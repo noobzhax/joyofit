@@ -9,6 +9,14 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTrueSleepSequen
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiTruSleepParser
 
 /**
+ * The watch's own score for one night, from the sequence file's summary (dict 700013245 score, 700013232
+ * efficiency). [start] is the time the stages start from, [end] the wake-up time.
+ */
+internal class SleepScore(val start: Long, val end: Long, val score: Int, val efficiency: Int?)
+
+internal class SleepDownload(val segments: List<SleepSegment>, val scores: List<SleepScore>)
+
+/**
  * Sleep from the files newer watches use instead of the old FitnessData sleep frames, gated and
  * ordered exactly like GB's `downloadTruSleepData(start, end)`:
  *
@@ -35,7 +43,7 @@ internal class SleepSync(
    * Returns the sleep segments, or an empty list when GB would not download sleep for this watch
    * or the download failed (logged). Only a lost link or cancellation aborts the caller.
    */
-  suspend fun sync(sinceSec: Int, end: Int): List<SleepSegment> {
+  suspend fun sync(sinceSec: Int, end: Int): SleepDownload {
     // GB starts at the last stored sleep. Here `sinceSec` is the previous sync, and a night that
     // began before it (synced mid-sleep, or the file not yet written then) would fall outside the
     // window, so the sleep window reaches back at least [SLEEP_LOOKBACK_SEC]. The database
@@ -54,7 +62,7 @@ internal class SleepSync(
     )
     if (!supportsTruSleep) {
       log("TruSleep: FitnessData command 0x16 not supported, sleep files skipped (as GB)")
-      return emptyList()
+      return SleepDownload(emptyList(), emptyList())
     }
     return try {
       if (supportsDict) dictionarySleep(start, end, supportsBedTime) else truSleep(start, end, newSync)
@@ -63,26 +71,26 @@ internal class SleepSync(
     } catch (e: WearException) {
       if (e.errorCode == ErrorCodes.DISCONNECTED) throw e
       events.log(LogDirection.ERROR, null, null, null, "TruSleep: sleep download failed: ${e.message}")
-      emptyList()
+      SleepDownload(emptyList(), emptyList())
     } catch (e: Exception) {
       events.log(LogDirection.ERROR, null, null, null, "TruSleep: sleep download failed: ${e.message ?: e.javaClass.simpleName}")
-      emptyList()
+      SleepDownload(emptyList(), emptyList())
     }
   }
 
   // GB downloadDictTrueSleepData
 
-  private suspend fun dictionarySleep(start: Int, end: Int, supportsBedTime: Boolean): List<SleepSegment> {
+  private suspend fun dictionarySleep(start: Int, end: Int, supportsBedTime: Boolean): SleepDownload {
     log("TruSleep: dictionary sleep sync (dict class ${HuaweiDictTypes.SLEEP_DETAILS_CLASS}), start=$start end=$end")
     val data = downloader.download(FileRequest.sequenceData(start, end, HuaweiDictTypes.SLEEP_DETAILS_CLASS))
-    val segments = parseSequenceFile(data, supportsBedTime) { log(it) }
-    log("TruSleep: dictionary sleep sync produced ${segments.size} segments")
-    return segments
+    val result = parseSequenceFile(data, supportsBedTime) { log(it) }
+    log("TruSleep: dictionary sleep sync produced ${result.segments.size} segments, ${result.scores.size} scores")
+    return result
   }
 
   // GB downloadTruSleepData, state + data files
 
-  private suspend fun truSleep(start: Int, end: Int, newSync: Boolean): List<SleepSegment> {
+  private suspend fun truSleep(start: Int, end: Int, newSync: Boolean): SleepDownload {
     log("TruSleep: sleep_state/sleep_data download (${if (newSync) "service 2C" else "service 0A"}), start=$start end=$end")
     // GB's SleepFileDownloadCallback: each file is independent; a failed one just stays null.
     val state = downloadOrLog(FileRequest.sleepState(newSync, start, end))
@@ -94,12 +102,12 @@ internal class SleepSync(
     }
     if (state == null || state.isEmpty()) {
       log("TruSleep: sleep state file empty")
-      return emptyList()
+      return SleepDownload(emptyList(), emptyList())
     }
     val segments = segmentsFromState(HuaweiTruSleepParser.parseState(state))
     if (segments.isEmpty()) log("TruSleep: no sleep results")
     for (s in segments) log("TruSleep: sleep range ${s.start}..${s.end} type=${s.type} stage=${s.stage}")
-    return segments
+    return SleepDownload(segments, emptyList())
   }
 
   private suspend fun downloadOrLog(request: FileRequest): ByteArray? =
@@ -167,15 +175,16 @@ internal class SleepSync(
       data: ByteArray,
       supportsBedTime: Boolean,
       log: (String) -> Unit,
-    ): List<SleepSegment> {
+    ): SleepDownload {
       val file = HuaweiSequenceDataFileParser.parseSequenceFileData(data)
       if (file == null) {
         log("TruSleep: sequence file empty or invalid (${data.size} bytes)")
-        return emptyList()
+        return SleepDownload(emptyList(), emptyList())
       }
       log("TruSleep: sequence file $file")
 
       val segments = ArrayList<SleepSegment>()
+      val scores = ArrayList<SleepScore>()
       for (sd in file.sequenceDataList) {
         log("TruSleep: SequenceData start=${sd.startTime} end=${sd.endTime} version=${sd.dataVersion} summaryType=${sd.summaryType}")
         val summary = HuaweiTrueSleepSequenceDataParser().parseData(file, sd)
@@ -221,8 +230,13 @@ internal class SleepSync(
           open = true
         }
         if (open) segments.add(segment(runStart, runEnd, runStage))
+        // correctSummary has already blanked the score of a summary the watch marked invalid.
+        if (summary.sleepScore in 0..100 && open) {
+          val wake = if (summary.wakeupTime > time) summary.wakeupTime else runEnd
+          scores.add(SleepScore(time, wake, summary.sleepScore, summary.sleepEfficiency.takeIf { it in 0..100 }))
+        }
       }
-      return segments
+      return SleepDownload(segments, scores)
     }
 
     private fun segment(start: Long, end: Long, huaweiStage: Int): SleepSegment {

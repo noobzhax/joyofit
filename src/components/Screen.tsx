@@ -1,9 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { IconChip, type IconName } from '@/components/IconChip';
+import { PressableScale } from '@/components/PressableScale';
 import { radius, spacing, useColors, type Tint } from '@/theme';
 
 export interface RefreshProps {
@@ -105,11 +107,14 @@ interface SectionProps {
   tint?: Tint | 'neutral';
   /** Right of the title, e.g. a count. */
   trailing?: ReactNode;
+  /** Makes the whole card a button that opens more detail; the header gets a chevron. */
+  onPress?: () => void;
   children: ReactNode;
 }
 
 /** A titled card. The title row carries an icon chip so every section is findable at a glance. */
-export function Section({ title, icon, tint = 'neutral', trailing, children }: SectionProps) {
+export function Section({ title, icon, tint = 'neutral', trailing, onPress, children }: SectionProps) {
+  const colors = useColors();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader} accessibilityRole="header">
@@ -118,8 +123,15 @@ export function Section({ title, icon, tint = 'neutral', trailing, children }: S
           {title}
         </AppText>
         {trailing}
+        {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} /> : null}
       </View>
-      <Card>{children}</Card>
+      {onPress ? (
+        <PressableScale accessibilityRole="button" accessibilityLabel={title} onPress={onPress} scaleTo={0.985}>
+          <Card>{children}</Card>
+        </PressableScale>
+      ) : (
+        <Card>{children}</Card>
+      )}
     </View>
   );
 }

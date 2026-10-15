@@ -1,5 +1,6 @@
 import type { WatchMealLoggedEvent } from './HuaweiWearDiet.types';
 import type { UploadProgressEvent, UploadResultEvent } from './HuaweiWearWatchface.types';
+import type { FaceCustomization } from './HuaweiWearFaceCustom.types';
 
 export type LinkState =
   | 'disconnected'
@@ -34,6 +35,7 @@ export interface DeviceInfo {
 export interface StepSample {
   timestamp: number;
   steps: number;
+  /** Small calories (cal, 1/1000 kcal), as the watch's step frames count them. */
   calories: number;
   distance: number;
   heartRate: number | null;
@@ -56,6 +58,7 @@ export interface SleepSegment {
 
 export interface FitnessTotals {
   steps: number;
+  /** kcal. */
   calories: number;
   distance: number;
 }
@@ -266,6 +269,53 @@ export interface HealthSensorsStatus extends HealthSensorsUpdate {
   supported: HealthSensorSupport | null;
 }
 
+/** Where a watch-started workout is: counting down on the watch, recording, paused, or finished. */
+export type LiveWorkoutStatus = 'preparing' | 'running' | 'paused' | 'ended';
+
+/**
+ * A workout started on the watch, followed live (`getLiveWorkout`, `onLiveWorkout`). The watch pushes its numbers
+ * about every second; every metric is null until it has sent one.
+ */
+export interface LiveWorkout {
+  /** Phone time (Unix ms) the workout was first seen; changes with every new workout. */
+  id: number;
+  status: LiveWorkoutStatus;
+  /** Huawei sport type (1 running, 2 walking, 3 cycling, 5 indoor running, 7 indoor cycling, 13 indoor walking ...). */
+  sportType: number | null;
+  sportName: string | null;
+  /** Unix ms of the last change, phone time. */
+  updatedAt: number;
+  endedAt: number | null;
+  /** Workout time on the watch, seconds (pauses excluded), as of `updatedAt`. */
+  durationSec: number | null;
+  heartRate: number | null;
+  /** Heart-rate zone as the watch numbers it (unverified). */
+  heartRateZone: number | null;
+  /** 220 - age from the profile (35 when none is saved); the fat and carb estimate uses it. */
+  maxHeartRate: number;
+  distanceM: number | null;
+  /** kcal burned in the workout. */
+  calories: number | null;
+  activeCalories: number | null;
+  speedKmh: number | null;
+  paceSecPerKm: number | null;
+  /** Steps per minute. */
+  stepRate: number | null;
+  steps: number | null;
+  /** Cycling cadence, rpm. */
+  cadence: number | null;
+  altitudeM: number | null;
+  riseM: number | null;
+  descentM: number | null;
+  aerobicTe: number | null;
+  anaerobicTe: number | null;
+  /** JoyoFit's estimate (the watch sends no such figure): grams of fat and carbohydrate burned so far. */
+  fatGrams: number;
+  carbGrams: number;
+  /** Share of energy from fat at the current heart rate, 0 to 1, same estimate. */
+  fatShare: number | null;
+}
+
 export type HuaweiWearModuleEvents = {
   onStateChange: (event: StateEvent) => void;
   onBattery: (event: BatteryEvent) => void;
@@ -275,4 +325,8 @@ export type HuaweiWearModuleEvents = {
   onSyncComplete: (event: SyncCompleteEvent) => void;
   onHeartRate: (event: HeartRateEvent) => void;
   onWatchMealLogged: (event: WatchMealLoggedEvent) => void;
+  /** The watch reported a face's options without being asked, e.g. the user edited the face on the watch. */
+  onFaceCustomization: (event: FaceCustomization) => void;
+  /** A workout started on the watch changed state or pushed new numbers. */
+  onLiveWorkout: (event: LiveWorkout) => void;
 };
