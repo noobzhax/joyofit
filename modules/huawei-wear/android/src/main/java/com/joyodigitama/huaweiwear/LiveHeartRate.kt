@@ -38,7 +38,26 @@ internal class LiveHeartRate(
   @Volatile
   private var workoutWanted = false
 
-  private val wanted get() = uiWanted || workoutWanted
+  /** A 1-minute HRV measurement ([HrvSpot]) owns service 0x19 meanwhile; live readings are off and come back after. */
+  @Volatile
+  private var paused = false
+
+  private val wanted get() = (uiWanted || workoutWanted) && !paused
+
+  /** A live workout holds the heart-rate sensor; an HRV measurement must not take it over. */
+  val workoutActive get() = workoutWanted
+
+  /** Switches the live readings off on the watch (when they were on) and keeps them off until [resume]. */
+  suspend fun pause() {
+    paused = true
+    stop()
+  }
+
+  /** Puts the live readings back if the UI or a workout still wants them. */
+  fun resume() {
+    paused = false
+    scope.launch { if (wanted) start() else stop() }
+  }
 
   private val stateMutex = Mutex()
   private val undecoded = AtomicInteger()

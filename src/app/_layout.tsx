@@ -103,8 +103,9 @@ export default function RootLayout() {
                   <Tabs.Screen name="log" options={{ href: null }} />
                   <Tabs.Screen name="alarms" options={{ href: null }} />
                   <Tabs.Screen name="watchfaces" options={{ href: null }} />
-                  {/* Pushed from Today; each draws its own header (HiddenTabHeader). */}
+                  {/* Pushed from Today (or Settings, for hrv); each draws its own header (HiddenTabHeader). */}
                   <Tabs.Screen name="health" options={{ href: null }} />
+                  <Tabs.Screen name="hrv" options={{ href: null }} />
                   <Tabs.Screen name="sleep" options={{ href: null }} />
                   <Tabs.Screen name="readiness" options={{ href: null }} />
                   {/* Opens by itself when a workout starts on the watch (LiveWorkoutProvider). */}

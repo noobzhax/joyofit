@@ -22,7 +22,10 @@ export function ReadinessSection({ readiness }: { readiness: Readiness }) {
     <Section title="Readiness" icon="speedometer" tint="link">
       {readiness.headline ? (
         <View style={styles.head}>
-          <AppText variant="heading">{readiness.headline}</AppText>
+          <AppText variant="heading">
+            {readiness.headline}
+            {readiness.recovery ? `, recovery ${readiness.recovery.percent}%` : ''}
+          </AppText>
           <AppText variant="caption" muted>
             {HEADLINE_HINT[readiness.headline]}
           </AppText>
@@ -51,7 +54,10 @@ export function ReadinessSection({ readiness }: { readiness: Readiness }) {
         </AppText>
       ))}
       <AppText variant="caption" muted>
-        Without HRV: the watch has sent none yet. Estimates from your own history, not medical advice.
+        {readiness.recovery
+          ? 'Recovery: your usual HRV is 50 %, one standard deviation above it 75 %. '
+          : ''}
+        Estimates from your own history, not medical advice.
       </AppText>
     </Section>
   );

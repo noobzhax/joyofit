@@ -12,13 +12,14 @@ const SIZE = 84;
 const STROKE = 7;
 
 /**
- * Today at a glance: readiness, strain and sleep against need, side by side. The whole card opens the Readiness screen,
- * where each number is explained; Today itself stays short.
+ * Today at a glance: recovery (or the readiness word until HRV has a baseline), strain, and sleep against need, side by
+ * side. The whole card opens the Readiness screen, where each number is explained; Today itself stays short.
  */
 export function ScoresCard({ readiness, today, onPress }: { readiness: Readiness; today: DayStrain | null; onPress: () => void }) {
   const colors = useColors();
   const sleep = readiness.signals.find((s) => s.key === 'sleep') ?? null;
-  // The readiness ring fills with the share of signals that look good (neutral counts half); the word is the read.
+  const recovery = readiness.recovery;
+  // Without recovery, the ring fills with the share of signals that look good (neutral counts half); the word is the read.
   const fill = readiness.signals.length
     ? readiness.signals.reduce((a, s) => a + (s.tone === 'good' ? 1 : s.tone === 'neutral' ? 0.5 : 0), 0) / readiness.signals.length
     : 0;
@@ -28,6 +29,13 @@ export function ScoresCard({ readiness, today, onPress }: { readiness: Readiness
       : readiness.headline
         ? colors.heart
         : colors.mutedForeground;
+  const recoveryColor = recovery
+    ? recovery.band === 'green'
+      ? colors.link
+      : recovery.band === 'yellow'
+        ? colors.workouts
+        : colors.heart
+    : readinessColor;
 
   return (
     <Card>
@@ -37,13 +45,13 @@ export function ScoresCard({ readiness, today, onPress }: { readiness: Readiness
         accessibilityLabel="Open readiness, strain and sleep details"
         style={styles.row}>
         <Gauge
-          label="Readiness"
-          value={fill}
-          max={1}
-          color={readinessColor}
+          label={recovery ? 'Recovery' : 'Readiness'}
+          value={recovery ? recovery.percent : fill}
+          max={recovery ? 100 : 1}
+          color={recoveryColor}
           track={colors.linkSoft}
-          center={readiness.headline ?? '--'}
-          small
+          center={recovery ? `${recovery.percent}%` : (readiness.headline ?? '--')}
+          small={!recovery}
         />
         <Gauge
           label="Strain"

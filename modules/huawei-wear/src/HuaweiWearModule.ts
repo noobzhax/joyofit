@@ -8,11 +8,13 @@ import type {
   HealthConnectStatus,
   HealthSensorsStatus,
   HealthSensorsUpdate,
+  HrvReading,
   HuaweiWearModuleEvents,
   LinkState,
   LiveWorkout,
   NotificationAccessStatus,
   NotificationApp,
+  StressStatus,
   SupportReport,
   SyncSummary,
   UserProfile,
@@ -107,6 +109,27 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
    * Does nothing when no watch is connected or it does not list the realtime command.
    */
   setLiveHeartRate(active: boolean): Promise<void>;
+
+  /**
+   * Measures HRV for one minute from the watch's realtime beat-to-beat intervals (19/01 {01: 3}, pushes 19/05), computes
+   * RMSSD and SDNN, stores a `spot` row in `hrv_readings` and resolves with it. Live heart rate is paused meanwhile and
+   * restored. Emits `onHrvProgress` every second. Rejects with ERR_NOT_CONNECTED, ERR_UNSUPPORTED (no 19/01), ERR_BUSY (a
+   * measurement or live workout is using the sensor), ERR_DISCONNECTED, ERR_HRV_CANCELLED, or ERR_HRV_TOO_FEW_BEATS when
+   * fewer than 40 beats had a clean signal (the message says how many).
+   */
+  measureHrv(): Promise<HrvReading>;
+  /** Ends a running `measureHrv` early; it rejects with ERR_HRV_CANCELLED. Does nothing when none is running. */
+  cancelHrvMeasurement(): Promise<void>;
+  /** The automatic stress switch as last set from the app, and whether the connected watch lists the command. */
+  getStressStatus(): StressStatus;
+  /**
+   * Turns the watch's automatic stress on or off (20/09). On: runs the 1-minute measurement (as `measureHrv`, and keeps
+   * its reading), computes the calibration Gadgetbridge computes and sends it; takes about a minute and the user has to
+   * sit still. The switch and the calibration are stored and sent again on every connect. Off: sends status 2.
+   * Rejects like `measureHrv`, plus ERR_STRESS_CALIBRATION (the minute could not be scored) and ERR_STRESS_REJECTED (the
+   * watch answered with an error code).
+   */
+  setAutomaticStress(enabled: boolean): Promise<StressStatus>;
 
   /** The workout started on the watch that is running now, or the last one until dismissed; null when none was seen. */
   getLiveWorkout(): LiveWorkout | null;

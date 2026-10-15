@@ -89,6 +89,10 @@ class HuaweiWearModule : Module() {
       emit("onLiveWorkout", payload)
     }
 
+    override fun hrvProgress(secondsLeft: Int, beats: Int) {
+      emit("onHrvProgress", mapOf("secondsLeft" to secondsLeft, "beats" to beats))
+    }
+
     private fun emit(name: String, payload: Map<String, Any?>) {
       if (destroyed) return
       try {
@@ -118,7 +122,7 @@ class HuaweiWearModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HuaweiWear")
 
-    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged", "onFaceCustomization", "onLiveWorkout")
+    Events("onStateChange", "onBattery", "onLog", "onSyncComplete", "onUploadProgress", "onUploadResult", "onHeartRate", "onWatchMealLogged", "onFaceCustomization", "onLiveWorkout", "onHrvProgress")
 
     OnCreate {
       val runtime = runtime()
@@ -241,6 +245,9 @@ class HuaweiWearModule : Module() {
     OnActivityEntersBackground {
       runtimeRef?.liveHeartRate?.setActive(false)
     }
+
+    // 1-minute HRV measurement and the watch's automatic stress switch (HrvModuleApi.kt, HrvSpot.kt, StressSwitch.kt).
+    hrvApi { runtime() }
 
     // Find my watch / find my phone, calls and alarms (PhoneFeaturesModuleApi.kt).
     phoneFeaturesApi { runtime() }

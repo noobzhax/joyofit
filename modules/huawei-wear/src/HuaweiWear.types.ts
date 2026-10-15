@@ -265,6 +265,42 @@ export interface HeartRateEvent {
   ts: number;
 }
 
+/**
+ * One 1-minute HRV measurement (`measureHrv`). Times are Unix seconds, intervals milliseconds. Computed on the phone from
+ * the watch's beat-to-beat (RR) intervals after artifacts are dropped; also stored as a `spot` row in `hrv_readings`.
+ */
+export interface HrvReading {
+  start: number;
+  end: number;
+  /** Root mean square of successive differences, ms: the vagal-tone number recovery is scored from. */
+  rmssd: number;
+  /** Standard deviation of the intervals, ms. */
+  sdnn: number;
+  /** Mean beat-to-beat interval, ms. */
+  meanRr: number;
+  /** Clean beats the numbers are computed from. */
+  beats: number;
+  /** Mean heart rate over the minute, bpm (from `meanRr`). */
+  heartRate: number;
+}
+
+/** `onHrvProgress`: the minute counts down while the watch sends intervals. */
+export interface HrvProgressEvent {
+  secondsLeft: number;
+  /** Intervals received so far with a usable signal. */
+  beats: number;
+}
+
+/** The watch's automatic stress switch (`getStressStatus`, `setAutomaticStress`). */
+export interface StressStatus {
+  /** As last set from this app; the watch has no query for it. */
+  enabled: boolean;
+  /** Unix seconds of the calibration the watch was last given; null when none was stored. */
+  lastCalibratedAt: number | null;
+  /** The connected watch lists the automatic stress command (20/09); false while no watch is connected. */
+  supported: boolean;
+}
+
 /** Which sensor commands the connected watch lists (Gadgetbridge's `HuaweiState.supports*`). */
 export interface HealthSensorSupport {
   heartRate: boolean;
@@ -359,4 +395,6 @@ export type HuaweiWearModuleEvents = {
   onFaceCustomization: (event: FaceCustomization) => void;
   /** A workout started on the watch changed state or pushed new numbers. */
   onLiveWorkout: (event: LiveWorkout) => void;
+  /** Once a second while `measureHrv` or the calibration of `setAutomaticStress` runs. */
+  onHrvProgress: (event: HrvProgressEvent) => void;
 };

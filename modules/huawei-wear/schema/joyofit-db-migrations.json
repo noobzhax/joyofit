@@ -47,5 +47,10 @@
   ],
   [
     "CREATE TABLE sleep_scores (start INTEGER PRIMARY KEY NOT NULL, end INTEGER NOT NULL, score INTEGER NOT NULL, efficiency INTEGER)"
+  ],
+  [
+    "CREATE TABLE rri_samples (ts_ms INTEGER PRIMARY KEY NOT NULL, rri INTEGER NOT NULL, sqi INTEGER)",
+    "CREATE TABLE hrv_readings (start INTEGER NOT NULL, end INTEGER NOT NULL, source TEXT NOT NULL, rmssd REAL NOT NULL, sdnn REAL, mean_rr REAL, beats INTEGER NOT NULL, PRIMARY KEY (start, source))",
+    "CREATE INDEX hrv_readings_by_end ON hrv_readings (end)"
   ]
 ]

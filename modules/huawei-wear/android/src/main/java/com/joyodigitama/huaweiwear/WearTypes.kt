@@ -47,6 +47,16 @@ internal object ErrorCodes {
 
   /** The watch refused a file upload or a watch face operation; the message carries the exact code it returned. */
   const val UPLOAD_REJECTED = "ERR_UPLOAD_REJECTED"
+
+  /** The 1-minute HRV measurement ended without enough clean beats to compute anything. */
+  const val HRV_TOO_FEW_BEATS = "ERR_HRV_TOO_FEW_BEATS"
+  const val HRV_CANCELLED = "ERR_HRV_CANCELLED"
+
+  /** The watch's stress model could not score the calibration measurement (too few clean beats or movement). */
+  const val STRESS_CALIBRATION = "ERR_STRESS_CALIBRATION"
+
+  /** The watch answered the automatic-stress switch with an error code. */
+  const val STRESS_REJECTED = "ERR_STRESS_REJECTED"
 }
 
 /** Every failure surfaced to JS is a [CodedException] with one of [ErrorCodes]. */
@@ -84,4 +94,7 @@ internal interface WearEvents {
 
   /** A workout started on the watch changed state or pushed new numbers (`onLiveWorkout`, see [LiveWorkout]). */
   fun liveWorkout(payload: Map<String, Any?>) = Unit
+
+  /** Once a second during a 1-minute HRV measurement (`onHrvProgress`): seconds left and intervals received with a usable signal. */
+  fun hrvProgress(secondsLeft: Int, beats: Int) = Unit
 }

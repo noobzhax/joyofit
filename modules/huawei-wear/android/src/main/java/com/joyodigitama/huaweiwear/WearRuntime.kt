@@ -74,6 +74,7 @@ internal class WearRuntime private constructor(context: Context) {
       features.onLinkState(state)
       weather.onLinkState(state)
       liveHeartRate.onLinkState(state)
+      stress.onLinkState(state)
       extras.onLinkState(state)
       workoutLink.onLinkState(state)
       p2p.onLinkState(state)
@@ -125,6 +126,10 @@ internal class WearRuntime private constructor(context: Context) {
     override fun liveWorkout(payload: Map<String, Any?>) {
       listeners.forEach { it.liveWorkout(payload) }
     }
+
+    override fun hrvProgress(secondsLeft: Int, beats: Int) {
+      listeners.forEach { it.hrvProgress(secondsLeft, beats) }
+    }
   }
 
   /** Same fan-out the link reports through; background code logs here so the Log tab shows it. */
@@ -152,6 +157,8 @@ internal class WearRuntime private constructor(context: Context) {
   val watchfaces = WatchfaceController(appContext, link, events)
   val photoFaces = PhotoFaceController(appContext, link, events)
   val liveHeartRate = LiveHeartRate(link, settings, events, scope)
+  val hrv = HrvSpot(link, liveHeartRate, syncStore, events)
+  val stress = StressSwitch(link, settings, hrv, events, scope)
   val dataSync = DataSyncService(link, events, scope)
   val faceCustomizer = WatchfaceCustomizer(events, { watchfaces.entries() })
   val activityGoals = ActivityGoals(appContext, dataSync, events, settings)
@@ -218,6 +225,7 @@ internal class WearRuntime private constructor(context: Context) {
   /** JS reload with background off: nothing keeps the link, so it is closed as before. */
   fun onModuleDestroyed() {
     liveHeartRate.setActive(false)
+    hrv.cancel()
     if (!settings.backgroundEnabled) link.shutdown()
   }
 

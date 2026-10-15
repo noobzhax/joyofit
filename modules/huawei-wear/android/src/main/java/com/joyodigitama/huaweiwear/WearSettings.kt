@@ -89,6 +89,16 @@ internal class WearSettings(context: Context) {
       .putInt(KEY_LOW_HR_ALERT, value.lowHeartRateAlert)
       .apply()
 
+  /** The watch's automatic stress switch as the user last set it here (GB PREF_HUAWEI_STRESS_SWITCH). */
+  var stressEnabled: Boolean
+    get() = prefs.getBoolean(KEY_STRESS_ENABLED, false)
+    set(value) = prefs.edit().putBoolean(KEY_STRESS_ENABLED, value).apply()
+
+  /** The last stress calibration as `HuaweiStressParser.stressDataToJsonStr` (GB PREF_HUAWEI_STRESS_LAST_DATA), so it can be re-sent. */
+  var stressCalibration: String?
+    get() = prefs.getString(KEY_STRESS_CALIBRATION, null)
+    set(value) = prefs.edit().apply { if (value == null) remove(KEY_STRESS_CALIBRATION) else putString(KEY_STRESS_CALIBRATION, value) }.apply()
+
   var profile: UserProfileData?
     get() {
       if (!prefs.contains(KEY_PROFILE_HEIGHT)) return null
@@ -138,5 +148,7 @@ internal class WearSettings(context: Context) {
     private const val KEY_TRUSLEEP = "sensor_trusleep"
     private const val KEY_HIGH_HR_ALERT = "sensor_high_hr_alert"
     private const val KEY_LOW_HR_ALERT = "sensor_low_hr_alert"
+    private const val KEY_STRESS_ENABLED = "stress_automatic"
+    private const val KEY_STRESS_CALIBRATION = "stress_calibration"
   }
 }

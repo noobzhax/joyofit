@@ -1,12 +1,13 @@
+import type { Recovery, RecoveryState } from '@/features/today/recovery';
 import { startOfLocalDay, type SleepSummary } from '@/features/today/stats';
 import type { DayStrain } from '@/features/today/strain';
 import type { StepSample } from '@/wear';
 
 /**
- * "Should you push today?" from signals the Fit 4 Pro actually gives JoyoFit. HRV is left out on purpose: the watch has
- * sent no HRV entries so far, and a recovery read without it would only look complete. Each signal is shown with its
- * numbers, and a signal without enough history is left out instead of guessed.
+ * "Should you push today?" from your own history. Each signal is shown with its numbers, and a signal without enough
+ * history is left out instead of guessed.
  *
+ *  - HRV against your 30-day baseline (see `recovery.ts`), from the watch's own RMSSD during last night's sleep or a 1-minute reading.
  *  - Resting heart rate against your own 30-day average (Lamberts: a resting heart rate a few beats above baseline
  *    goes with fatigue or illness).
  *  - Last night's sleep against a need of 7 h 30 min plus up to 1 h after a hard day (yesterday's strain / 21).
@@ -23,12 +24,12 @@ export const LOAD_DAYS = 28;
 
 export type SignalTone = 'good' | 'neutral' | 'bad';
 export interface Signal {
-  key: 'rhr' | 'sleep' | 'load';
+  key: 'hrv' | 'rhr' | 'sleep' | 'load';
   title: string;
   value: string;
   detail: string;
   tone: SignalTone;
-  /** The number behind `value`: bpm above baseline, share of sleep need (0..), or the load ratio. */
+  /** The number behind `value`: HRV z-score, bpm above baseline, share of sleep need (0..), or the load ratio. */
   amount: number;
 }
 
@@ -39,6 +40,8 @@ export interface Readiness {
   signals: Signal[];
   /** Signals that could not be computed yet, with the reason. */
   missing: string[];
+  /** HRV against your baseline, when there is a reading and a baseline. */
+  recovery: Recovery | null;
 }
 
 /** The watch's resting heart rate per local day: the lowest value it reported that day. */
@@ -70,10 +73,25 @@ export function readiness(input: {
   samples: readonly StepSample[];
   strain: readonly DayStrain[];
   sleep: SleepSummary | null;
+  hrv: RecoveryState;
 }): Readiness {
-  const { dayStart, samples, strain, sleep } = input;
+  const { dayStart, samples, strain, sleep, hrv } = input;
   const signals: Signal[] = [];
   const missing: string[] = [];
+
+  if ('recovery' in hrv) {
+    const r = hrv.recovery;
+    signals.push({
+      key: 'hrv',
+      title: r.source === 'night' ? 'HRV last night' : 'HRV (1-minute reading)',
+      value: `${Math.round(r.rmssd)} ms`,
+      detail: `${r.z >= 0 ? '+' : ''}${r.z.toFixed(1)} SD against your usual ${Math.round(r.baselineRmssd)} ms (${r.baselineCount} ${r.source === 'night' ? 'nights' : 'readings'})`,
+      tone: r.z >= 0.5 ? 'good' : r.z <= -1 ? 'bad' : 'neutral',
+      amount: r.z,
+    });
+  } else {
+    missing.push(hrv.missing);
+  }
 
   const resting = restingByDay(samples);
   const today = resting.get(dayStart);
@@ -138,7 +156,7 @@ export function readiness(input: {
     }
   }
 
-  return { headline: headline(signals), signals, missing };
+  return { headline: headline(signals), signals, missing, recovery: 'recovery' in hrv ? hrv.recovery : null };
 }
 
 function headline(signals: readonly Signal[]): ReadinessHeadline | null {

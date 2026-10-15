@@ -388,6 +388,7 @@ internal class WearLink(
         val result = ActivitySync(connection.session, events).sync(from)
         val stored = storage { syncStore.save(connection.address, result) }
         val summary = stored.withWorkouts(syncWorkouts(connection))
+        syncNightHrv(connection)
         for (extension in syncExtensions) {
           try {
             extension(connection.session)
@@ -442,5 +443,22 @@ internal class WearLink(
     }
     events.log(LogDirection.INFO, null, null, null, "Workout sync: ${sync.saved} workouts stored")
     return sync.saved
+  }
+
+  /**
+   * Nightly HRV from the watch's stress records, after the sleep is stored. Whatever fails here is logged and does not fail
+   * the sync; only a lost link ends it.
+   */
+  private suspend fun syncNightHrv(connection: Connection) {
+    try {
+      NightHrvSync(connection.session, events, syncStore).sync(System.currentTimeMillis() / 1000)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: WearException) {
+      if (e.errorCode == ErrorCodes.DISCONNECTED) throw e
+      events.log(LogDirection.ERROR, null, null, null, "Night HRV failed [${e.errorCode}]: ${e.message}")
+    } catch (e: Exception) {
+      events.log(LogDirection.ERROR, null, null, null, "Night HRV failed: ${e.message ?: e.javaClass.simpleName}")
+    }
   }
 }

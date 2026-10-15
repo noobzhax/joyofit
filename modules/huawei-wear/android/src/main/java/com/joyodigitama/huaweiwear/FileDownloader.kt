@@ -1,5 +1,6 @@
 // Derived from Gadgetbridge (AGPL-3.0-or-later; see NOTICE): service/devices/huawei/HuaweiFileDownloadManager and
-// service/devices/huawei/requests/{GetFileDownloadInit,GetFileParameters,GetFileInfo,GetFileBlock,GetFileDownloadComplete}Request.
+// service/devices/huawei/requests/{GetFileDownloadInit,GetFileParameters,GetFileInfo,GetFileBlock,GetFileDownloadComplete}Request
+// (RRI file: FileRequest.rriFileRequest, getDownloadParameters file type 0x04).
 package com.joyodigitama.huaweiwear
 
 import java.nio.ByteBuffer
@@ -15,6 +16,7 @@ internal enum class DownloadFileType(val service2c: FileDownloadService2C.FileTy
   SLEEP_STATE(FileDownloadService2C.FileType.SLEEP_STATE),
   SLEEP_DATA(FileDownloadService2C.FileType.SLEEP_DATA),
   SEQUENCE_DATA(FileDownloadService2C.FileType.SEQUENCE_DATA),
+  RRI(FileDownloadService2C.FileType.RRI),
   GPS(FileDownloadService2C.FileType.GPS),
 }
 
@@ -43,6 +45,10 @@ internal class FileRequest private constructor(
 
     fun sequenceData(start: Int, end: Int, dictId: Int) =
       FileRequest("sequence_data", DownloadFileType.SEQUENCE_DATA, true, start, end, dictId)
+
+    /** GB `FileRequest.rriFileRequest`: `rrisqi_data.bin`, service 0x2C when SettingRelated said `rriNewSync`, else 0x0A. */
+    fun rri(newSync: Boolean, start: Int, end: Int) =
+      FileRequest("rrisqi_data.bin", DownloadFileType.RRI, newSync, start, end, 0)
 
     /**
      * GB `FileRequest.workoutGpsFileRequest`: new sync asks for `<n>_gps.bin` over service 0x2C (start/end
@@ -220,6 +226,30 @@ internal class FileDownloader(
         name = gpsNames.first()
         val parameters = session
           .request(FileDownloadService0A.FileParameters.Request(params, 0x02.toByte()), REQUEST_MS, "FileParameters $name")
+          .expect<FileDownloadService0A.FileParameters.Response>("FileParameters $name")
+        log(
+          "FileParameters $name: version=${parameters.version} packetSize=${parameters.packetSize} " +
+            "maxBlockSize=${parameters.maxBlockSize} timeout=${parameters.timeout}",
+        )
+        OldSyncContext(names, parameters.maxBlockSize.toInt(), parameters.timeout.toInt())
+      }
+      // GB getDownloadParameters: RRI parameters use fileType 0x04. The init answers with the file list
+      // (GetFileDownloadInitRequest builds FileDownloadInit.RriFileRequest for RRI) and must contain the name.
+      DownloadFileType.RRI -> {
+        val init = session
+          .request(
+            FileDownloadService0A.FileDownloadInit.RriFileRequest(params, request.startTime, request.endTime),
+            REQUEST_MS,
+            "FileDownloadInit $name (old sync)",
+          )
+          .expect<FileDownloadService0A.FileDownloadInit.Response>("FileDownloadInit $name")
+        val names = init.fileNames.toList()
+        log("FileDownloadInit $name (old sync): files=${names.joinToString(";")}")
+        if (name !in names) {
+          throw protocol("$name: file $name cannot be downloaded using this method. Only the following files are supported: $names")
+        }
+        val parameters = session
+          .request(FileDownloadService0A.FileParameters.Request(params, 0x04.toByte()), REQUEST_MS, "FileParameters $name")
           .expect<FileDownloadService0A.FileParameters.Response>("FileParameters $name")
         log(
           "FileParameters $name: version=${parameters.version} packetSize=${parameters.packetSize} " +

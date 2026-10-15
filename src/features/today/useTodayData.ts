@@ -2,7 +2,15 @@ import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
-import { getLatestHeartRate, listSleepScores, listSleepSince, listStepSamplesSince, type SleepScoreRow } from '@/db/queries';
+import {
+  getLatestHeartRate,
+  listHrvReadingsSince,
+  listSleepScores,
+  listSleepSince,
+  listStepSamplesSince,
+  type HrvReadingRow,
+  type SleepScoreRow,
+} from '@/db/queries';
 import { errorMessage } from '@/format';
 import { startOfLocalDay } from '@/features/today/stats';
 import type { SleepSegment, StepSample } from '@/wear';
@@ -27,6 +35,10 @@ export interface TodayData {
   sleepScores: SleepScoreRow[];
   /** Newest stored heart-rate reading of any day; the hero falls back to it when today has none. */
   latestHeart: { bpm: number; timestamp: number } | null;
+  /** HRV readings of the last `HISTORY_DAYS + 1` days, oldest first (recovery). */
+  hrv: HrvReadingRow[];
+  /** Unix seconds the data was read. */
+  nowSec: number;
 }
 
 interface TodayState {
@@ -49,10 +61,13 @@ export function useTodayData(dataVersion: number): TodayState {
         listSleepSince(db, nowSec - SLEEP_LOOKBACK_SEC),
         getLatestHeartRate(db),
         listSleepScores(db),
+        listHrvReadingsSince(db, dayStart - (HISTORY_DAYS + 1) * 86400),
       ]).then(
-        ([historySamples, sleep, latestHeart, sleepScores]) => {
+        ([historySamples, sleep, latestHeart, sleepScores, hrv]) => {
           const samples = historySamples.filter((s) => s.timestamp >= dayStart);
-          if (!cancelled) setState({ data: { dayStart, samples, historySamples, sleep, sleepScores, latestHeart }, error: null });
+          if (!cancelled) {
+            setState({ data: { dayStart, nowSec, samples, historySamples, sleep, sleepScores, latestHeart, hrv }, error: null });
+          }
         },
         (e: unknown) => {
           if (!cancelled) setState({ data: null, error: errorMessage(e) });

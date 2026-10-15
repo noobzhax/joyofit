@@ -5,6 +5,7 @@ import { Divider, Section } from '@/components/Screen';
 import { Segmented } from '@/components/Segmented';
 import { Notice } from '@/components/States';
 import { SwitchRow } from '@/components/SwitchRow';
+import { AutomaticStressRows } from '@/features/settings/AutomaticStressRows';
 import { useNativeRefresh } from '@/features/settings/useNativeRefresh';
 import { errorMessage } from '@/format';
 import { HuaweiWear, type HealthSensorsUpdate } from '@/wear';
@@ -96,6 +97,8 @@ export function HeartRateSection() {
         onValueChange={(value) => change({ truSleep: value })}
         disabled={busy || off('truSleep')}
       />
+      <Divider />
+      <AutomaticStressRows connected={supported !== null} />
       <Divider />
       <AppText variant="bodyStrong">High heart-rate alert (bpm)</AppText>
       <AppText variant="caption" muted>

@@ -52,6 +52,23 @@ export function listSleepScores(db: SQLiteDatabase): Promise<SleepScoreRow[]> {
   return db.getAllAsync<SleepScoreRow>('SELECT start, end, score, efficiency FROM sleep_scores ORDER BY start');
 }
 
+/** One HRV value (`hrv_readings`): `night` from the watch's own RMSSD records during sleep, `spot` from a 1-minute measurement. */
+export interface HrvReadingRow {
+  start: number;
+  end: number;
+  source: 'night' | 'spot';
+  /** Milliseconds. */
+  rmssd: number;
+  beats: number;
+}
+
+export function listHrvReadingsSince(db: SQLiteDatabase, sinceSec: number): Promise<HrvReadingRow[]> {
+  return db.getAllAsync<HrvReadingRow>(
+    'SELECT start, end, source, rmssd, beats FROM hrv_readings WHERE end >= ? ORDER BY end',
+    sinceSec,
+  );
+}
+
 /** A `workouts` row. `complete` is false while a part of its download failed; the next sync retries. */
 export interface WorkoutRow {
   id: number;
