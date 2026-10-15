@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiCoordinator.HuaweiDeviceType
 
 /** What the notification and profile senders need from the live connection. */
 internal class LinkHandle(
@@ -29,7 +30,7 @@ internal class LinkHandle(
 )
 
 /**
- * The single active session to a watch: RFCOMM transport + packet session + auth/init/sync, and
+ * The single active session to a watch: RFCOMM or BLE GATT transport (per model) + packet session + auth/init/sync, and
  * the [LinkState] machine JS observes. At most one [Connection] exists; every failure while
  * connecting (including every authentication failure) tears it down. The JS module and the
  * background service both drive this one instance.
@@ -72,17 +73,36 @@ internal class WearLink(
     /** Completes when this connect attempt finishes, so a second caller for the same watch can join it. */
     val ready = CompletableDeferred<Map<String, Any?>>()
     lateinit var session: HuaweiSession
-    val transport = RfcommTransport(
-      adapter = adapter,
-      device = device,
-      sdp = model.sdp,
-      onData = { chunk -> session.onData(chunk) },
-      onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
-    )
+
+    /** A listed model uses its Gadgetbridge coordinator's link; for other names Android's view of the device decides. */
+    val transportKind: ModelTransport = model.transportFor(isLeOnly(device))
+
+    /** GB's HuaweiDeviceType for the link: BR, or BLE / AW over GATT. */
+    val deviceType: HuaweiDeviceType = model.deviceType(transportKind)
+
+    val transport: WatchTransport = when (transportKind) {
+      ModelTransport.BR -> RfcommTransport(
+        adapter = adapter,
+        device = device,
+        sdp = model.sdp,
+        onData = { chunk -> session.onData(chunk) },
+        onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
+      )
+      ModelTransport.LE -> BleTransport(
+        context = appContext,
+        device = device,
+        newHonorProtocol = model.newHonorProtocol,
+        onData = { chunk -> session.onData(chunk) },
+        onRemoteClosed = { cause -> onRemoteClosed(this, cause) },
+        log = { line -> events.log(LogDirection.INFO, null, null, null, line) },
+      )
+    }
 
     init {
       session = HuaweiSession(transport, events)
       session.params.setTransactionsCrypted(model.crypted)
+      // GB HuaweiSupportProvider: the AW70 bands send their workout records with their own layout.
+      session.params.setAW(deviceType == HuaweiDeviceType.AW)
     }
   }
 
@@ -109,6 +129,11 @@ internal class WearLink(
   /** The Bluetooth name of the watch of the last connect attempt, successful or not (support report). */
   @Volatile
   var lastAttemptName: String? = null
+    private set
+
+  /** The link opened in the last connect attempt, successful or not (support report). */
+  @Volatile
+  var lastAttemptTransport: ModelTransport? = null
     private set
 
   /** True until a HiChain bind with [address] has completed; a bind needs the user to confirm on the watch. */
@@ -185,6 +210,7 @@ internal class WearLink(
         }
         connection = Connection(address, device, adapter, model)
         lastAttemptName = name
+        lastAttemptTransport = connection.transportKind
         current = connection
         state = LinkState.CONNECTING
       } else {
@@ -194,22 +220,27 @@ internal class WearLink(
     joining?.let { return it.ready.await() }
     events.state(LinkState.CONNECTING, null)
     val model = connection.model
+    val link = when (connection.transportKind) {
+      ModelTransport.BR -> "RFCOMM, SDP ${model.sdp}"
+      ModelTransport.LE ->
+        "Bluetooth LE GATT (${if (model.newHonorProtocol) "Honor service" else "service 0xFE86"}), device type ${connection.deviceType}"
+    }
     events.log(
       LogDirection.INFO,
       null,
       null,
       null,
       "Connecting to $address \"${lastAttemptName ?: "no name"}\": ${model.model?.name ?: "unknown model"} (${model.support.wire}), " +
-        "RFCOMM, SDP ${model.sdp}, encrypted ${model.crypted}",
+        "$link, encrypted ${model.crypted}",
     )
 
     try {
       connection.transport.connect(Timeouts.CONNECT_MS)
-      events.log(LogDirection.INFO, null, null, null, "RFCOMM connected")
+      events.log(LogDirection.INFO, null, null, null, "${connection.transportKind.label} connected")
 
       setState(connection, LinkState.AUTHENTICATING)
       val identity = store.forDevice(address)
-      val authenticator = HuaweiAuthenticator(connection.session, identity, events)
+      val authenticator = HuaweiAuthenticator(connection.session, identity, events, connection.deviceType)
       val authMode = authenticator.authenticate()
 
       setState(connection, LinkState.INITIALIZING)
@@ -221,6 +252,7 @@ internal class WearLink(
         profile = settings.profile,
         notificationsEnabled = settings.notificationsEnabled,
         healthSensors = settings.healthSensors,
+        deviceType = connection.deviceType,
       ).run()
 
       val name = bondedName(connection.device) ?: init.deviceName ?: address
@@ -288,6 +320,15 @@ internal class WearLink(
       device.name
     } catch (e: SecurityException) {
       null
+    }
+
+  /** True when Android knows [device] as Bluetooth LE only, so it has no Classic side to open an RFCOMM socket on. */
+  @SuppressLint("MissingPermission")
+  private fun isLeOnly(device: BluetoothDevice): Boolean =
+    try {
+      device.type == BluetoothDevice.DEVICE_TYPE_LE
+    } catch (e: SecurityException) {
+      false
     }
 
   // Disconnect / teardown

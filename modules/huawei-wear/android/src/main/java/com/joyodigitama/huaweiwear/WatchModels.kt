@@ -5,13 +5,14 @@ package com.joyodigitama.huaweiwear
 import java.util.Locale
 import java.util.UUID
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiCoordinator.HuaweiDeviceType
 
 /** How far JoyoFit gets with a watch model. */
 internal enum class ModelSupport(val wire: String) {
   /** Checked on a real watch. */
   TESTED("tested"),
 
-  /** In Gadgetbridge's list and on the same link JoyoFit speaks; never tried with JoyoFit. */
+  /** In Gadgetbridge's list, on a link (RFCOMM or GATT) and an auth mode JoyoFit implements; never tried with JoyoFit. */
   EXPERIMENTAL("experimental"),
 
   /** A Huawei or Honor name Gadgetbridge does not list; JoyoFit tries it like a Huawei watch. */
@@ -21,8 +22,11 @@ internal enum class ModelSupport(val wire: String) {
   UNSUPPORTED("unsupported"),
 }
 
-/** Bluetooth Classic (RFCOMM, what JoyoFit speaks) or Bluetooth LE (GATT, which it does not). */
-internal enum class ModelTransport { BR, LE }
+/** Bluetooth Classic (RFCOMM, [RfcommTransport]) or Bluetooth LE (GATT, [BleTransport]); [label] is what the support report says. */
+internal enum class ModelTransport(val label: String) {
+  BR("Bluetooth Classic (RFCOMM)"),
+  LE("Bluetooth LE (GATT)"),
+}
 
 internal class WatchModel(
   /** For people: "Huawei Watch GT 4". */
@@ -37,6 +41,10 @@ internal class WatchModel(
   /** GB supportsHiChainPake: Honor's newer pairing, which JoyoFit does not implement. */
   val pake: Boolean = false,
   val tested: Boolean = false,
+  /** GB HuaweiDeviceType.AW (HuaweiBandAw70Coordinator: Band 3e, 4e): LE, but asks LinkParams and ProductInfo with the AW tag sets. */
+  val aw: Boolean = false,
+  /** GB isNewHonorProtocol (Honor Band 7, 9, 10): LE with Honor's own GATT service instead of 0xFE86. */
+  val newHonorProtocol: Boolean = false,
 )
 
 internal class ModelMatch(val model: WatchModel?, val support: ModelSupport, val reason: String?) {
@@ -45,7 +53,25 @@ internal class ModelMatch(val model: WatchModel?, val support: ModelSupport, val
 
   val crypted: Boolean get() = model?.crypted ?: true
 
+  /** GATT service and characteristics are Honor's own ones ([HuaweiConstants.UUID_SERVICE_HONOR_SERVICE]), not 0xFE86. */
+  val newHonorProtocol: Boolean get() = model?.newHonorProtocol == true
+
   val connectable: Boolean get() = support != ModelSupport.UNSUPPORTED
+
+  /**
+   * The link to open. A listed model has the transport of its Gadgetbridge coordinator. GB lists no model for other names, so
+   * there is nothing to follow: those are tried over RFCOMM, the link JoyoFit has been used with, unless Android knows the
+   * device as Bluetooth LE only (it has no Classic side to open a socket on).
+   */
+  fun transportFor(leOnlyDevice: Boolean): ModelTransport =
+    model?.transport ?: if (leOnlyDevice) ModelTransport.LE else ModelTransport.BR
+
+  /** GB's HuaweiDeviceType: BR on RFCOMM, AW for the AW70 bands, BLE for the other LE models and unlisted LE-only devices. */
+  fun deviceType(transport: ModelTransport): HuaweiDeviceType = when {
+    transport == ModelTransport.BR -> HuaweiDeviceType.BR
+    model?.aw == true -> HuaweiDeviceType.AW
+    else -> HuaweiDeviceType.BLE
+  }
 
   fun toJs(): Map<String, Any?> = mapOf("model" to model?.name, "support" to support.wire, "reason" to reason)
 }
@@ -54,7 +80,8 @@ internal object WatchModels {
   private fun br(name: String, prefix: String, honorSdp: Boolean = false, crypted: Boolean = true, pake: Boolean = false, tested: Boolean = false) =
     WatchModel(name, prefix, ModelTransport.BR, honorSdp, crypted, pake, tested)
 
-  private fun le(name: String, prefix: String) = WatchModel(name, prefix, ModelTransport.LE)
+  private fun le(name: String, prefix: String, aw: Boolean = false, newHonorProtocol: Boolean = false) =
+    WatchModel(name, prefix, ModelTransport.LE, aw = aw, newHonorProtocol = newHonorProtocol)
 
   val all: List<WatchModel> = listOf(
     br("Huawei Watch Fit 4 Pro", HuaweiConstants.HU_JOYOFIT4PRO_NAME, tested = true),
@@ -103,10 +130,10 @@ internal object WatchModels {
     le("Huawei Band 2 Pro", HuaweiConstants.HU_BAND2PRO_NAME),
     le("Huawei Band 3", HuaweiConstants.HU_BAND3_NAME),
     le("Huawei Band 3 Pro", HuaweiConstants.HU_BAND3PRO_NAME),
-    le("Huawei Band 3e", HuaweiConstants.HU_BAND3E_NAME),
+    le("Huawei Band 3e", HuaweiConstants.HU_BAND3E_NAME, aw = true),
     le("Huawei Band 4", HuaweiConstants.HU_BAND4_NAME),
     le("Huawei Band 4 Pro", HuaweiConstants.HU_BAND4PRO_NAME),
-    le("Huawei Band 4e", HuaweiConstants.HU_BAND4E_NAME),
+    le("Huawei Band 4e", HuaweiConstants.HU_BAND4E_NAME, aw = true),
     le("Huawei Band 6", HuaweiConstants.HU_BAND6_NAME),
     le("Huawei Band 7", HuaweiConstants.HU_BAND7_NAME),
     le("Huawei Band 8", HuaweiConstants.HU_BAND8_NAME),
@@ -118,9 +145,9 @@ internal object WatchModels {
     le("Honor Band 4", HuaweiConstants.HO_BAND4_NAME),
     le("Honor Band 5", HuaweiConstants.HO_BAND5_NAME),
     le("Honor Band 6", HuaweiConstants.HO_BAND6_NAME),
-    le("Honor Band 7", HuaweiConstants.HO_BAND7_NAME),
-    le("Honor Band 9", HuaweiConstants.HO_BAND9_NAME),
-    le("Honor Band 10", HuaweiConstants.HO_BAND10_NAME),
+    le("Honor Band 7", HuaweiConstants.HO_BAND7_NAME, newHonorProtocol = true),
+    le("Honor Band 9", HuaweiConstants.HO_BAND9_NAME, newHonorProtocol = true),
+    le("Honor Band 10", HuaweiConstants.HO_BAND10_NAME, newHonorProtocol = true),
     le("Honor Watch", HuaweiConstants.HO_MAGICWATCH_NAME),
   )
 
@@ -137,10 +164,10 @@ internal object WatchModels {
       model == null && (lower.isEmpty() || lower.startsWith("huawei") || lower.startsWith("honor")) ->
         ModelMatch(null, ModelSupport.UNKNOWN, "Not in the list of known watches; it may not work")
       model == null -> ModelMatch(null, ModelSupport.UNSUPPORTED, "Not a Huawei or Honor watch")
-      model.transport == ModelTransport.LE ->
-        ModelMatch(model, ModelSupport.UNSUPPORTED, "Uses Bluetooth LE, which JoyoFit does not support yet")
       model.pake -> ModelMatch(model, ModelSupport.UNSUPPORTED, "Uses Honor's newer pairing, which JoyoFit does not support yet")
       model.tested -> ModelMatch(model, ModelSupport.TESTED, null)
+      // GB's coordinators for these three carry isExperimental() (its issue #6027).
+      model.newHonorProtocol -> ModelMatch(model, ModelSupport.EXPERIMENTAL, "Not tested with JoyoFit yet; Gadgetbridge calls it experimental too")
       else -> ModelMatch(model, ModelSupport.EXPERIMENTAL, "Not tested with JoyoFit yet")
     }
   }

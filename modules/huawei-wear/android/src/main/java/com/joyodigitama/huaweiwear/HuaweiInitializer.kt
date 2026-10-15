@@ -21,7 +21,8 @@ internal class InitResult(
 )
 
 /**
- * Port of HuaweiSupportProvider.initializeDeviceConfigure for a BR device:
+ * Port of HuaweiSupportProvider.initializeDeviceConfigure (the same on every transport; [deviceType] only picks the
+ * ProductInfo tag set, as GB does for HuaweiDeviceType.AW):
  * ProductInfo -> SetTime (get, set again if drifted) -> BatteryLevel -> SupportedServices ->
  * SupportedCommands. Each request has GB's 2 s `initTimeout`; like GB, a missing reply only skips
  * to the next request.
@@ -39,6 +40,8 @@ internal class HuaweiInitializer(
   private val notificationsEnabled: Boolean,
   /** The sensor switches the user saved (continuous heart rate, SpO2, TruSleep, alerts). */
   private val healthSensors: HealthSensorConfig,
+  /** GB HuaweiDeviceType of the link; AW asks ProductInfo for a shorter tag set. */
+  private val deviceType: HuaweiDeviceType = HuaweiDeviceType.BR,
 ) {
   private val params get() = session.params
 
@@ -54,7 +57,7 @@ internal class HuaweiInitializer(
     // GetProductInformationRequest
     soft("ProductInfo") {
       val response = session
-        .request(DeviceConfig.ProductInfo.Request(params, HuaweiDeviceType.BR), Timeouts.INIT_MS, "ProductInfo")
+        .request(DeviceConfig.ProductInfo.Request(params, deviceType), Timeouts.INIT_MS, "ProductInfo")
         .expect<DeviceConfig.ProductInfo.Response>("ProductInfo")
       softwareVersion = response.softwareVersion
       hardwareVersion = response.hardwareVersion

@@ -23,6 +23,18 @@ internal interface FrameSink {
   suspend fun write(frames: List<ByteArray>)
 }
 
+/** The link [WearLink] opens to a watch: [RfcommTransport] (Bluetooth Classic) or [BleTransport] (Bluetooth LE GATT). */
+internal interface WatchTransport : FrameSink {
+  /**
+   * Suspends until the link is usable for [HuaweiSession] frames, within [timeoutMs] in total. Throws [WearException]
+   * (ERR_TIMEOUT, ERR_CONNECT_FAILED, ERR_BLUETOOTH_PERMISSION, ERR_DISCONNECTED); every failure leaves the transport closed.
+   */
+  suspend fun connect(timeoutMs: Long)
+
+  /** Idempotent; does not invoke the remote-closed callback. */
+  fun close()
+}
+
 /**
  * Bluetooth Classic RFCOMM link to the watch, resolved through SDP ([sdp]: `UUID_SERVICE_HUAWEI_SDP`, or
  * `UUID_SERVICE_HONOR_SDP` for GB's HonorBRSupport), as GB's BtBRQueue does: discovery cancelled
@@ -35,14 +47,14 @@ internal class RfcommTransport(
   private val onData: (ByteArray) -> Unit,
   /** Called once if the link ends without [close] having been called; null cause means clean EOF. */
   private val onRemoteClosed: (IOException?) -> Unit,
-) : FrameSink {
+) : WatchTransport {
   @Volatile private var socket: BluetoothSocket? = null
   private val closed = AtomicBoolean(false)
   private val writeLock = Mutex()
 
   /** Blocks (off the caller's thread) until the socket is connected; closing aborts a pending connect. */
   @SuppressLint("MissingPermission")
-  suspend fun connect(timeoutMs: Long) {
+  override suspend fun connect(timeoutMs: Long) {
     val created = try {
       // Discovery slows down and can fail RFCOMM connects. Cancelling needs BLUETOOTH_SCAN on
       // Android 12+, which this app never requests (it never scans), so it is best-effort.
@@ -139,7 +151,7 @@ internal class RfcommTransport(
   }
 
   /** Idempotent; does not invoke [onRemoteClosed]. */
-  fun close() {
+  override fun close() {
     closed.set(true)
     closeSocket()
   }

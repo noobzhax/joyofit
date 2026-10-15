@@ -61,6 +61,8 @@ internal object SupportReport {
     device: Map<String, Any?>?,
     linkState: String,
     log: List<SupportLog.Line>,
+    /** The link the last connect attempt opened; the same model name can need either, so it is recorded rather than derived. */
+    transport: ModelTransport? = null,
     nowMs: Long = System.currentTimeMillis(),
   ): Map<String, Any?> {
     val serial = device?.get("serialNumber") as String?
@@ -81,6 +83,7 @@ internal object SupportReport {
           "hardware ${device["hardwareVersion"] ?: "?"}, auth ${device["authMode"] ?: "?"}",
       )
     }
+    summary.appendLine("Transport: ${transport?.label ?: "none yet"}")
     summary.appendLine("Link: $linkState")
     val commands = DeviceCaps.supportedCommands
     if (commands.isNotEmpty()) {

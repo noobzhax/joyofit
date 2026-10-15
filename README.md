@@ -15,17 +15,17 @@ The app has two parts:
 
 ## Supported watches
 
-JoyoFit talks to the watch over Bluetooth Classic, the link the Watch Fit 4 Pro uses. The model list comes from Gadgetbridge's Huawei support (see `WatchModels.kt`). **Only the Huawei Watch Fit 4 Pro has been tested with JoyoFit.** Everything else is a best guess until someone tries it.
+JoyoFit talks to Huawei Watch models over Bluetooth Classic (RFCOMM), the link the Watch Fit 4 Pro uses, and to Huawei and Honor bands over Bluetooth LE (GATT). The model list comes from Gadgetbridge's Huawei support (see `WatchModels.kt`). **Only the Huawei Watch Fit 4 Pro has been tested with JoyoFit.** Everything else is a best guess until someone tries it.
 
 | Status | Watches | Notes |
 | --- | --- | --- |
 | **Tested** | Huawei Watch Fit 4 Pro | Checked on a real watch. |
 | **Experimental** | Huawei Watch Fit 4, Huawei Watch Fit 5, Huawei Watch Fit 5 Pro, Huawei Watch Fit 3, Huawei Watch Fit 2, Huawei Watch GT 2, Huawei Watch GT 2 Pro, Huawei Watch GT 3, Huawei Watch GT 3 Pro, Huawei Watch GT 3 SE, Huawei Watch GT 4, Huawei Watch GT 5, Huawei Watch GT 5 Pro, Huawei Watch GT 6, Huawei Watch GT 6 Pro, Huawei Watch GT 7, Huawei Watch GT 7 Pro, Huawei Watch GT Runner, Huawei Watch GT Runner 2, Huawei Watch GT Cyber, Huawei Watch 3, Huawei Watch 3 Pro, Huawei Watch 4, Huawei Watch 4 Pro, Huawei Watch 5, Huawei Watch D2, Huawei Watch Ultimate, Huawei Watch Ultimate 2, Huawei TalkBand B6, Honor MagicWatch 2, Honor Watch GS 3, Honor Watch GS Pro, Honor Watch 4, Honor Watch 4 Pro | Bluetooth Classic models in Gadgetbridge's list. Never tried with JoyoFit, so some or all features may not work. |
-| **Not yet** | Huawei Watch Fit, Huawei Watch GT, Huawei Watch GT 2e, Huawei Band 2, Huawei Band 2 Pro, Huawei Band 3, Huawei Band 3 Pro, Huawei Band 3e, Huawei Band 4, Huawei Band 4 Pro, Huawei Band 4e, Huawei Band 6, Huawei Band 7, Huawei Band 8, Huawei Band 9, Huawei Band 10, Huawei Band 11, Huawei Band 11 Pro, Honor Band 3, Honor Band 4, Honor Band 5, Honor Band 6, Honor Band 7, Honor Band 9, Honor Band 10, Honor Watch | Bluetooth LE. JoyoFit has no BLE transport yet. |
+| **Experimental** | Huawei Watch Fit, Huawei Watch GT, Huawei Watch GT 2e, Huawei Band 2, Huawei Band 2 Pro, Huawei Band 3, Huawei Band 3 Pro, Huawei Band 3e, Huawei Band 4, Huawei Band 4 Pro, Huawei Band 4e, Huawei Band 6, Huawei Band 7, Huawei Band 8, Huawei Band 9, Huawei Band 10, Huawei Band 11, Huawei Band 11 Pro, Honor Band 3, Honor Band 4, Honor Band 5, Honor Band 6, Honor Band 7, Honor Band 9, Honor Band 10, Honor Watch | Bluetooth LE (GATT) models in Gadgetbridge's list. **Untested, please report:** the LE link was ported from Gadgetbridge without a band to try it on, so connecting, pairing or sync may fail. Connect once and send the report (see below). JoyoFit lists bonded devices, so the band must show up as paired in Android's Bluetooth settings. Band 3e and 4e use a variant of the handshake. Honor Band 7, 9 and 10 use Honor's own GATT service, and Gadgetbridge calls those three experimental too. |
 | **Not yet** | Honor Watch 5, Honor Watch 5 Pro, Honor Watch 6 | Honor's newer pairing (HiChain PAKE) is not implemented. |
 | **Not yet** | Earphones (FreeBuds, FreeClip, FreeArc, FreeLace, Earbuds) | Not watches; they do not speak the watch protocol. |
 
-A Huawei or Honor watch that is not in the list is **unknown**: JoyoFit tries to connect to it like a Huawei watch, and it may not work. Anything that is not a Huawei or Honor watch is refused.
+A Huawei or Honor watch that is not in the list is **unknown**: JoyoFit tries to connect to it like a Huawei watch (over Bluetooth Classic, or over Bluetooth LE if Android reports the device as LE only), and it may not work. Anything that is not a Huawei or Honor watch is refused.
 
 ### Help support your watch
 
@@ -39,8 +39,10 @@ The report is plain text: app version, phone, watch model and software, supporte
 
 ## How it talks to the watch
 
-The Fit 4 Pro (and the other supported models) use **Bluetooth Classic RFCOMM**, not BLE GATT. This is why the earlier BLE explorer
-never found a usable channel. See [`protocol/README.md`](protocol/README.md) for the frame format,
+The Fit 4 Pro (and the other Classic watches) use **Bluetooth Classic RFCOMM**, not BLE GATT. This is why the earlier BLE explorer
+never found a usable channel. Huawei and Honor bands speak the same packet protocol over **Bluetooth LE GATT** (service `0xFE86`,
+write `FE01`, notifications `FE02`; Honor Band 7, 9 and 10 use Honor's own service), which `BleTransport` carries; that path is
+experimental and has not been tried on a real band. `WatchModels.kt` picks the transport per model. See [`protocol/README.md`](protocol/README.md) for the frame format,
 the commands used, and how the app picks an auth path.
 
 ```mermaid
@@ -57,6 +59,7 @@ flowchart LR
   AUTH & INIT & SYNC --> SES[HuaweiSession<br/>reassembly · request/response]
   SES --> GB[Gadgetbridge Java<br/>HuaweiPacket · TLV · Crypto · DeviceConfig · FitnessData]
   SES --> RF[RfcommTransport<br/>SDP 82FF3820-…]
+  SES --> BLE[BleTransport<br/>GATT FE86 · FE01 write · FE02 notify]
   STORE --> DB[(joyofit.db)]
   UI -- reads --> DB
 ```
@@ -257,7 +260,7 @@ browser. It builds on [`packages/hwt`](packages/hwt/README.md), the TypeScript `
 
 | Permission | Why |
 |---|---|
-| `BLUETOOTH_CONNECT` (`BLUETOOTH` / `BLUETOOTH_ADMIN` up to API 30) | list bonded watches and open the RFCOMM link |
+| `BLUETOOTH_CONNECT` (`BLUETOOTH` / `BLUETOOTH_ADMIN` up to API 30) | list bonded watches and open the RFCOMM or Bluetooth LE (GATT) link; no scan or location permission is needed for either, JoyoFit connects to a device you already paired |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE` | the background service (Android 14 requires the typed permission) |
 | `POST_NOTIFICATIONS` | show the service notification (runtime prompt on Android 13+) |
 | `RECEIVE_BOOT_COMPLETED` | restart background mode after a reboot or app update |

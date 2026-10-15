@@ -35,6 +35,9 @@ export function MealsSection() {
         background service answers from the last day it stored; it cannot read JoyoRogo then, because the sign-in is kept for the app
         only. Untested on the Fit 4 Pro so far.
       </AppText>
+      <AppText variant="caption" muted>
+        While signed in, the app also sends your daily Recovery, Strain and Sleep to the JoyoRogo diary so they sit next to your food.
+      </AppText>
       <KeyValue icon="person" label="JoyoRogo" value={meals.signedIn ? 'Signed in' : CLOUD_CONFIGURED ? 'Not signed in' : 'Not signed in (cloud off)'} />
       <KeyValue icon="calendar" label="Day on the watch" value={diet.date} />
       <KeyValue

@@ -112,7 +112,22 @@ export interface RogoWeightEntry {
   createdAt: string;
 }
 
-/** Read-only procedures. */
+/** JoyoFit's readiness word, as `fitness.upsertScores` accepts it. */
+export type RogoReadiness = 'Primed' | 'Balanced' | 'Strained' | 'Run down';
+
+/**
+ * One day of scores for `fitness.upsertScores`. `date` is `YYYY-MM-DD`; a score that is left out keeps what JoyoRogo has
+ * stored for that day. Ranges: recoveryPct 0..100, strain 0..21, sleepPct 0..300.
+ */
+export interface RogoScoreDay {
+  date: string;
+  recoveryPct?: number;
+  strain?: number;
+  sleepPct?: number;
+  readiness?: RogoReadiness;
+}
+
+/** Procedures JoyoFit calls. */
 export const rogo = {
   foodDay: (date: string) => rogoCall<RogoFoodDay>('food/listByDate', { date }),
   myProfile: () => rogoCall<RogoMyProfile>('profile/myProfile', {}),
@@ -124,4 +139,6 @@ export const rogo = {
   /** Writes one item to the diary (a meal the watch quick-logged). */
   addFood: (input: { date: string; meal: RogoMeal; name: string; kcal: number }) =>
     rogoCall<RogoFoodItem>('food/add', { ...input, source: 'manual' }),
+  /** Stores the day's Recovery / Strain / Sleep for JoyoRogo's diary. JoyoRogo answers 404 until it is deployed with the `fitness` router. */
+  pushScores: (days: RogoScoreDay[]) => rogoCall<{ saved: number }>('fitness/upsertScores', { days }),
 };

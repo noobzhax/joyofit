@@ -42,15 +42,18 @@ internal object Timeouts {
 }
 
 /**
- * Port of the HuaweiSupportProvider.initializeDevice* chain for a BR (Bluetooth Classic) device:
+ * Port of the HuaweiSupportProvider.initializeDevice* chain:
  * LinkParams -> DeviceStatus -> SecurityNegotiation -> HiChain / HiChain Lite / normal auth.
  * Requests are the ones in service/devices/huawei/requests (GetLinkParamsRequest, ...); each
- * `processResponse()` is inlined after the matching `session.request`.
+ * `processResponse()` is inlined after the matching `session.request`. [deviceType] is GB's HuaweiDeviceType: BR
+ * (RFCOMM) is the path the Fit 4 Pro runs; BLE and AW (Bluetooth LE) differ in the LinkParams request, in skipping
+ * the device status check (BLE only) and in the BondParams and Bond steps after normal mode.
  */
 internal class HuaweiAuthenticator(
   private val session: HuaweiSession,
   private val identity: DeviceIdentity,
   private val events: WearEvents,
+  private val deviceType: HuaweiDeviceType = HuaweiDeviceType.BR,
 ) {
   private val params get() = session.params
   private val random = SecureRandom()
@@ -88,14 +91,17 @@ internal class HuaweiAuthenticator(
 
     val serverNonce = linkParams()
 
-    // GB initializeDeviceCheckStatus (askStatus = true).
-    val status = deviceStatus()
-    if (status != -1 && status != 0 && status != 1) {
-      // GB calls initializeDeviceNotify(), an empty TODO, so the connection silently hangs.
-      throw WearException(
-        ErrorCodes.DEVICE_STATUS,
-        "Watch reported unexpected device status $status (0x%02x); expected -1, 0 or 1".format(status and 0xFF),
-      )
+    // GB initializeDeviceCheckStatus (askStatus = true). GB skips it for HuaweiDeviceType.BLE ("only BLE known, check later for
+    // AW and SMART") and goes straight to the security negotiation.
+    if (deviceType != HuaweiDeviceType.BLE) {
+      val status = deviceStatus()
+      if (status != -1 && status != 0 && status != 1) {
+        // GB calls initializeDeviceNotify(), an empty TODO, so the connection silently hangs.
+        throw WearException(
+          ErrorCodes.DEVICE_STATUS,
+          "Watch reported unexpected device status $status (0x%02x); expected -1, 0 or 1".format(status and 0xFF),
+        )
+      }
     }
 
     // GB initializeDeviceDealHiChain.
@@ -128,7 +134,7 @@ internal class HuaweiAuthenticator(
 
   private suspend fun linkParams(): ByteArray {
     val response = session
-      .request(DeviceConfig.LinkParams.Request(params, HuaweiDeviceType.BR), Timeouts.AUTH_MS, "LinkParams")
+      .request(DeviceConfig.LinkParams.Request(params, deviceType), Timeouts.AUTH_MS, "LinkParams")
       .expect<DeviceConfig.LinkParams.Response>("LinkParams")
 
     params.setDeviceSupportType(response.deviceSupportType)
@@ -388,7 +394,11 @@ internal class HuaweiAuthenticator(
       pinCode(authTimeout)
     }
     auth.run(authTimeout)
+    bondParamsAndBond(authTimeout)
+  }
 
+  /** GetBondParamsRequest, then GetBondRequest: how GB finishes HiChain Lite on every transport, and normal mode on LE. */
+  private suspend fun bondParamsAndBond(authTimeout: Long) {
     // GetBondParamsRequest
     val bondParams = session
       .request(
@@ -426,12 +436,16 @@ internal class HuaweiAuthenticator(
     identity.markBonded()
   }
 
-  // initializeDeviceNormalMode (BR: Auth only, no BondParams/Bond)
+  // initializeDeviceNormalMode: BR is Auth only; BLE and AW go on with BondParams and Bond, like HiChain Lite.
 
   private suspend fun normalMode(serverNonce: ByteArray, authTimeout: Long) {
     params.setSecretKey(identity.createSecretKey())
     AuthExchange(serverNonce).run(authTimeout)
-    identity.markBonded()
+    if (deviceType == HuaweiDeviceType.BLE || deviceType == HuaweiDeviceType.AW) {
+      bondParamsAndBond(authTimeout)
+    } else {
+      identity.markBonded()
+    }
   }
 
   /** GetAuthRequest: the constructor captures params at construction time, like GB's. */

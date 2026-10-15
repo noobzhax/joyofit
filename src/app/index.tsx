@@ -28,6 +28,7 @@ import { WatchHero } from '@/features/today/WatchHero';
 import { computeScores } from '@/features/today/scores';
 import { MorningCheckin } from '@/features/today/MorningCheckin';
 import { ScoresCard } from '@/features/today/ScoresCard';
+import { useRogoScoresPush } from '@/features/today/useRogoScoresPush';
 import { formatElapsed } from '@/features/workouts/summary';
 import { formatClock, formatCount, formatDistance } from '@/format';
 import { useNow } from '@/hooks/useNow';
@@ -70,6 +71,8 @@ export default function TodayScreen() {
       scores: computeScores(data),
     };
   }, [data, totals]);
+
+  useRogoScoresPush(view?.scores ?? null, data?.dayStart ?? null);
 
   const canSync = linkState === 'connected' && device !== null;
   const syncing = linkState === 'syncing';

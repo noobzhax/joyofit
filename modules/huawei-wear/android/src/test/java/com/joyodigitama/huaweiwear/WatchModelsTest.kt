@@ -1,6 +1,7 @@
 package com.joyodigitama.huaweiwear
 
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiCoordinator.HuaweiDeviceType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -28,12 +29,53 @@ class WatchModelsTest {
   }
 
   @Test
-  fun bluetoothLeAndHonorPakeModelsCannotConnect() {
+  fun theFit4ProKeepsRfcommAndItsAuthPath() {
+    val fit = WatchModels.match("HUAWEI WATCH FIT 4 Pro-A0B")
+    assertEquals(ModelTransport.BR, fit.transportFor(leOnlyDevice = false))
+    // A classic model stays on RFCOMM whatever Android reports for the device.
+    assertEquals(ModelTransport.BR, fit.transportFor(leOnlyDevice = true))
+    assertEquals(HuaweiDeviceType.BR, fit.deviceType(ModelTransport.BR))
+  }
+
+  @Test
+  fun bluetoothLeBandsAreExperimentalOverGatt() {
     val band = WatchModels.match("HUAWEI Band 9-ABC")
     assertEquals("Huawei Band 9", band.model?.name)
-    assertEquals(ModelSupport.UNSUPPORTED, band.support)
-    assertFalse(band.connectable)
-    assertEquals(ModelSupport.UNSUPPORTED, WatchModels.match("HONOR Watch 5-ABC").support)
+    assertEquals(ModelSupport.EXPERIMENTAL, band.support)
+    assertTrue(band.connectable)
+    assertEquals(ModelTransport.LE, band.transportFor(leOnlyDevice = false))
+    assertEquals(HuaweiDeviceType.BLE, band.deviceType(ModelTransport.LE))
+    assertFalse(band.newHonorProtocol)
+    assertEquals(ModelSupport.EXPERIMENTAL, WatchModels.match("HUAWEI WATCH FIT-1C2").support)
+  }
+
+  @Test
+  fun leQuirksFollowGadgetbridgesCoordinators() {
+    // HuaweiBandAw70Coordinator: Band 3e and 4e are HuaweiDeviceType.AW.
+    assertEquals(HuaweiDeviceType.AW, WatchModels.match("HUAWEI Band 4e-ABC").deviceType(ModelTransport.LE))
+    assertEquals(HuaweiDeviceType.BLE, WatchModels.match("HUAWEI Band 4-ABC").deviceType(ModelTransport.LE))
+    assertEquals(HuaweiDeviceType.BLE, WatchModels.match("HUAWEI Band 4 Pro-ABC").deviceType(ModelTransport.LE))
+    // isNewHonorProtocol: Honor Band 7, 9 and 10 only.
+    for (name in listOf("HONOR Band 7-ABC", "HONOR Band 9-ABC", "HONOR Band 10-ABC")) {
+      assertTrue(name, WatchModels.match(name).newHonorProtocol)
+    }
+    assertFalse(WatchModels.match("HONOR Band 6-ABC").newHonorProtocol)
+    assertFalse(WatchModels.match("HUAWEI Band 9-ABC").newHonorProtocol)
+  }
+
+  @Test
+  fun honorPakeWatchesCannotConnect() {
+    val honor5 = WatchModels.match("HONOR Watch 5-ABC")
+    assertEquals(ModelSupport.UNSUPPORTED, honor5.support)
+    assertFalse(honor5.connectable)
+  }
+
+  @Test
+  fun unlistedNamesFollowWhatAndroidKnowsOfTheDevice() {
+    val unknown = WatchModels.match("HUAWEI WATCH 6-ABC")
+    assertEquals(ModelTransport.BR, unknown.transportFor(leOnlyDevice = false))
+    assertEquals(ModelTransport.LE, unknown.transportFor(leOnlyDevice = true))
+    assertEquals(HuaweiDeviceType.BLE, unknown.deviceType(ModelTransport.LE))
   }
 
   @Test
