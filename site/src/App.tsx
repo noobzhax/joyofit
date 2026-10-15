@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import {
+  ArrowRight,
   AlarmClock,
   ArrowLeft,
   Bell,
@@ -605,7 +606,7 @@ function Features() {
           <span className="min-w-0 flex-1">
             <span className="block text-lg font-extrabold tracking-tight">Coba JoyoRogo</span>
             <span className="block text-sm text-muted-foreground">
-              Catat makan dari foto, gratis untuk mulai
+              Catat makanmu cukup dari foto
             </span>
           </span>
           <ArrowRight className="size-5 shrink-0 text-makan-ink transition-transform group-hover:translate-x-0.5" aria-hidden />
