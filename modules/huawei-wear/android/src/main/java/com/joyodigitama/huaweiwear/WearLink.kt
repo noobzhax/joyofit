@@ -389,6 +389,7 @@ internal class WearLink(
         val stored = storage { syncStore.save(connection.address, result) }
         val summary = stored.withWorkouts(syncWorkouts(connection))
         syncNightHrv(connection)
+        postMorningSummary()
         for (extension in syncExtensions) {
           try {
             extension(connection.session)
@@ -443,6 +444,17 @@ internal class WearLink(
     }
     events.log(LogDirection.INFO, null, null, null, "Workout sync: ${sync.saved} workouts stored")
     return sync.saved
+  }
+
+  /** The morning summary notification, after the night's sleep and HRV are stored; never fails the sync. */
+  private suspend fun postMorningSummary() {
+    try {
+      MorningSummary.postIfDue(appContext, settings, syncStore, events)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      events.log(LogDirection.ERROR, null, null, null, "Morning summary failed: ${e.message ?: e.javaClass.simpleName}")
+    }
   }
 
   /**

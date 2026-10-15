@@ -15,6 +15,7 @@ import { EmptyState, Notice, Skeleton } from '@/components/States';
 import { listWorkouts, type WorkoutRow } from '@/db/queries';
 import { sportIcon } from '@/features/workouts/sportIcon';
 import { formatElapsed, formatWorkoutDistance } from '@/features/workouts/summary';
+import { useWorkoutStrain } from '@/features/workouts/useWorkoutStrain';
 import { errorMessage, formatCount, formatDateTime } from '@/format';
 import { useWatch } from '@/state/WatchProvider';
 import { radius, spacing, tintColors, useColors } from '@/theme';
@@ -42,6 +43,7 @@ function WorkoutCard({ workout }: { workout: WorkoutRow }) {
   const heart = tintColors(colors, 'heart');
   // `formatWorkoutDistance` returns "2.34 km"; the card shows the number big and the unit small.
   const [distance, distanceUnit] = formatWorkoutDistance(workout.distance).split(' ');
+  const strain = useWorkoutStrain(workout);
   return (
     <PressableScale
       accessibilityRole="button"
@@ -66,6 +68,9 @@ function WorkoutCard({ workout }: { workout: WorkoutRow }) {
         {workout.calories > 0 ? <Metric value={formatCount(workout.calories)} unit="kcal" size="sm" /> : null}
         {workout.avgHr !== null ? (
           <Metric value={String(workout.avgHr)} unit="bpm avg" size="sm" color={heart.text} unitColor={heart.text} />
+        ) : null}
+        {strain !== null && strain !== undefined ? (
+          <Metric value={strain.toFixed(1)} unit="strain" size="sm" color={colors.workoutsText} unitColor={colors.workoutsText} />
         ) : null}
       </View>
       {!workout.complete ? (

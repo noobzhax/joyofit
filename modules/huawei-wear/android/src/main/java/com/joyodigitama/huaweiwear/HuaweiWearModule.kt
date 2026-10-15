@@ -212,6 +212,14 @@ class HuaweiWearModule : Module() {
       runtime().setNotificationsEnabled(enabled)
     }
 
+    Function("getMorningSummaryEnabled") {
+      runtime().morningSummaryEnabled()
+    }
+
+    AsyncFunction("setMorningSummaryEnabled") { enabled: Boolean ->
+      runtime().setMorningSummaryEnabled(enabled)
+    }
+
     AsyncFunction("getNotificationApps") Coroutine { ->
       runtime().notificationApps()
     }

@@ -136,3 +136,33 @@ export function listWorkoutPoints(db: SQLiteDatabase, workoutId: number): Promis
     workoutId,
   );
 }
+
+/** The two columns `dailyStrain` reads; the Trends screen skips steps and the rest so 90 days stay light. */
+export type HeartRateRow = Pick<StepSample, 'timestamp' | 'heartRate'>;
+
+/** Heart-rate readings from `sinceSec` on, oldest first. */
+export function listHeartRatesSince(db: SQLiteDatabase, sinceSec: number): Promise<HeartRateRow[]> {
+  return db.getAllAsync<HeartRateRow>(
+    'SELECT timestamp, heart_rate AS heartRate FROM step_samples WHERE timestamp >= ? AND heart_rate > 0 ORDER BY timestamp',
+    sinceSec,
+  );
+}
+
+/**
+ * The watch's resting heart rate per day, as `restingByDay` takes it (the lowest reported that day), aggregated in SQL.
+ * `bounds` are consecutive local midnights; day `i` spans `bounds[i]` up to `bounds[i + 1]`, so the local calendar
+ * (and daylight-saving days) stay with the caller. Days without a value are absent from the result.
+ */
+export async function listRestingHeartRateByDay(db: SQLiteDatabase, bounds: readonly number[]): Promise<Map<number, number>> {
+  const days: number[] = [];
+  for (let i = 0; i + 1 < bounds.length; i++) days.push(bounds[i], bounds[i + 1]);
+  if (days.length === 0) return new Map();
+  const rows = await db.getAllAsync<{ day: number; bpm: number }>(
+    `WITH days(d0, d1) AS (VALUES ${Array.from({ length: days.length / 2 }, () => '(?, ?)').join(', ')})
+     SELECT d0 AS day, MIN(s.resting_heart_rate) AS bpm
+     FROM days JOIN step_samples s ON s.timestamp >= d0 AND s.timestamp < d1
+     WHERE s.resting_heart_rate > 0 GROUP BY d0`,
+    days,
+  );
+  return new Map(rows.map((r) => [r.day, r.bpm]));
+}

@@ -26,6 +26,7 @@ import { useStepGoal } from '@/features/today/useStepGoal';
 import { useTodayData } from '@/features/today/useTodayData';
 import { WatchHero } from '@/features/today/WatchHero';
 import { computeScores } from '@/features/today/scores';
+import { MorningCheckin } from '@/features/today/MorningCheckin';
 import { ScoresCard } from '@/features/today/ScoresCard';
 import { formatElapsed } from '@/features/workouts/summary';
 import { formatClock, formatCount, formatDistance } from '@/format';
@@ -124,6 +125,10 @@ export default function TodayScreen() {
       </View>
 
       {view ? <ScoresCard readiness={view.scores.readiness} today={view.scores.today} onPress={() => router.push('/readiness')} /> : null}
+
+      {data ? (
+        <MorningCheckin hrv={data.hrv} dayStart={data.dayStart} nowMs={nowMs} connected={isLinkUp(linkState)} onMeasure={() => router.push('/hrv')} />
+      ) : null}
 
       {loading ? (
         <View style={styles.tiles}>

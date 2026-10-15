@@ -494,6 +494,73 @@ function Workouts() {
   );
 }
 
+const SCORES: { Icon: LucideIcon; name: string; line: string; method: string; tone: string }[] = [
+  {
+    Icon: Moon,
+    name: "Recovery",
+    line: "Seberapa pulih badanmu pagi ini, dalam persen.",
+    method: "HRV (ln RMSSD) malam ini dibanding baseline 30 harinya, mengikuti Plews dan Buchheit.",
+    tone: "bg-tidur-soft text-tidur-ink",
+  },
+  {
+    Icon: Flame,
+    name: "Strain",
+    line: "Seberapa berat hari ini untuk jantungmu, skala 0 sampai 21.",
+    method: "TRIMP Edwards dari zona detak jantung seharian, dipetakan ke skala 0 sampai 21.",
+    tone: "bg-bakar-soft text-bakar-ink",
+  },
+  {
+    Icon: HeartPulse,
+    name: "Readiness",
+    line: "Siap atau perlu santai hari ini.",
+    method: "Selisih detak istirahat dari biasanya, tidur dibanding kebutuhan, dan beban latihan 7 hari lawan 28 hari.",
+    tone: "bg-makan-soft text-makan-ink",
+  },
+];
+
+function Scores() {
+  return (
+    <section data-section="scores" className="scroll-mt-16 bg-card py-20 md:py-28">
+      <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+        <div className="max-w-2xl">
+          <p className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+            Baru, masih diuji
+          </p>
+          <SectionTitle>Recovery, Strain, dan Readiness</SectionTitle>
+          <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
+            Tiga skor harian gaya aplikasi pelatih kebugaran, terinspirasi dari WHOOP tapi bukan
+            produk WHOOP. Semuanya dihitung di HP dari data jammu dengan metode yang dipublikasikan.
+          </p>
+        </div>
+        <ul className="mt-10 grid gap-4 md:grid-cols-3">
+          {SCORES.map(({ Icon, name, line, method, tone }) => (
+            <li key={name} className="rounded-[1.75rem] border border-border/70 bg-background p-6">
+              <span className={`flex size-10 items-center justify-center rounded-full ${tone}`}>
+                <Icon className="size-5" aria-hidden />
+              </span>
+              <h3 className="mt-4 text-xl font-extrabold tracking-tight">{name}</h3>
+              <p className="mt-1 font-semibold">{line}</p>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed text-muted-foreground">{method}</p>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <p className="rounded-2xl bg-muted p-4 text-[0.9375rem] leading-relaxed text-muted-foreground">
+            <span className="font-bold text-foreground">Recovery butuh beberapa malam data.</span>{" "}
+            Nyalakan stres otomatis di jam supaya HRV tercatat saat tidur. Sebelum baseline cukup,
+            skornya belum muncul.
+          </p>
+          <p className="rounded-2xl bg-muted p-4 text-[0.9375rem] leading-relaxed text-muted-foreground">
+            <span className="font-bold text-foreground">Ukur HRV 1 menit kapan saja.</span> Diam
+            sebentar, jam mengukur, hasilnya ikut jadi bahan Recovery. Ini perkiraan, bukan alat
+            medis.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Features() {
   return (
     <section
@@ -1050,6 +1117,7 @@ export function App() {
             <Basics />
             <SleepSection />
             <Workouts />
+            <Scores />
             <Features />
             <WatchSection />
             <JamTeaser />

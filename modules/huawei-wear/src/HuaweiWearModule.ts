@@ -81,6 +81,9 @@ declare class HuaweiWearModule extends NativeModule<HuaweiWearModuleEvents> {
   openNotificationAccess(): Promise<void>;
   getNotificationAccess(): NotificationAccessStatus;
   setNotificationsEnabled(enabled: boolean): Promise<void>;
+  /** The once-a-day "Morning summary" notification, posted after the first sync that stored last night's sleep. Off by default. */
+  getMorningSummaryEnabled(): boolean;
+  setMorningSummaryEnabled(enabled: boolean): Promise<void>;
   /** Launcher apps with their forwarding state. Apps without an explicit choice are on unless they are system apps. */
   getNotificationApps(): Promise<NotificationApp[]>;
   setNotificationAppEnabled(packageName: string, enabled: boolean): Promise<void>;

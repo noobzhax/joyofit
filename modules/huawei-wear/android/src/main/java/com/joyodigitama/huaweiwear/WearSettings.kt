@@ -51,6 +51,16 @@ internal class WearSettings(context: Context) {
     get() = prefs.getBoolean(KEY_NOTIFICATIONS, false)
     set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS, value).apply()
 
+  /** The once-a-day morning summary notification (off by default). */
+  var morningSummaryEnabled: Boolean
+    get() = prefs.getBoolean(KEY_MORNING_SUMMARY, false)
+    set(value) = prefs.edit().putBoolean(KEY_MORNING_SUMMARY, value).apply()
+
+  /** Local date (`yyyy-MM-dd`) the morning summary was last posted, so it posts once per day. */
+  var morningSummaryDay: String?
+    get() = prefs.getString(KEY_MORNING_SUMMARY_DAY, null)
+    set(value) = prefs.edit().apply { if (value == null) remove(KEY_MORNING_SUMMARY_DAY) else putString(KEY_MORNING_SUMMARY_DAY, value) }.apply()
+
   /** Explicit per-app choice: true = forward, false = block, null = default policy. */
   fun appChoice(packageName: String): Boolean? = when {
     prefs.getStringSet(KEY_APPS_ON, emptySet())!!.contains(packageName) -> true
@@ -136,6 +146,8 @@ internal class WearSettings(context: Context) {
     private const val KEY_BACKGROUND = "background_enabled"
     private const val KEY_INTERVAL = "sync_interval_min"
     private const val KEY_NOTIFICATIONS = "notifications_enabled"
+    private const val KEY_MORNING_SUMMARY = "morning_summary_enabled"
+    private const val KEY_MORNING_SUMMARY_DAY = "morning_summary_day"
     private const val KEY_APPS_ON = "notification_apps_on"
     private const val KEY_APPS_OFF = "notification_apps_off"
     private const val KEY_PROFILE_HEIGHT = "profile_height_cm"

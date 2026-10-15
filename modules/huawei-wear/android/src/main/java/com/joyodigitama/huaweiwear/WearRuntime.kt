@@ -325,6 +325,13 @@ internal class WearRuntime private constructor(context: Context) {
     }
   }
 
+  fun morningSummaryEnabled(): Boolean = settings.morningSummaryEnabled
+
+  /** Turning it on lets the next sync post today's summary if it has not been posted yet. */
+  fun setMorningSummaryEnabled(enabled: Boolean) {
+    settings.morningSummaryEnabled = enabled
+  }
+
   /** Stores the switch and, when the watch is connected, mirrors it to the watch (GB SetNotificationRequest). */
   suspend fun setNotificationsEnabled(enabled: Boolean) {
     settings.notificationsEnabled = enabled

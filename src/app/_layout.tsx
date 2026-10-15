@@ -108,6 +108,7 @@ export default function RootLayout() {
                   <Tabs.Screen name="hrv" options={{ href: null }} />
                   <Tabs.Screen name="sleep" options={{ href: null }} />
                   <Tabs.Screen name="readiness" options={{ href: null }} />
+                  <Tabs.Screen name="trends" options={{ href: null }} />
                   {/* Opens by itself when a workout starts on the watch (LiveWorkoutProvider). */}
                   <Tabs.Screen name="workout-live" options={{ href: null }} />
                 </Tabs>

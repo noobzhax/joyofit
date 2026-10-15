@@ -7,21 +7,25 @@ import { AppText } from '@/components/AppText';
 import { IconChip } from '@/components/IconChip';
 import { KeyValue } from '@/components/KeyValue';
 import { Metric } from '@/components/Metric';
+import { Ring } from '@/components/Ring';
 import { Card, Screen, Section } from '@/components/Screen';
 import { StatTile } from '@/components/StatTile';
 import { Notice, Skeleton } from '@/components/States';
 import {
   getWorkout,
+  listStepSamplesSince,
   listWorkoutPoints,
   type WorkoutPointRow,
   type WorkoutRow,
 } from '@/db/queries';
 import { BurnFigure, FuelBar } from '@/features/live/FuelBar';
 import { formatGrams } from '@/features/live/liveWorkout';
+import { startOfLocalDay } from '@/features/today/stats';
+import { STRAIN_MAX, strainAddedToDay, workoutStrain } from '@/features/today/strain';
 import { HeartRateChart } from '@/features/workouts/HeartRateChart';
 import { RouteView } from '@/features/workouts/RouteView';
 import { sportIcon } from '@/features/workouts/sportIcon';
-import { DEFAULT_AGE, maxHeartRate, splitWorkout } from '@/features/workouts/substrate';
+import { splitWorkout } from '@/features/workouts/substrate';
 import {
   formatElapsed,
   formatPace,
@@ -32,14 +36,17 @@ import {
   routePoints,
   type WorkoutSummary,
 } from '@/features/workouts/summary';
+import { userMaxHr } from '@/features/workouts/useWorkoutStrain';
 import { errorMessage, formatClock, formatCount, formatDateTime } from '@/format';
 import { radius, spacing, useColors } from '@/theme';
-import { HuaweiWear } from '@/wear';
+import type { StepSample } from '@/wear';
 
 interface Loaded {
   workout: WorkoutRow;
   summary: WorkoutSummary;
   points: WorkoutPointRow[];
+  /** Per-minute samples of the workout's day, for its share of that day's strain. */
+  daySamples: StepSample[];
 }
 
 /** `x.y m`, or null when the summary does not have the value. */
@@ -83,7 +90,9 @@ export default function WorkoutDetailScreen() {
         const found = await getWorkout(db, workoutId);
         if (!found) throw new Error('This workout is no longer stored');
         const points = await listWorkoutPoints(db, workoutId);
-        return { workout: found.workout, summary: parseSummary(found.summaryJson), points };
+        const day = startOfLocalDay(found.workout.start);
+        const daySamples = (await listStepSamplesSince(db, day)).filter((s) => s.timestamp < day + 86400);
+        return { workout: found.workout, summary: parseSummary(found.summaryJson), points, daySamples };
       })().then(
         (value) => {
           if (!cancelled) setLoaded(value);
@@ -100,14 +109,17 @@ export default function WorkoutDetailScreen() {
 
   const route = useMemo(() => (loaded ? routePoints(loaded.points) : []), [loaded]);
   const splits = useMemo(() => (loaded ? kmSplits(loaded.summary) : []), [loaded]);
+  const maxHr = useMemo(() => userMaxHr(), []);
   const burn = useMemo(() => {
     if (!loaded) return null;
-    const birthYear = HuaweiWear.getUserProfile()?.birthYear;
-    const age = birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE;
-    const maxHr = maxHeartRate(age);
-    const split = splitWorkout(loaded.workout.calories, loaded.points, maxHr);
-    return split ? { ...split, maxHr } : null;
-  }, [loaded]);
+    return splitWorkout(loaded.workout.calories, loaded.points, maxHr);
+  }, [loaded, maxHr]);
+  const strain = useMemo(() => {
+    if (!loaded) return null;
+    const own = workoutStrain(loaded.points, maxHr);
+    if (!own) return null;
+    return { ...own, share: strainAddedToDay(loaded.daySamples, loaded.workout, own.trimp, maxHr) };
+  }, [loaded, maxHr]);
   const colors = useColors();
 
   if (!loaded) {
@@ -190,6 +202,52 @@ export default function WorkoutDetailScreen() {
         ) : null}
       </Card>
 
+      <Section title="Strain" icon="pulse" tint="workouts">
+        {strain ? (
+          <>
+            <View style={styles.strainRow}>
+              <Ring
+                size={84}
+                stroke={7}
+                value={strain.strain}
+                max={STRAIN_MAX}
+                color={colors.workouts}
+                track={colors.workoutsSoft}
+                accessibilityLabel={`Workout strain ${strain.strain.toFixed(1)} of ${STRAIN_MAX}`}>
+                <AppText variant="heading" style={styles.strainValue}>
+                  {strain.strain.toFixed(1)}
+                </AppText>
+              </Ring>
+              <View style={styles.strainText}>
+                <Metric value={`+${strain.share.added.toFixed(1)}`} unit="to the day" size="md" color={colors.workoutsText} unitColor={colors.workoutsText} />
+                <AppText variant="caption" muted>
+                  Added about {strain.share.added.toFixed(1)} to the strain of that day, which comes to {strain.share.dayStrain.toFixed(1)}.
+                </AppText>
+              </View>
+            </View>
+            {strain.zoneMinutes.map((minutes, i) =>
+              minutes > 0 ? (
+                <KeyValue
+                  key={i}
+                  label={`Zone ${i + 1} (${50 + 10 * i} to ${60 + 10 * i} % of max)`}
+                  value={formatElapsed(Math.round(minutes * 60))}
+                />
+              ) : null,
+            )}
+            <AppText variant="caption" muted>
+              An estimate by JoyoFit, the watch does not report it: the heart-rate zones of this workout, with a maximum of {maxHr}{' '}
+              bpm, are summed (Edwards TRIMP: zones 1 to 5 count 1 to 5 per minute) and mapped onto 0 to 21 like the strain of a
+              day. Pauses over two minutes count for nothing. The added part is the strain of the day with this workout minus
+              the strain of the day without its minutes, so the same workout adds less on a day that already carried load.
+            </AppText>
+          </>
+        ) : (
+          <Notice icon="heart-outline">
+            No heart-rate samples were stored for this workout, so JoyoFit cannot work out its strain.
+          </Notice>
+        )}
+      </Section>
+
       {burn ? (
         <Section title="Fat and carbs burned" icon="flame" tint="workouts">
           <View style={styles.tiles}>
@@ -206,7 +264,7 @@ export default function WorkoutDetailScreen() {
           ))}
           <AppText variant="caption" muted>
             An estimate by JoyoFit, the watch does not measure it: the {formatCount(workout.calories)} kcal are split over the
-            time you actually spent at each heart rate, with a maximum of {burn.maxHr} bpm (220 minus your age from the
+            time you actually spent at each heart rate, with a maximum of {maxHr} bpm (220 minus your age from the
             profile). Easier effort burns a larger share of fat.
           </AppText>
         </Section>
@@ -309,6 +367,9 @@ function Figure({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  strainRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  strainText: { flex: 1, gap: spacing.xs },
+  strainValue: { fontVariant: ['tabular-nums'] },
   summaryHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   summaryTitle: { flex: 1, gap: 2 },
   figures: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.xl, rowGap: spacing.md },

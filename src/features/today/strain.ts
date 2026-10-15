@@ -43,7 +43,7 @@ export interface DayStrain {
  * Strain per local day from per-minute samples (oldest first). Samples without heart rate are skipped; each reading
  * counts until the next reading or [MAX_READING_SEC], whichever is first, and never past its day's midnight.
  */
-export function dailyStrain(samples: readonly StepSample[], maxHr: number): DayStrain[] {
+export function dailyStrain(samples: readonly Pick<StepSample, 'timestamp' | 'heartRate'>[], maxHr: number): DayStrain[] {
   const withHr = samples.filter((s) => s.heartRate !== null && s.heartRate > 0);
   const days = new Map<number, DayStrain>();
   for (let i = 0; i < withHr.length; i++) {
@@ -67,4 +67,70 @@ export function dailyStrain(samples: readonly StepSample[], maxHr: number): DayS
   return [...days.values()]
     .map((entry) => ({ ...entry, strain: strainFromTrimp(entry.trimp) }))
     .sort((a, b) => a.day - b.day);
+}
+
+/** A gap longer than this between a workout's heart-rate samples is a pause; it counts for nothing (as in `splitWorkout`). */
+const MAX_WORKOUT_GAP_SEC = 120;
+
+export interface WorkoutStrain {
+  trimp: number;
+  /** 0..21, this workout on its own (as if it were the only effort of the day). */
+  strain: number;
+  /** Minutes in Edwards zones 1..5 (index 0 is zone 1). */
+  zoneMinutes: [number, number, number, number, number];
+  /** Minutes the heart-rate samples cover, pauses left out. */
+  coveredMinutes: number;
+}
+
+/**
+ * Strain of one workout from its own heart-rate samples: each sample counts until the next one, gaps over two minutes are
+ * pauses and count for nothing. Null when there is no stretch of consecutive samples to work from.
+ */
+export function workoutStrain(points: readonly { ts: number; hr: number | null }[], maxHr: number): WorkoutStrain | null {
+  const samples = points.filter((p) => p.hr !== null && p.hr > 0).sort((a, b) => a.ts - b.ts);
+  const result: WorkoutStrain = { trimp: 0, strain: 0, zoneMinutes: [0, 0, 0, 0, 0], coveredMinutes: 0 };
+  for (let i = 0; i + 1 < samples.length; i++) {
+    const dt = samples[i + 1].ts - samples[i].ts;
+    if (dt <= 0 || dt > MAX_WORKOUT_GAP_SEC) continue;
+    const minutes = dt / 60;
+    result.coveredMinutes += minutes;
+    const zone = edwardsZone(samples[i].hr as number, maxHr);
+    if (zone > 0) {
+      result.zoneMinutes[zone - 1] += minutes;
+      result.trimp += zone * minutes;
+    }
+  }
+  if (result.coveredMinutes <= 0) return null;
+  result.strain = strainFromTrimp(result.trimp);
+  return result;
+}
+
+export interface WorkoutDayShare {
+  /** The day's strain with the workout. */
+  dayStrain: number;
+  /** What the workout added to it: the day's strain with the workout minus the day's strain without. */
+  added: number;
+}
+
+/**
+ * What a workout added to its day's strain. The day without the workout is the day's stored per-minute heart rate with
+ * the workout's own minutes left out; the day with it adds the workout's TRIMP (from its heart-rate samples, which are
+ * denser than the per-minute ones) on top. Strain is a saturating curve, so the same workout adds less on a day that
+ * already carried load. `samples` must be oldest first and contain the day of `workout.start`.
+ */
+export function strainAddedToDay(
+  samples: readonly StepSample[],
+  workout: { start: number; end: number },
+  workoutTrimp: number,
+  maxHr: number,
+): WorkoutDayShare {
+  const day = startOfLocalDay(workout.start);
+  const outside = samples.filter((s) => s.timestamp < workout.start - 59 || s.timestamp > workout.end);
+  // A zone-0 reading at the start ends the coverage of the last reading before the workout, which would otherwise
+  // stretch across the workout's minutes (up to 10 min) and count them twice.
+  outside.push({ timestamp: workout.start, steps: 0, calories: 0, distance: 0, heartRate: 1, spo2: null, restingHeartRate: null });
+  outside.sort((a, b) => a.timestamp - b.timestamp);
+  const without = dailyStrain(outside, maxHr).find((d) => d.day === day)?.trimp ?? 0;
+  const dayStrain = strainFromTrimp(without + workoutTrimp);
+  return { dayStrain, added: dayStrain - strainFromTrimp(without) };
 }
