@@ -2176,7 +2176,10 @@ public class DeviceConfig {
 
                 // Bits like ext capabilities
                 //byte[] capabilities = {(byte) 0xFD, (byte) 0xF7, (byte)0x73, (byte)0x7A};
-                byte[] capabilities = {(byte) 0xFD, (byte) 0xF7, 0x33, (byte) 0xFA, 0x29, 0x37};
+                // JoyoFit: Huawei Health 17.0.8.300's own bitmap for this watch (sign-capture.log, ReverseCapabilityConfigUtil):
+                // GB's bits plus 22, 43 and 47..59. It makes the watch ask for config 900100007 (FeatureConfig.kt answers it).
+                // GB sent {FD, F7, 33, FA, 29, 37}.
+                byte[] capabilities = {(byte) 0xFD, (byte) 0xF7, 0x73, (byte) 0xFA, 0x29, (byte) 0xBF, (byte) 0xFF, 0x0F};
                 this.tlv = new HuaweiTLV()
                         .put(0x01, capabilities);
 

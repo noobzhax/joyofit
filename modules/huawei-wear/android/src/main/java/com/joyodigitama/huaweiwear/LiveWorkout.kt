@@ -152,6 +152,42 @@ internal class LiveWorkout(
     publish(force = false)
   }
 
+  /** The watch shows a workout is running (it asked for the phone's GPS) before any number arrived. */
+  fun workoutSeen() {
+    val created = synchronized(lock) {
+      if (session?.status.let { it == null || it == Status.ENDED }) {
+        session = newSession(null, Status.RUNNING)
+        true
+      } else {
+        false
+      }
+    }
+    if (created) {
+      log("Live workout: running on the watch (phone GPS asked)")
+      publish(force = true)
+    }
+  }
+
+  /** A `17/11` realtime report ([WorkoutReport]); operator type 1 running, 2 paused, 3 resumed, 4 stopped. */
+  fun onReport(report: WorkoutReport.Parsed) {
+    synchronized(lock) {
+      val current = session?.takeIf { it.status != Status.ENDED } ?: newSession(null, Status.RUNNING).also { session = it }
+      val metrics = report.apply(current.metrics)
+      current.metrics = metrics
+      current.updatedAtMs = System.currentTimeMillis()
+      current.estimator.update(metrics.calories, metrics.heartRate)
+      when (report.operatorType) {
+        1, 3 -> current.status = Status.RUNNING
+        2 -> current.status = Status.PAUSED
+        4 -> {
+          current.status = Status.ENDED
+          current.endedAtMs = current.updatedAtMs
+        }
+      }
+    }
+    publish(force = false)
+  }
+
   private fun newSession(workoutType: Int?, status: Status): Session {
     val birthYear = settings.profile?.birthYear?.takeIf { it > 0 }
     val age = birthYear?.let { ProfileSender.age(it, LocalDate.now()) } ?: DEFAULT_AGE

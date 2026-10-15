@@ -10,10 +10,10 @@ import { Metric } from '@/components/Metric';
 import { Card, Screen, Section } from '@/components/Screen';
 import { StatTile } from '@/components/StatTile';
 import { EmptyState } from '@/components/States';
+import { BurnFigure, FuelBar } from '@/features/live/FuelBar';
 import {
   distanceParts,
   elapsedSec,
-  formatGrams,
   heartZone,
   paceValue,
   prefersSpeed,
@@ -125,7 +125,7 @@ function LiveBody({ live }: { live: LiveWorkout }) {
             <Metric value={live.calories !== null ? formatCount(Math.round(live.calories)) : DASH} unit="kcal" size="md" />
           </View>
         </View>
-        <FuelBar fatShare={live.fatShare} />
+        <FuelBar fatShare={live.fatShare} lead="Right now" />
         <AppText variant="caption" muted>
           An estimate by JoyoFit, the watch does not measure it: each calorie is split by your heart rate at that moment, with a
           maximum of {live.maxHeartRate} bpm (220 minus your age from the profile). Easier effort burns a larger share of fat.
@@ -166,34 +166,6 @@ function LiveBody({ live }: { live: LiveWorkout }) {
   );
 }
 
-function BurnFigure({ label, grams, color }: { label: string; grams: number; color: string }) {
-  return (
-    <View style={styles.burnFigure} accessible accessibilityLabel={`${label} ${formatGrams(grams)} grams`}>
-      <AppText variant="label" color={color}>
-        {label}
-      </AppText>
-      <Metric value={formatGrams(grams)} unit="g" size="lg" color={color} unitColor={color} />
-    </View>
-  );
-}
-
-/** The fat and carbohydrate shares of the energy being burned right now. */
-function FuelBar({ fatShare }: { fatShare: number | null }) {
-  const colors = useColors();
-  if (fatShare === null) return null;
-  const fatPct = Math.round(fatShare * 100);
-  return (
-    <View style={styles.fuel}>
-      <View style={[styles.fuelTrack, { backgroundColor: colors.stepsSoft }]}>
-        <View style={[styles.fuelFat, { width: `${fatPct}%`, backgroundColor: colors.workouts }]} />
-      </View>
-      <AppText variant="caption" muted>
-        Right now {fatPct}% from fat, {100 - fatPct}% from carbs
-      </AppText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   headText: { flex: 1, gap: 2 },
@@ -204,8 +176,5 @@ const styles = StyleSheet.create({
   zone: { borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   burnRow: { flexDirection: 'row', gap: spacing.md },
   burnFigure: { flex: 1, gap: 2 },
-  fuel: { gap: spacing.xs },
-  fuelTrack: { height: 10, borderRadius: 5, overflow: 'hidden' },
-  fuelFat: { height: '100%' },
   tiles: { flexDirection: 'row', gap: spacing.md },
 });

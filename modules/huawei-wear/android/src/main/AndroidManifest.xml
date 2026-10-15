@@ -29,6 +29,8 @@
   <!-- Weather: Open-Meteo over HTTPS, and the phone's coarse location (LocationManager, no Google Play services). -->
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <!-- Workouts: the watch asks for the phone's GPS while it records (GpsAndTime 18/02); fixes need precise location. -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   <uses-feature android:name="android.hardware.location" android:required="false" />
   <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
 

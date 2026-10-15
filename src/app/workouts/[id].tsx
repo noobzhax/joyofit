@@ -16,9 +16,12 @@ import {
   type WorkoutPointRow,
   type WorkoutRow,
 } from '@/db/queries';
+import { BurnFigure, FuelBar } from '@/features/live/FuelBar';
+import { formatGrams } from '@/features/live/liveWorkout';
 import { HeartRateChart } from '@/features/workouts/HeartRateChart';
 import { RouteView } from '@/features/workouts/RouteView';
 import { sportIcon } from '@/features/workouts/sportIcon';
+import { DEFAULT_AGE, maxHeartRate, splitWorkout } from '@/features/workouts/substrate';
 import {
   formatElapsed,
   formatPace,
@@ -30,7 +33,8 @@ import {
   type WorkoutSummary,
 } from '@/features/workouts/summary';
 import { errorMessage, formatClock, formatCount, formatDateTime } from '@/format';
-import { radius, spacing } from '@/theme';
+import { radius, spacing, useColors } from '@/theme';
+import { HuaweiWear } from '@/wear';
 
 interface Loaded {
   workout: WorkoutRow;
@@ -96,6 +100,15 @@ export default function WorkoutDetailScreen() {
 
   const route = useMemo(() => (loaded ? routePoints(loaded.points) : []), [loaded]);
   const splits = useMemo(() => (loaded ? kmSplits(loaded.summary) : []), [loaded]);
+  const burn = useMemo(() => {
+    if (!loaded) return null;
+    const birthYear = HuaweiWear.getUserProfile()?.birthYear;
+    const age = birthYear ? new Date().getFullYear() - birthYear : DEFAULT_AGE;
+    const maxHr = maxHeartRate(age);
+    const split = splitWorkout(loaded.workout.calories, loaded.points, maxHr);
+    return split ? { ...split, maxHr } : null;
+  }, [loaded]);
+  const colors = useColors();
 
   if (!loaded) {
     return (
@@ -176,6 +189,28 @@ export default function WorkoutDetailScreen() {
           </View>
         ) : null}
       </Card>
+
+      {burn ? (
+        <Section title="Fat and carbs burned" icon="flame" tint="workouts">
+          <View style={styles.tiles}>
+            <BurnFigure label="Fat" grams={burn.fatGrams} color={colors.workoutsText} />
+            <BurnFigure label="Carbs" grams={burn.carbGrams} color={colors.stepsText} />
+          </View>
+          <FuelBar fatShare={burn.fatShare} lead="Overall" />
+          {burn.zones.map((z) => (
+            <KeyValue
+              key={z.zone}
+              label={z.zone === 0 ? `${z.label} · ${formatElapsed(z.seconds)}` : `Zone ${z.zone} ${z.label} · ${formatElapsed(z.seconds)}`}
+              value={`fat ${formatGrams(z.fatGrams)} g, carbs ${formatGrams(z.carbGrams)} g`}
+            />
+          ))}
+          <AppText variant="caption" muted>
+            An estimate by JoyoFit, the watch does not measure it: the {formatCount(workout.calories)} kcal are split over the
+            time you actually spent at each heart rate, with a maximum of {burn.maxHr} bpm (220 minus your age from the
+            profile). Easier effort burns a larger share of fat.
+          </AppText>
+        </Section>
+      ) : null}
 
       <Section title="Details" icon="list">
         <KeyValue

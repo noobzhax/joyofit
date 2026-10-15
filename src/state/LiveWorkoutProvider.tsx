@@ -1,7 +1,7 @@
 import { useEventListener } from 'expo';
 import { useRootNavigationState, useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, PermissionsAndroid } from 'react-native';
 
 import { isActive } from '@/features/live/liveWorkout';
 import { HuaweiWear, type LiveWorkout } from '@/wear';
@@ -37,6 +37,14 @@ export function LiveWorkoutProvider({ children }: { children: ReactNode }) {
       if (state === 'active') setLive(HuaweiWear.getLiveWorkout());
     });
     return () => subscription.remove();
+  }, []);
+
+  // The watch asks for the phone's GPS during outdoor workouts; that needs precise location.
+  useEffect(() => {
+    const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    void PermissionsAndroid.check(fine).then((granted) => {
+      if (!granted) return PermissionsAndroid.request(fine);
+    });
   }, []);
 
   const activeId = isActive(live) ? live.id : null;
