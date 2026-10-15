@@ -756,16 +756,6 @@ function Options() {
               </li>
             ))}
           </ol>
-          <p className="mt-6 rounded-2xl bg-muted p-4 text-[0.9375rem] leading-relaxed text-muted-foreground">
-            <span className="font-bold text-foreground">Catatan jujur.</span> Worker ini dibuat dan
-            diuji untuk Cloudflare Workers. Langkah CloudAgni di atas mengikuti dokumentasi CloudAgni
-            dan belum kami uji dari ujung ke ujung. Panduan lengkap Worker ada di{" "}
-            <a className="font-semibold text-primary hover:underline" href={`${GITHUB_URL}/blob/expo-gadgetbridge/server/README.md`}>
-              server/README.md
-            </a>
-            , dan JoyoRogo perlu mempercayai skema <Code>joyofit://</Code> (lihat{" "}
-            <Code>JOYOROGO_PATCH.md</Code>).
-          </p>
         </div>
       </div>
     </section>
