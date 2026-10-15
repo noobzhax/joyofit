@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import {
   AlarmClock,
+  ArrowLeft,
   Bell,
   BellRing,
   Bluetooth,
@@ -159,13 +161,13 @@ function Header() {
           <span className="text-lg font-extrabold tracking-tight">JoyoFit</span>
         </a>
         <nav aria-label="Utama" className="hidden items-center gap-1 md:flex">
-          <a href="#fitur" className={link}>
+          <a href="/#fitur" className={link}>
             Fitur
           </a>
-          <a href="#cara" className={link}>
+          <a href="/#cara" className={link}>
             Tiga cara pakai
           </a>
-          <a href="#faq" className={link}>
+          <a href="/#faq" className={link}>
             Tanya jawab
           </a>
           <a href={JOYOROGO_URL} className={link}>
@@ -183,7 +185,7 @@ function Header() {
             <GithubMark className="size-5" />
             <span className="hidden sm:inline">GitHub</span>
           </a>
-          <ButtonLink href="#cara">Mulai</ButtonLink>
+          <ButtonLink href="/#cara">Mulai</ButtonLink>
         </div>
       </div>
     </header>
@@ -206,7 +208,7 @@ function Footer() {
           </p>
         </div>
         <nav aria-label="Tautan" className="flex flex-wrap gap-x-6 gap-y-1 text-sm font-semibold">
-          <a href="#cara" className={link}>
+          <a href="/#cara" className={link}>
             Tiga cara pakai
           </a>
           <a href={HARGA_URL} className={link}>
@@ -650,7 +652,7 @@ function Options() {
               ))}
             </ul>
             <div className="mt-auto pt-6">
-              <ButtonLink variant="secondary" className="w-full" href="#self-host">
+              <ButtonLink variant="secondary" className="w-full" href={SELF_HOST_PATH}>
                 <Server aria-hidden />
                 Lihat langkahnya
               </ButtonLink>
@@ -693,70 +695,6 @@ function Options() {
           </section>
         </div>
 
-        {/* Self-host steps */}
-        <div id="self-host" className="mt-4 scroll-mt-20 rounded-[1.75rem] bg-card p-6 md:p-8">
-          <div className="flex gap-4">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-foreground">
-              <Cloud className="size-6" aria-hidden />
-            </span>
-            <div>
-              <h3 className="text-xl font-extrabold tracking-tight md:text-2xl">
-                Pasang cloud JoyoFit di CloudAgni
-              </h3>
-              <p className="mt-1 max-w-2xl text-[0.9375rem] leading-relaxed text-muted-foreground">
-                Cloud JoyoFit adalah satu Cloudflare Worker (Hono) dengan database D1 dan bucket R2.
-                CloudAgni menjalankan Worker semacam itu dan membuatkan D1 dan R2 dari konfigurasinya.
-              </p>
-            </div>
-          </div>
-          <ol className="mt-8 grid gap-6 md:grid-cols-2">
-            {[
-              [
-                "Ambil kodenya",
-                <>
-                  Klon <Code>github.com/dzulfikar08/watch-fit</Code> dan masuk ke folder{" "}
-                  <Code>server/</Code>. Konfigurasinya ada di <Code>wrangler.jsonc</Code>: Worker{" "}
-                  <Code>joyofit-api</Code>, D1 <Code>DB</Code> (<Code>joyofit</Code>), R2{" "}
-                  <Code>IMPORTS</Code> (<Code>joyofit-imports</Code>).
-                </>,
-              ],
-              [
-                "Siapkan database",
-                <>
-                  Skema D1 ada di <Code>migrations/</Code> dan ikut dipasang saat deploy. Ganti{" "}
-                  <Code>database_id</Code> dengan milikmu bila deploy memakai Wrangler.
-                </>,
-              ],
-              [
-                "Kirim ke CloudAgni",
-                <>
-                  Login ke <a className="font-semibold text-primary hover:underline" href={CLOUDAGNI_URL}>CloudAgni</a>, lalu
-                  jalankan <Code>agni publish ./</Code> dari <Code>server/</Code>. Pack CloudAgni
-                  memakai skrip <Code>build</Code> di <Code>package.json</Code>, jadi tambahkan satu
-                  yang sederhana bila belum ada.
-                </>,
-              ],
-              [
-                "Isi variabel, lalu arahkan aplikasi",
-                <>
-                  Biarkan <Code>JOYOROGO_AUTH_URL</Code> di <Code>https://api.joyorogo.com</Code>
-                  (login tetap lewat akun JoyoRogo). Bangun APK dengan{" "}
-                  <Code>EXPO_PUBLIC_JOYOFIT_CLOUD_URL=https://alamat-workermu</Code>.
-                </>,
-              ],
-            ].map(([title, body], i) => (
-              <li key={title as string} className="flex gap-4">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground tabular-nums">
-                  {i + 1}
-                </span>
-                <div>
-                  <p className="font-bold">{title as string}</p>
-                  <p className="mt-0.5 text-[0.9375rem] leading-relaxed text-muted-foreground">{body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
       </div>
     </section>
   );
@@ -849,23 +787,136 @@ function Closing() {
   );
 }
 
+const SELF_HOST_PATH = "/self-host";
+
+const SELF_HOST_META = {
+  title: "Pasang cloud JoyoFit di CloudAgni sendiri",
+  description:
+    "Panduan memasang server cloud JoyoFit (Cloudflare Worker, D1, R2) di CloudAgni. Datamu tetap di akunmu sendiri.",
+};
+
+function setMeta(selector: string, attr: string, value: string) {
+  document.head.querySelector(selector)?.setAttribute(attr, value);
+}
+
+function SelfHostPage() {
+  useEffect(() => {
+    const { title, description } = SELF_HOST_META;
+    const url = `https://fit.joyorogo.com${SELF_HOST_PATH}`;
+    document.title = `${title} | JoyoFit`;
+    setMeta('meta[name="description"]', "content", description);
+    setMeta('link[rel="canonical"]', "href", url);
+    setMeta('meta[property="og:url"]', "content", url);
+    setMeta('meta[property="og:title"]', "content", title);
+    setMeta('meta[property="og:description"]', "content", description);
+    setMeta('meta[name="twitter:title"]', "content", title);
+    setMeta('meta[name="twitter:description"]', "content", description);
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <section data-section="self-host" className="py-12 md:py-16">
+      <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+        <a
+          href="/#cara"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          Kembali ke tiga cara pakai
+        </a>
+        <div className="mt-4 rounded-[1.75rem] bg-card p-6 md:p-8">
+          <div className="flex gap-4">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-foreground">
+              <Cloud className="size-6" aria-hidden />
+            </span>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight md:text-4xl">
+                Pasang cloud JoyoFit di CloudAgni
+              </h1>
+              <p className="mt-1 max-w-2xl text-[0.9375rem] leading-relaxed text-muted-foreground">
+                Cloud JoyoFit adalah satu Cloudflare Worker (Hono) dengan database D1 dan bucket R2.
+                CloudAgni menjalankan Worker semacam itu dan membuatkan D1 dan R2 dari konfigurasinya.
+              </p>
+            </div>
+          </div>
+          <ol className="mt-8 grid gap-6 md:grid-cols-2">
+            {[
+              [
+                "Ambil kodenya",
+                <>
+                  Klon <Code>github.com/dzulfikar08/watch-fit</Code> dan masuk ke folder{" "}
+                  <Code>server/</Code>. Konfigurasinya ada di <Code>wrangler.jsonc</Code>: Worker{" "}
+                  <Code>joyofit-api</Code>, D1 <Code>DB</Code> (<Code>joyofit</Code>), R2{" "}
+                  <Code>IMPORTS</Code> (<Code>joyofit-imports</Code>).
+                </>,
+              ],
+              [
+                "Siapkan database",
+                <>
+                  Skema D1 ada di <Code>migrations/</Code> dan ikut dipasang saat deploy. Ganti{" "}
+                  <Code>database_id</Code> dengan milikmu bila deploy memakai Wrangler.
+                </>,
+              ],
+              [
+                "Kirim ke CloudAgni",
+                <>
+                  Login ke <a className="font-semibold text-primary hover:underline" href={CLOUDAGNI_URL}>CloudAgni</a>, lalu
+                  jalankan <Code>agni publish ./</Code> dari <Code>server/</Code>. Pack CloudAgni
+                  memakai skrip <Code>build</Code> di <Code>package.json</Code>, jadi tambahkan satu
+                  yang sederhana bila belum ada.
+                </>,
+              ],
+              [
+                "Isi variabel, lalu arahkan aplikasi",
+                <>
+                  Biarkan <Code>JOYOROGO_AUTH_URL</Code> di <Code>https://api.joyorogo.com</Code>
+                  (login tetap lewat akun JoyoRogo). Bangun APK dengan{" "}
+                  <Code>EXPO_PUBLIC_JOYOFIT_CLOUD_URL=https://alamat-workermu</Code>.
+                </>,
+              ],
+            ].map(([title, body], i) => (
+              <li key={title as string} className="flex gap-4">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground tabular-nums">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="font-bold">{title as string}</p>
+                  <p className="mt-0.5 text-[0.9375rem] leading-relaxed text-muted-foreground">{body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function App() {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  const selfHost = path === SELF_HOST_PATH;
   return (
     <div className="min-h-svh">
       <Header />
       <main>
-        <Hero />
-        <Facts />
-        <Basics />
-        <SleepSection />
-        <Workouts />
-        <Features />
-        <WatchSection />
-        <Promises />
-        <Options />
-        <Faq />
-        <OpenSource />
-        <Closing />
+        {selfHost ? (
+          <SelfHostPage />
+        ) : (
+          <>
+            <Hero />
+            <Facts />
+            <Basics />
+            <SleepSection />
+            <Workouts />
+            <Features />
+            <WatchSection />
+            <Promises />
+            <Options />
+            <Faq />
+            <OpenSource />
+            <Closing />
+          </>
+        )}
       </main>
       <Footer />
     </div>
